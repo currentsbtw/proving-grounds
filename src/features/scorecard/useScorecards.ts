@@ -69,16 +69,28 @@ export interface ScoredRun {
 }
 
 /**
- * One run's scorecard. `undefined` while loading, `null` when the run is no
- * longer in the database (the caller should drop its selection).
+ * A scorecard lookup, stamped with the run id it answers for. `useLiveQuery`
+ * keeps handing back the previous subscription's value while a new one loads,
+ * so without the stamp a caller switching from "no run" to a run would briefly
+ * see `null` and mistake it for a deleted run.
  */
-export function useScorecard(runId: string | null): ScoredRun | null | undefined {
-  return useLiveQuery(async () => {
-    if (!runId) return null;
+export interface ScoredLookup {
+  runId: string | null;
+  /** `null` when the run is no longer in the database. */
+  scored: ScoredRun | null;
+}
+
+/**
+ * One run's scorecard. `undefined` while loading — callers must also treat a
+ * result whose `runId` differs from the one they asked for as still loading.
+ */
+export function useScorecard(runId: string | null): ScoredLookup | undefined {
+  return useLiveQuery(async (): Promise<ScoredLookup> => {
+    if (!runId) return { runId, scored: null };
     const run = await db.runs.get(runId);
-    if (!run) return null;
+    if (!run) return { runId, scored: null };
     const facts = await factsForLegacy([run]);
-    return { run, card: scoreCached(run, facts) };
+    return { runId, scored: { run, card: scoreCached(run, facts) } };
   }, [runId]);
 }
 

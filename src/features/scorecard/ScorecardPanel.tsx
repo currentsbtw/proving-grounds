@@ -426,8 +426,14 @@ export default function ScorecardPanel() {
   const selectRun = useUiStore((s) => s.selectRun);
   const setCompare = useUiStore((s) => s.setCompare);
 
-  const selected = useScorecard(selectedRunId);
-  const compared = useScorecard(compareRunId);
+  // A lookup answering for a different run id than the one asked for is the
+  // hook's stale previous value — still loading, not "deleted".
+  const selectedLookup = useScorecard(selectedRunId);
+  const comparedLookup = useScorecard(compareRunId);
+  const selected =
+    selectedLookup && selectedLookup.runId === selectedRunId ? selectedLookup.scored : undefined;
+  const compared =
+    comparedLookup && comparedLookup.runId === compareRunId ? comparedLookup.scored : undefined;
   const deckId = selected?.run.deckId ?? null;
   const deckRuns = useDeckScorecards(deckId);
   const deck = useLiveQuery(
