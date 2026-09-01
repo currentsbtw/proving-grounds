@@ -12,6 +12,8 @@ import { useCallback, useMemo, useState } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
 import { byArrival, canMulligan, commanderTax, useGameStore } from '../../state/gameStore';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
+import CounterTell from '../pressure/CounterTell';
+import PressureLayer from '../pressure/PressureLayer';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
 import { CardMenuProvider } from './CardMenu';
@@ -166,6 +168,8 @@ function TableSurface() {
         className={`pg-table tbl-root${activeId ? ' tbl-dragging' : ''}`}
         aria-label="Table"
       >
+        <PressureLayer />
+
         <Battlefield cards={zones.battlefield} />
 
         <div className="tbl-strip">
@@ -184,6 +188,7 @@ function TableSurface() {
             <div className="tbl-hand-head">
               <span>Hand</span>
               <span className="tbl-hand-n">{zones.hand.length}</span>
+              <CounterTell />
               <span className="tbl-mull-spacer" />
               <span className="muted tbl-hand-tip">
                 double-click to play · drag to any zone · right-click for options

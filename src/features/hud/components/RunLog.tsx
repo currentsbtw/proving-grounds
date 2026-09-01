@@ -12,6 +12,32 @@ function isFlow(kind: LogKind): boolean {
   return kind === 'phase' || kind === 'turn';
 }
 
+/**
+ * The pressure event class an entry belongs to, so 'event' and 'respond' rows
+ * carry the same colour the dock used. Windows and threat notes have no type.
+ */
+function eventClassOf(entry: LogEntry): string {
+  const type = entry.payload.eventType;
+  return typeof type === 'string' ? ` evt-${type}` : '';
+}
+
+/**
+ * An opponent window renders as a separator rather than a line of prose: a rule
+ * across the log with the turn it precedes, then the engine's summary beneath.
+ */
+function WindowSeparator({ entry }: { entry: LogEntry }) {
+  const before = entry.payload.windowBeforeTurn;
+  const turn = typeof before === 'number' ? before : entry.turn + 1;
+  return (
+    <div className="hud-log-window">
+      <div className="hud-log-window-rule">
+        <span>OPPONENT WINDOW → TURN {turn}</span>
+      </div>
+      <div className="hud-log-window-sum">{entry.message}</div>
+    </div>
+  );
+}
+
 /** Live run log: newest at the bottom, chat-style auto-scroll, plus a note input. */
 export default function RunLog() {
   const log = useGameStore((s) => s.run?.log) ?? EMPTY;
@@ -82,6 +108,7 @@ export default function RunLog() {
           <p className="hud-log-empty">No entries yet.</p>
         ) : (
           log.map((entry, i) => {
+            if (entry.kind === 'window') return <WindowSeparator key={entry.seq} entry={entry} />;
             const flow = isFlow(entry.kind);
             const collapsed = flow && i > 0 && isFlow(log[i - 1].kind);
             return (
@@ -89,6 +116,7 @@ export default function RunLog() {
                 key={entry.seq}
                 className={
                   `hud-log-row kind-${entry.kind}` +
+                  eventClassOf(entry) +
                   (flow ? ' is-flow' : '') +
                   (collapsed ? ' is-collapsed' : '')
                 }

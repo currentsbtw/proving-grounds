@@ -233,6 +233,122 @@
   padding: 3px 4px;
 }
 
+/* Threat meter ----------------------------------------------------------- */
+
+.hud-threat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.hud-threat-prefix {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hud-threat-bar {
+  display: flex;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hud-threat-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.hud-life-card.is-you .hud-threat-seg {
+  background: var(--surface);
+}
+
+.hud-threat.is-low .hud-threat-seg.is-on {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+.hud-threat.is-mid .hud-threat-seg.is-on {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.hud-threat.is-high .hud-threat-seg.is-on {
+  background: var(--danger);
+  box-shadow: none;
+}
+
+.hud-threat-num {
+  flex: none;
+  min-width: 14px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hud-threat.is-mid .hud-threat-num {
+  color: var(--accent);
+}
+
+.hud-threat.is-high .hud-threat-num {
+  color: var(--danger);
+}
+
+.hud-threat-max {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+/* Silhouette row --------------------------------------------------------- */
+
+.hud-sil {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.hud-sil.is-dead {
+  color: var(--muted);
+  letter-spacing: 0.2em;
+}
+
+.hud-sil-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Dimmed, never hidden — the row must not change height as a board grows. */
+.hud-sil-cell.is-zero {
+  opacity: 0.38;
+}
+
+.hud-sil-sub {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.hud-sil-dot {
+  color: var(--line);
+}
+
+.hud-sil .pgp-glyph {
+  flex: none;
+  color: var(--muted);
+  vertical-align: -1px;
+}
+
 .hud-cmdr-row {
   display: flex;
   align-items: center;
@@ -391,6 +507,79 @@
 .hud-log-row.kind-note .hud-log-msg {
   font-style: italic;
   color: var(--ink);
+}
+
+/* Pressure entries ------------------------------------------------------- */
+
+/* Opponent windows read as chapter breaks, not as another line of prose. */
+.hud-log-window {
+  margin: 7px 0 4px;
+}
+
+.hud-log-window-rule {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hud-log-window-rule::before,
+.hud-log-window-rule::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.hud-log-window-rule::before {
+  flex-grow: 0;
+  width: 10px;
+}
+
+.hud-log-window-sum {
+  margin-top: 2px;
+  padding-left: 18px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.hud-log-row.kind-threat .hud-log-msg {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* Default for a response that answered no typed event (a declared interaction);
+   the event-class colours below take over when the entry carries a type. */
+.hud-log-row.kind-respond .hud-log-msg {
+  color: var(--ok);
+}
+
+/* Event class colours, matching the dock stripe. */
+.hud-log-row.evt-wipe .hud-log-msg {
+  color: var(--mana-w);
+}
+
+.hud-log-row.evt-removal .hud-log-msg,
+.hud-log-row.evt-resource .hud-log-msg {
+  color: var(--mana-b);
+}
+
+.hud-log-row.evt-counter .hud-log-msg {
+  color: var(--mana-u);
+}
+
+.hud-log-row.evt-combat .hud-log-msg {
+  color: var(--mana-r);
+}
+
+.hud-log-row.evt-clock .hud-log-msg {
+  color: var(--mana-g);
 }
 
 .hud-log-row.is-flow {

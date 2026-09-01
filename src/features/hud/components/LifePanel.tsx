@@ -1,8 +1,99 @@
-import { LETHAL_COMMANDER_DAMAGE, useGameStore } from '../../../state/gameStore';
+import { currentPlayerThreat, LETHAL_COMMANDER_DAMAGE, useGameStore } from '../../../state/gameStore';
 import type { LifeTarget } from '../../../state/gameStore';
-import type { Seat } from '../../../domain/types';
+import type { Seat, Silhouette } from '../../../domain/types';
+import { SilhouetteIcon } from '../../pressure/pressureUi';
 
 const LIFE_STEPS: number[] = [-5, -1, 1, 5];
+
+/** Segments in a threat meter — the engine's threat scale is 0–10. */
+const THREAT_SEGMENTS = 10;
+
+/** Colour band for a threat reading: quiet, dangerous, lethal. */
+function threatTone(filled: number): string {
+  if (filled >= 7) return 'is-high';
+  if (filled >= 4) return 'is-mid';
+  return 'is-low';
+}
+
+interface ThreatMeterProps {
+  /** Raw 0–10 threat; displayed rounded. */
+  value: number;
+  label: string;
+  /** The player's own meter is prefixed rather than bare. */
+  prefix?: string;
+}
+
+/** A ten-segment bar plus the number, so the meter reads at a glance and exactly. */
+function ThreatMeter({ value, label, prefix }: ThreatMeterProps) {
+  const filled = Math.max(0, Math.min(THREAT_SEGMENTS, Math.round(value)));
+  const tone = threatTone(filled);
+
+  return (
+    <div
+      className={'hud-threat ' + tone}
+      role="img"
+      aria-label={`${label}: threat ${filled} of ${THREAT_SEGMENTS}`}
+    >
+      {prefix && <span className="hud-threat-prefix">{prefix}</span>}
+      <span className="hud-threat-bar" aria-hidden="true">
+        {Array.from({ length: THREAT_SEGMENTS }, (_, i) => (
+          <span key={i} className={'hud-threat-seg' + (i < filled ? ' is-on' : '')} />
+        ))}
+      </span>
+      <span className="hud-threat-num num">
+        {filled}
+        {prefix && <span className="hud-threat-max">/{THREAT_SEGMENTS}</span>}
+      </span>
+    </div>
+  );
+}
+
+/** The abstract board a seat is presenting. Zeroes stay visible, just dimmed. */
+function SilhouetteRow({ silhouette, dead }: { silhouette: Silhouette; dead: boolean }) {
+  if (dead) {
+    return (
+      <div className="hud-sil is-dead" aria-label="No board — seat eliminated">
+        —
+      </div>
+    );
+  }
+
+  const { creatures, power, artifacts, openMana } = silhouette;
+
+  return (
+    <div className="hud-sil">
+      <span
+        className={'hud-sil-cell' + (creatures === 0 ? ' is-zero' : '')}
+        title={`${creatures} creature(s), ${power} total power`}
+      >
+        <SilhouetteIcon kind="creatures" />
+        <span className="num">{creatures}</span>
+        <span className="hud-sil-sub num">({power} power)</span>
+      </span>
+      <span className="hud-sil-dot" aria-hidden="true">
+        ·
+      </span>
+      <span
+        className={'hud-sil-cell' + (artifacts === 0 ? ' is-zero' : '')}
+        title={`${artifacts} rocks / artifacts`}
+      >
+        <SilhouetteIcon kind="artifacts" />
+        <span className="num">{artifacts}</span>
+      </span>
+      <span className="hud-sil-dot" aria-hidden="true">
+        ·
+      </span>
+      <span
+        className={'hud-sil-cell' + (openMana === 0 ? ' is-zero' : '')}
+        title={`${openMana} open mana`}
+      >
+        <SilhouetteIcon kind="mana" />
+        <span className="num">{openMana}</span>
+        <span className="hud-sil-sub">open</span>
+      </span>
+    </div>
+  );
+}
 
 function lifeToneClass(life: number): string {
   if (life >= 40) return ' is-high';
@@ -41,6 +132,8 @@ function LifeButtons({ target, disabled }: LifeButtonsProps) {
 
 function PlayerCard() {
   const life = useGameStore((s) => s.playerLife);
+  // Live, not the value the pod judged at the last window — that one is on the log.
+  const threat = useGameStore(currentPlayerThreat);
   return (
     <div className="hud-life-card is-you">
       <div className="hud-life-row">
@@ -48,6 +141,7 @@ function PlayerCard() {
         <span className={'hud-life-total num' + lifeToneClass(life)}>{life}</span>
         <LifeButtons target="player" />
       </div>
+      <ThreatMeter value={threat} label="Your threat" prefix="YOUR THREAT" />
     </div>
   );
 }
@@ -65,6 +159,9 @@ function SeatCard({ seat }: { seat: Seat }) {
         <span className={'hud-life-total num' + lifeToneClass(seat.life)}>{seat.life}</span>
         <LifeButtons target={seat.id} disabled={dead} />
       </div>
+
+      <ThreatMeter value={dead ? 0 : seat.threat} label={`Seat ${seat.id}`} />
+      <SilhouetteRow silhouette={seat.silhouette} dead={dead} />
 
       <div className="hud-cmdr-row">
         <span className="hud-cmdr-label">CMDR</span>

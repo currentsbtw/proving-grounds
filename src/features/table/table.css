@@ -4,8 +4,15 @@
   padding: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* pressure layer · battlefield · bottom strip */
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
+}
+
+/* The pressure dock is docked here rather than floated, so it can never sit on
+   top of a card the player needs to reach. */
+.pg-table.tbl-root > .pgp-layer:not(:empty) {
+  padding: 10px 12px 0;
 }
 
 /* Empty state ------------------------------------------------------------ */
