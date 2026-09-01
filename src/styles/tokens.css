@@ -1,0 +1,34 @@
+:root {
+  /* Surfaces */
+  --ground: #17181c;
+  --surface: #1f2127;
+  --raised: #262932;
+  --line: #33353c;
+
+  /* Text */
+  --ink: #e8e6e1;
+  --muted: #a0a3aa;
+
+  /* Signals */
+  --accent: #c9a85c;
+  --danger: #e58a76;
+  --ok: #8fc49e;
+
+  /* Mana chips */
+  --mana-w: #e5d9a5;
+  --mana-u: #8fc1e8;
+  --mana-b: #bba9c9;
+  --mana-r: #e58a76;
+  --mana-g: #8fc49e;
+
+  /* Type */
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Marcellus', Georgia, 'Times New Roman', serif;
+
+  /* Layout */
+  --rail-left: 280px;
+  --rail-right: 320px;
+  --titlebar-h: 52px;
+  --radius: 6px;
+  --gap: 12px;
+}
