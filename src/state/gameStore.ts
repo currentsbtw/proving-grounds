@@ -31,6 +31,7 @@ import type {
   LogKind,
   Phase,
   PressureEvent,
+  RosterEntry,
   RunRecord,
   RunResult,
   Seat,
@@ -817,18 +818,35 @@ export const useGameStore = create<GameState>((set, get) => {
 
       const cards: Record<string, CardInstance> = {};
       const libraryOrder: string[] = [];
+      // Frozen card facts for the scorer. Written here rather than read back off
+      // the card cache at scoring time so a run stays scorable forever, even if
+      // the deck is edited or the cached Scryfall rows are evicted.
+      const roster: Record<string, RosterEntry> = {};
       let stamp = 0;
+
+      function enroll(inst: CardInstance, scryfallId: string, isCommander: boolean): void {
+        const data = cardData[scryfallId];
+        roster[inst.iid] = {
+          scryfallId,
+          name: data?.name ?? 'Unknown card',
+          manaValue: data?.manaValue ?? 0,
+          typeLine: data?.typeLine ?? '',
+          isCommander,
+        };
+      }
 
       for (const ref of deck.cards) {
         for (let i = 0; i < ref.qty; i++) {
           const inst = makeInstance(ref.scryfallId, 'library', false, ++stamp);
           cards[inst.iid] = inst;
           libraryOrder.push(inst.iid);
+          enroll(inst, ref.scryfallId, false);
         }
       }
       for (const commanderId of deck.commanderIds) {
         const inst = makeInstance(commanderId, 'command', true, ++stamp);
         cards[inst.iid] = inst;
+        enroll(inst, commanderId, true);
       }
 
       shuffleInPlace(libraryOrder, rng);
@@ -842,6 +860,7 @@ export const useGameStore = create<GameState>((set, get) => {
         seed: runSeed,
         bracket: deck.bracket,
         startedAt: Date.now(),
+        roster,
         log: [],
       };
 
@@ -1591,9 +1610,18 @@ export const useGameStore = create<GameState>((set, get) => {
             performMove(iid, 'graveyard');
             detail = ` — ${mode === 'discard' ? 'discarded' : 'sacrificed'} ${name}`;
           } else {
-            // The 'tax' variant has no bookkeeping — acknowledging it is enough.
-            outcome.mode = event.variant ?? 'tax';
-            outcome.acknowledged = true;
+            const mode = event.variant ?? 'tax';
+            outcome.mode = mode;
+            if (mode === 'discard' || mode === 'sacrifice') {
+              // No card came with the resolution: the player had nothing to give.
+              // Say so on the entry, otherwise the log reads as an unexplained
+              // no-op and the scorer cannot tell a whiff from a mis-click.
+              outcome.noTarget = true;
+              detail = mode === 'discard' ? ' — nothing to discard' : ' — nothing to sacrifice';
+            } else {
+              // The 'tax' variant has no bookkeeping — acknowledging it is enough.
+              outcome.acknowledged = true;
+            }
           }
           break;
         }

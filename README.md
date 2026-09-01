@@ -40,6 +40,8 @@ npm run dev     # start the dev server
 npm run build   # typecheck and produce a production build
 npm run preview # serve the production build
 npm run lint    # oxlint
+
+npm run verify:scorecard  # drive the store headlessly and check the scoring engine
 ```
 
 ## Fan content notice

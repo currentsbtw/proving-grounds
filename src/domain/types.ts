@@ -169,6 +169,15 @@ export interface Deck {
 
 export type RunResult = 'win' | 'loss' | 'concede' | 'abandoned';
 
+/** Card facts frozen at run start so a persisted run scores without the card cache. */
+export interface RosterEntry {
+  scryfallId: string | null;
+  name: string;
+  manaValue: number;
+  typeLine: string;
+  isCommander: boolean;
+}
+
 export interface RunRecord {
   id: string;
   deckId: string;
@@ -178,6 +187,14 @@ export interface RunRecord {
   startedAt: number;
   endedAt?: number;
   result?: RunResult;
+  /**
+   * Every non-token instance the run started with, keyed by iid. The log records
+   * movements by iid and display name only, so without this a persisted run
+   * cannot be scored for board value once the Scryfall cache has moved on.
+   * Optional because runs persisted before M2 lack it — the scorer falls back to
+   * resolving facts by name and marks the scorecard `partial`.
+   */
+  roster?: Record<string, RosterEntry>;
   log: LogEntry[];
 }
 
