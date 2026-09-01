@@ -632,8 +632,11 @@ export const useGameStore = create<GameState>((set, get) => {
 
   /**
    * An armed seat catches a spell on its way to the battlefield. The card stays
-   * in hand until the player says what happened: `resolveActiveEvent` bins it,
-   * `respondToActiveEvent` forces it through.
+   * where it was cast from — hand for a normal spell, the command zone for a
+   * commander — until the player says what happened: `resolveActiveEvent` bins
+   * it (or returns a commander to the command zone), `respondToActiveEvent`
+   * forces it through. Consumes no rng, so a seed replays identically whether
+   * or not the player happened to cast into an armed seat.
    */
   function raiseCounterEvent(iid: string, armed: CounterArmed): void {
     const state = get();
@@ -648,6 +651,7 @@ export const useGameStore = create<GameState>((set, get) => {
       cardName(state, iid),
       armed.threshold,
       manaValue,
+      card.isCommander,
     );
 
     // A counter is about the spell you just cast, so it jumps the queue; the
@@ -1055,6 +1059,33 @@ export const useGameStore = create<GameState>((set, get) => {
       const tax = commanderTax(state, key);
       const priorCasts = state.commanderCasts[key] ?? 0;
 
+      // Commanders are counterable like anything else. The threshold compares
+      // the printed mana value — commander tax is paid on top of the cost, it
+      // does not make the spell bigger.
+      const armed = state.counterArmed;
+      if (armed && manaValueOf(state, card) >= armed.threshold) {
+        // The cast still happened, so the tax still accrues: the commander is
+        // on the stack when it gets answered, and comes back more expensive.
+        set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
+        appendLog(
+          'commander',
+          `Cast ${name} (cast #${priorCasts + 1}, tax +${tax}) — met by a counter`,
+          {
+            iid,
+            name,
+            scryfallId: key,
+            castNumber: priorCasts + 1,
+            taxPaid: tax,
+            nextTax: 2 * (priorCasts + 1),
+            from: card.zone,
+            to: 'stack',
+            countered: true,
+          },
+        );
+        raiseCounterEvent(iid, armed);
+        return;
+      }
+
       set((s) => ({
         cards: {
           ...s.cards,
@@ -1430,10 +1461,11 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!state.run || !event) return;
 
       // A countered spell you force through actually resolves — the card
-      // finishes the trip to the battlefield the interception interrupted.
+      // finishes the trip to the battlefield the interception interrupted,
+      // whether it was cast from hand or off the command zone.
       if (event.type === 'counter' && event.targetIid) {
         const held = state.cards[event.targetIid];
-        if (held && held.zone === 'hand') performMove(event.targetIid, 'battlefield');
+        if (held && held.zone !== 'battlefield') performMove(event.targetIid, 'battlefield');
       }
 
       const answered: PressureEvent = { ...event, state: 'negated' };
@@ -1453,6 +1485,8 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!state.run || !event) return;
 
       const outcome: Record<string, unknown> = {};
+      /** Appended to the log message when the outcome needs naming. */
+      let detail = '';
 
       switch (event.type) {
         case 'wipe': {
@@ -1479,13 +1513,41 @@ export const useGameStore = create<GameState>((set, get) => {
         }
 
         case 'counter': {
-          // The held spell never resolved: it goes from hand to the graveyard.
           const iid = payload?.targetIid ?? event.targetIid;
           const card = iid ? state.cards[iid] : undefined;
-          if (iid && card && card.zone !== 'graveyard') {
+          if (iid && card) {
+            const name = cardName(state, iid);
             outcome.counteredIid = iid;
-            outcome.counteredName = cardName(state, iid);
-            performMove(iid, 'graveyard');
+            outcome.counteredName = name;
+            outcome.commander = card.isCommander ? 1 : 0;
+
+            if (card.isCommander) {
+              // A countered commander never sees the graveyard — it goes back
+              // to the command zone. The tax it accrued on the way stays paid,
+              // so the next attempt costs more.
+              const nextTax = card.scryfallId ? commanderTax(state, card.scryfallId) : 0;
+              outcome.returnedTo = 'command';
+              outcome.nextTax = nextTax;
+              if (card.zone !== 'command') performMove(iid, 'command');
+              appendLog(
+                'commander',
+                `${name} countered — returned to command zone (next cast tax ${nextTax})`,
+                {
+                  iid,
+                  name,
+                  scryfallId: card.scryfallId,
+                  countered: true,
+                  from: card.zone,
+                  to: 'command',
+                  nextTax,
+                },
+              );
+              detail = ` — ${name} returned to the command zone`;
+            } else if (card.zone !== 'graveyard') {
+              outcome.returnedTo = 'graveyard';
+              performMove(iid, 'graveyard');
+              detail = ` — ${name} countered`;
+            }
           }
           break;
         }
@@ -1500,13 +1562,34 @@ export const useGameStore = create<GameState>((set, get) => {
         }
 
         case 'resource': {
-          const iid = payload?.discardIid ?? payload?.sacrificeIid;
+          const discardIid = payload?.discardIid;
+          const sacrificeIid = payload?.sacrificeIid;
+          const iid = discardIid ?? sacrificeIid;
           const card = iid ? state.cards[iid] : undefined;
           if (iid && card) {
-            outcome.mode = payload?.discardIid ? 'discard' : 'sacrifice';
+            // Which payload field the caller filled in is a claim; the card's
+            // actual zone is the truth. A card in hand is discarded, one on the
+            // battlefield is sacrificed — believe the board, and say so.
+            const claimed = discardIid ? 'discard' : 'sacrifice';
+            const actual =
+              card.zone === 'hand'
+                ? 'discard'
+                : card.zone === 'battlefield'
+                  ? 'sacrifice'
+                  : null;
+            const mode = actual ?? claimed;
+            const name = cardName(state, iid);
+
+            outcome.mode = mode;
+            outcome.claimedMode = claimed;
+            outcome.fromZone = card.zone;
             outcome.iid = iid;
-            outcome.name = cardName(state, iid);
+            outcome.name = name;
+            if (actual && actual !== claimed) outcome.modeCorrected = true;
+            if (!actual) outcome.unexpectedZone = card.zone;
+
             performMove(iid, 'graveyard');
+            detail = ` — ${mode === 'discard' ? 'discarded' : 'sacrificed'} ${name}`;
           } else {
             // The 'tax' variant has no bookkeeping — acknowledging it is enough.
             outcome.mode = event.variant ?? 'tax';
@@ -1527,7 +1610,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       const resolved: PressureEvent = { ...event, state: 'resolved' };
       const trimmed = payload?.note?.trim();
-      appendLog('event', `Resolved ${event.type}: ${event.prompt}${trimmed ? ` — "${trimmed}"` : ''}`, {
+      appendLog('event', `Resolved ${event.type}: ${event.prompt}${detail}${trimmed ? ` — "${trimmed}"` : ''}`, {
         ...eventPayload(resolved),
         resolved: true,
         outcome,

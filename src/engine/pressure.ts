@@ -653,13 +653,25 @@ export function toSnapshot(seat: Seat): SeatSnapshot {
 
 /**
  * The prompt shown when an armed seat catches a spell. Built here so the
- * wording lives beside every other prompt.
+ * wording lives beside every other prompt. A countered commander goes back to
+ * the command zone rather than the graveyard, so it gets its own phrasing.
  */
-export function counterPrompt(seatId: SeatId, cardName: string, threshold: number): string {
-  return `${seatLabel(seatId)} counters ${cardName} — they held up ${threshold}+ mana all turn. Resolve it to bin the spell, or respond if you can force it through.`;
+export function counterPrompt(
+  seatId: SeatId,
+  cardName: string,
+  threshold: number,
+  isCommander = false,
+): string {
+  const outcome = isCommander
+    ? 'Resolve it to send them back to the command zone — the tax still stands'
+    : 'Resolve it to bin the spell';
+  return `${seatLabel(seatId)} counters ${cardName} — they held up ${threshold}+ mana all turn. ${outcome}, or respond if you can force it through.`;
 }
 
-/** Build the counter event the store raises when it intercepts a hand play. */
+/**
+ * Build the counter event the store raises when it intercepts a cast — a hand
+ * play or a commander coming off the command zone.
+ */
 export function makeCounterEvent(
   windowIndex: number,
   seatId: SeatId,
@@ -668,14 +680,15 @@ export function makeCounterEvent(
   cardName: string,
   threshold: number,
   manaValue: number,
+  isCommander = false,
 ): PressureEvent {
   return {
     id: `w${windowIndex}-counter-${seatId}-${iid}`,
     type: 'counter',
     seatId,
     turn,
-    prompt: counterPrompt(seatId, cardName, threshold),
-    severity: { turn, threshold, manaValue },
+    prompt: counterPrompt(seatId, cardName, threshold, isCommander),
+    severity: { turn, threshold, manaValue, commander: isCommander ? 1 : 0 },
     targetIid: iid,
     state: 'pending',
   };
