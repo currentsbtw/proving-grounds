@@ -1,0 +1,715 @@
+/* ── Proving Grounds — M2 scorecard ──────────────────────────────────────── */
+
+/* Shared: result chips, used by the rail and the header alike. */
+.sc-chip {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-chip.is-win {
+  color: var(--ok);
+}
+
+.sc-chip.is-loss,
+.sc-chip.is-concede {
+  color: var(--danger);
+}
+
+.sc-chip.is-abandoned {
+  color: var(--muted);
+}
+
+/* ── Left rail: run history ─────────────────────────────────────────────── */
+
+.sc-hist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.sc-hist-head {
+  margin-bottom: 2px;
+}
+
+.sc-hist-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sc-hist-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  padding: 3px 4px;
+  font-size: 12px;
+}
+
+.sc-hist-toggle:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+.sc-hist-caret {
+  flex: none;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.sc-hist-deck-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+}
+
+.sc-hist-count {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-hist-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sc-hist-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+
+.sc-hist-row.is-selected {
+  background: var(--raised);
+  border-color: var(--accent);
+}
+
+.sc-hist-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  background: transparent;
+  border-color: transparent;
+  padding: 3px 5px;
+  font-size: 11px;
+  text-align: left;
+}
+
+.sc-hist-open:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+.sc-hist-turns {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.sc-hist-bracket {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sc-hist-seed {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.sc-hist-when {
+  flex: none;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.sc-hist-pair {
+  flex: none;
+  padding: 0 5px;
+  border: 1px dashed var(--accent);
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.sc-hist-x {
+  flex: none;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  padding: 0 6px;
+  line-height: 1;
+  font-size: 14px;
+}
+
+.sc-hist-x:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: transparent;
+}
+
+.sc-hist-confirm {
+  flex: none;
+  display: inline-flex;
+  gap: 1px;
+}
+
+/* ── Centre: the scorecard ──────────────────────────────────────────────── */
+
+.pg-table.sc-root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.sc-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sc-header-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.sc-deck {
+  font-size: 20px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.sc-verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 0;
+}
+
+.sc-result {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sc-result.is-win {
+  color: var(--ok);
+}
+
+.sc-result.is-loss,
+.sc-result.is-concede {
+  color: var(--danger);
+}
+
+.sc-result.is-abandoned {
+  color: var(--muted);
+}
+
+.sc-facts {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-seed {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  padding: 1px 5px;
+}
+
+.sc-seed:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.sc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Banners ────────────────────────────────────────────────────────────── */
+
+.sc-banner {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--line);
+  background: var(--ground);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sc-banner.is-good {
+  border-left-color: var(--ok);
+  color: var(--ink);
+}
+
+.sc-banner.is-warn {
+  border-left-color: var(--accent);
+}
+
+.sc-banner.is-error {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.sc-share-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+.sc-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.sc-dim {
+  color: var(--muted);
+}
+
+/* ── Compare picker ─────────────────────────────────────────────────────── */
+
+.sc-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.sc-picker-head {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.sc-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border-color: transparent;
+  padding: 3px 6px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.sc-picker-item:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+.sc-picker-item.is-picked {
+  border-color: var(--accent);
+  background: var(--raised);
+}
+
+/* ── Metric tiles ───────────────────────────────────────────────────────── */
+
+.sc-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sc-tile {
+  flex: 1 1 190px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.sc-tile-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-tile-value {
+  font-family: var(--font-display);
+  font-size: 27px;
+  line-height: 1.15;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-tile-sub {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+
+.sc-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px 12px;
+}
+
+.sc-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ── Chart ──────────────────────────────────────────────────────────────── */
+
+.sc-chart {
+  margin: 0;
+}
+
+.sc-chart svg {
+  display: block;
+  max-width: 100%;
+}
+
+.sc-chart-axis {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.sc-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sc-key::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.sc-key-bar::before {
+  background: var(--accent);
+}
+
+.sc-key-land::before {
+  background: var(--muted);
+  width: 4px;
+}
+
+.sc-key-board::before {
+  background: var(--mana-u);
+  height: 2px;
+  border-radius: 0;
+}
+
+.sc-key-life::before {
+  background: repeating-linear-gradient(
+    to right,
+    var(--muted) 0 4px,
+    transparent 4px 7px
+  );
+  height: 2px;
+  border-radius: 0;
+}
+
+.sc-key-wipe::before {
+  background: var(--mana-w);
+  opacity: 0.35;
+}
+
+/* ── Tables (event ledger, compare) ─────────────────────────────────────── */
+
+.sc-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.sc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.sc-table th {
+  text-align: left;
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 8px 4px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.sc-table td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.sc-cell-detail {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+/* Event accents, mirroring the dock stripe in `pressure.css`. One declaration
+   feeds both the ledger chip and the chart's markers. */
+.sc-evt.type-wipe,
+.sc-evt-dot.type-wipe {
+  --sc-evt: var(--mana-w);
+}
+
+.sc-evt.type-removal,
+.sc-evt.type-resource,
+.sc-evt-dot.type-removal,
+.sc-evt-dot.type-resource {
+  --sc-evt: var(--mana-b);
+}
+
+.sc-evt.type-counter,
+.sc-evt-dot.type-counter {
+  --sc-evt: var(--mana-u);
+}
+
+.sc-evt.type-combat,
+.sc-evt-dot.type-combat {
+  --sc-evt: var(--mana-r);
+}
+
+.sc-evt.type-clock,
+.sc-evt-dot.type-clock {
+  --sc-evt: var(--mana-g);
+}
+
+.sc-evt {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--sc-evt, var(--line));
+  border-radius: 999px;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sc-evt, var(--muted));
+  white-space: nowrap;
+}
+
+.sc-seed-inline {
+  text-transform: none;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  letter-spacing: 0;
+}
+
+.sc-evt-dot {
+  fill: var(--sc-evt, var(--muted));
+}
+
+/* An answered event is a hollow marker — it arrived, but it never landed. */
+.sc-evt-dot.is-answered {
+  fill-opacity: 0.3;
+  stroke: var(--sc-evt, var(--muted));
+  stroke-width: 1;
+}
+
+.sc-term {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sc-term.is-responded {
+  color: var(--ok);
+}
+
+.sc-term.is-resolved {
+  color: var(--muted);
+}
+
+.sc-term.is-unresolved {
+  color: var(--accent);
+}
+
+.sc-note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.sc-delta.is-better {
+  color: var(--ok);
+}
+
+.sc-delta.is-worse {
+  color: var(--danger);
+}
+
+.sc-delta.is-flat {
+  color: var(--muted);
+}
+
+/* ── Seats ──────────────────────────────────────────────────────────────── */
+
+.sc-seats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sc-seat {
+  flex: 1 1 150px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.sc-seat.is-dead {
+  opacity: 0.55;
+  border-color: var(--danger);
+}
+
+.sc-seat-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.sc-seat-dmg {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.sc-seat-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Deck profile ───────────────────────────────────────────────────────── */
+
+.sc-profile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+}
+
+.sc-profile > div {
+  min-width: 96px;
+}
+
+.sc-profile dt {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-profile dd {
+  margin: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-profile dd .sc-dim {
+  font-size: 11px;
+}
+
+.sc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.sc-tag {
+  padding: 1px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}

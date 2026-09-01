@@ -107,10 +107,9 @@ function signed(n: number): string {
 
 interface LifeButtonsProps {
   target: LifeTarget;
-  disabled?: boolean;
 }
 
-function LifeButtons({ target, disabled }: LifeButtonsProps) {
+function LifeButtons({ target }: LifeButtonsProps) {
   const adjustLife = useGameStore((s) => s.adjustLife);
   const label = target === 'player' ? 'you' : `seat ${target}`;
   return (
@@ -119,7 +118,6 @@ function LifeButtons({ target, disabled }: LifeButtonsProps) {
         <button
           key={delta}
           type="button"
-          disabled={disabled}
           aria-label={`${signed(delta)} life for ${label}`}
           onClick={() => adjustLife(target, delta)}
         >
@@ -152,12 +150,15 @@ function SeatCard({ seat }: { seat: Seat }) {
 
   return (
     <div className={'hud-life-card' + (dead ? ' is-eliminated' : '')}>
-      {dead && <span className="hud-life-stamp">ELIMINATED</span>}
-
       <div className="hud-life-row">
         <span className="hud-life-name">SEAT {seat.id}</span>
         <span className={'hud-life-total num' + lifeToneClass(seat.life)}>{seat.life}</span>
-        <LifeButtons target={seat.id} disabled={dead} />
+        {/* The buttons are inert once the seat is out; the stamp inherits their slot. */}
+        {dead ? (
+          <span className="hud-life-stamp">ELIMINATED</span>
+        ) : (
+          <LifeButtons target={seat.id} />
+        )}
       </div>
 
       <ThreatMeter value={dead ? 0 : seat.threat} label={`Seat ${seat.id}`} />

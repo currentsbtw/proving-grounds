@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useGameStore } from '../../state/gameStore';
-import { resolveCardsByIds } from '../../services/scryfall';
-import type { CardData, Deck } from '../../domain/types';
+import type { Deck } from '../../domain/types';
 import { DeckList } from './DeckList';
 import { DeckImport } from './DeckImport';
+import RunHistory from './RunHistory';
+import { startDeckRun } from './startDeckRun';
 import './decks.css';
 
 type View = { kind: 'list' } | { kind: 'import'; deck?: Deck };
@@ -37,7 +38,6 @@ function ActiveRun() {
 
 export default function DeckPanel() {
   const run = useGameStore((s) => s.run);
-  const startRun = useGameStore((s) => s.startRun);
 
   const [view, setView] = useState<View>({ kind: 'list' });
   const [startingDeckId, setStartingDeckId] = useState<string | null>(null);
@@ -47,21 +47,11 @@ export default function DeckPanel() {
     setError(null);
     setStartingDeckId(deck.id);
     try {
-      const ids = [...deck.commanderIds, ...deck.cards.map((c) => c.scryfallId)];
-      const { found, notFound } = await resolveCardsByIds(ids);
-      if (notFound.length > 0) {
-        setError(
-          `Could not resolve ${notFound.length} card${notFound.length === 1 ? '' : 's'} for this deck. Reimport it or check your connection.`,
-        );
-        return;
-      }
-      const record: Record<string, CardData> = {};
-      for (const card of found) record[card.scryfallId] = card;
-      startRun(deck, record, seed.trim() || undefined);
+      await startDeckRun(deck, seed);
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? `Could not start the run — ${err.message}` : 'Could not start the run',
-      );
+      // `startDeckRun` already phrases the resolve failure for the reader; only a
+      // surprise (a thrown non-Error) needs the generic wording.
+      setError(err instanceof Error ? err.message : 'Could not start the run');
     } finally {
       setStartingDeckId(null);
     }
@@ -88,6 +78,7 @@ export default function DeckPanel() {
             error={error}
           />
           {startingDeckId && <p className="dk-busy">Preparing library</p>}
+          <RunHistory />
         </>
       )}
     </section>
