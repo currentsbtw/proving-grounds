@@ -47,11 +47,75 @@ export interface CardInstance {
 
 export type SeatId = 'A' | 'B' | 'C';
 
+/**
+ * An opponent seat's abstract board. Never a real card list — the seats are not
+ * simulated players, they are a threat level plus this shape. Every field is a
+ * whole number; the engine rounds stochastically as it grows them so the
+ * silhouette always reads as a plausible board.
+ */
+export interface Silhouette {
+  /** How many creatures the seat is presenting. */
+  creatures: number;
+  /** Total power across those creatures. */
+  power: number;
+  /** Noncreature permanents worth respecting (artifacts + enchantments). */
+  artifacts: number;
+  /** Untapped mana the seat is representing — roughly `min(turn, 8)`. */
+  openMana: number;
+}
+
 export interface Seat {
   id: SeatId;
   life: number;
   commanderDamage: number;
   eliminated: boolean;
+  /** 0–10 pressure rating. Rises every opponent window, falls when damaged. */
+  threat: number;
+  silhouette: Silhouette;
+}
+
+export type EventType = 'wipe' | 'removal' | 'counter' | 'combat' | 'clock' | 'resource';
+
+/**
+ * Lifecycle of a pressure event.
+ * - `pending`   — queued, not yet in front of the player.
+ * - `responded` — the player claimed an answer on the table (honor system).
+ * - `negated`   — terminal state that follows `responded`; nothing was applied.
+ * - `resolved`  — the event's bookkeeping was applied to the board.
+ */
+export type PressureEventState = 'pending' | 'responded' | 'resolved' | 'negated';
+
+export interface PressureEvent {
+  /** Deterministic per seed: `w<window>-<type>-<seat>`. Never random. */
+  id: string;
+  type: EventType;
+  seatId: SeatId;
+  /** The player turn this event arrived in front of (the turn about to begin). */
+  turn: number;
+  /** Human-readable table prompt, built from the seat's silhouette. */
+  prompt: string;
+  /** Machine-readable magnitudes for M2's scorecard. Keys vary by type. */
+  severity: Record<string, number>;
+  /** Sub-kind: wipe `creatures`/`nonlands`, resource `discard`/`sacrifice`/`tax`. */
+  variant?: string;
+  /** Removal target, or the spell held by a counter. Resolution may override it. */
+  targetIid?: string;
+  state: PressureEventState;
+}
+
+/** A seat that wins on its next turn unless answered by the end of `deadlineTurn`. */
+export interface ClockState {
+  seatId: SeatId;
+  /** Last player turn that may complete before the run is lost. */
+  deadlineTurn: number;
+  /** Player turn the clock spawned on. */
+  spawnedTurn: number;
+}
+
+/** A seat holding up interaction: spells of `threshold`+ mana value get countered. */
+export interface CounterArmed {
+  seatId: SeatId;
+  threshold: number;
 }
 
 export type LogKind =
@@ -68,7 +132,15 @@ export type LogKind =
   | 'commander'
   | 'damage'
   | 'note'
-  | 'run';
+  | 'run'
+  /** An opponent window resolved between the player's turns. */
+  | 'window'
+  /** A pressure event was created, activated, or resolved. */
+  | 'event'
+  /** The player claimed an answer on the table and negated an event. */
+  | 'respond'
+  /** A seat's threat meter or silhouette changed outside a window. */
+  | 'threat';
 
 export interface LogEntry {
   seq: number;

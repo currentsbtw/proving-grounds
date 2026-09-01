@@ -3,17 +3,39 @@ import { nanoid } from 'nanoid';
 import { createRng, randomSeed, shuffleInPlace } from '../domain/rng';
 import { nextPhaseOf } from '../domain/phases';
 import { saveRun } from '../db/db';
+import { PRESSURE } from '../data/pressure';
+import {
+  applyDamageToSeat,
+  emptySilhouette,
+  initialThreat,
+  makeCounterEvent,
+  playerThreatOf,
+  redistribute,
+  resolveWindow,
+  toSnapshot,
+  zeroFiredCounts,
+  zeroLastFiredWindow,
+  type FiredCounts,
+  type LastFiredWindow,
+  type PermanentSummary,
+  type PlayerSummary,
+} from '../engine/pressure';
 import type {
   CardData,
   CardInstance,
+  ClockState,
+  CounterArmed,
   Deck,
+  EventType,
   LogEntry,
   LogKind,
   Phase,
+  PressureEvent,
   RunRecord,
   RunResult,
   Seat,
   SeatId,
+  Silhouette,
   TokenSpec,
   ZoneId,
 } from '../domain/types';
@@ -34,6 +56,26 @@ export interface MoveOptions {
 
 export type MoveArg = 'top' | 'bottom' | MoveOptions;
 
+/**
+ * Optional detail supplied when the player resolves a pressure event on the
+ * table. Everything is optional: the engine's own numbers are the default, and
+ * the payload only overrides what the real board disagreed with.
+ */
+export interface ResolveEventPayload {
+  /** combat — how much actually got through after blocks. Defaults to the offer. */
+  damageTaken?: number;
+  /** removal / counter — override the engine's chosen target. */
+  targetIid?: string;
+  /** resource (discard) — the card you pitched. */
+  discardIid?: string;
+  /** resource (sacrifice) — the permanent you gave up. */
+  sacrificeIid?: string;
+  /** wipe — force the "all nonlands" variant regardless of what was rolled. */
+  wipeNonlands?: boolean;
+  /** Free-text table note recorded on the log entry. */
+  note?: string;
+}
+
 const SEAT_IDS: SeatId[] = ['A', 'B', 'C'];
 
 const ZONE_LABELS: Record<ZoneId, string> = {
@@ -45,13 +87,118 @@ const ZONE_LABELS: Record<ZoneId, string> = {
   command: 'command zone',
 };
 
-function freshSeats(): Seat[] {
+/**
+ * Three fresh seats. With an rng they open at a randomised 1–2 threat, which is
+ * what `startRun` wants; without one they open flat, which is what the cleared
+ * post-run state wants.
+ */
+function freshSeats(rng?: () => number): Seat[] {
   return SEAT_IDS.map((id) => ({
     id,
     life: STARTING_LIFE,
     commanderDamage: 0,
     eliminated: false,
+    threat: rng ? initialThreat(rng) : PRESSURE.threat.startMin,
+    silhouette: emptySilhouette(),
   }));
+}
+
+/** Type line for a card instance — tokens carry their own, real cards use the cache. */
+function typeLineOf(state: GameState, card: CardInstance): string {
+  if (card.isToken) return card.tokenSpec?.typeLine ?? 'Creature — Token';
+  if (card.scryfallId) return state.cardData[card.scryfallId]?.typeLine ?? '';
+  return '';
+}
+
+export function isLandCard(state: GameState, card: CardInstance): boolean {
+  return /\bLand\b/i.test(typeLineOf(state, card));
+}
+
+export function isCreatureCard(state: GameState, card: CardInstance): boolean {
+  return /\bCreature\b/i.test(typeLineOf(state, card));
+}
+
+/** Mana value from the Scryfall cache. Tokens are 0. */
+export function manaValueOf(state: GameState, card: CardInstance): number {
+  if (card.isToken || !card.scryfallId) return 0;
+  return state.cardData[card.scryfallId]?.manaValue ?? 0;
+}
+
+/** Printed power as a number; `*` and missing values read as 0. */
+function powerOf(state: GameState, card: CardInstance): number {
+  const raw = card.isToken
+    ? card.tokenSpec?.power
+    : card.scryfallId
+      ? state.cardData[card.scryfallId]?.power
+      : undefined;
+  const n = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+/** Everything the engine is told about the player. Never a card list. */
+function playerSummaryOf(state: GameState): PlayerSummary {
+  let boardMV = 0;
+  let boardPower = 0;
+  let commanderOnBattlefield = false;
+  for (const card of Object.values(state.cards)) {
+    if (card.zone !== 'battlefield') continue;
+    if (card.isCommander) commanderOnBattlefield = true;
+    if (!card.isToken && !isLandCard(state, card)) boardMV += manaValueOf(state, card);
+    if (isCreatureCard(state, card)) boardPower += powerOf(state, card);
+  }
+
+  let damageDealtRecent = 0;
+  const oldest = state.turn - PRESSURE.playerThreat.recentTurns + 1;
+  for (const [turn, amount] of Object.entries(state.damageDealtByTurn)) {
+    if (Number(turn) >= oldest) damageDealtRecent += amount;
+  }
+
+  return {
+    life: state.playerLife,
+    boardMV,
+    boardPower,
+    commanderOnBattlefield,
+    damageDealtRecent,
+  };
+}
+
+/** The player's battlefield, flattened for the engine's targeting heuristic. */
+function playerPermanentsOf(state: GameState): PermanentSummary[] {
+  return Object.values(state.cards)
+    .filter((c) => c.zone === 'battlefield')
+    .sort(byArrival)
+    .map((c) => ({
+      iid: c.iid,
+      name: cardName(state, c.iid),
+      manaValue: manaValueOf(state, c),
+      isCommander: c.isCommander,
+      isToken: c.isToken,
+      isLand: isLandCard(state, c),
+      movedAt: c.movedAt,
+    }));
+}
+
+/**
+ * The player's 0–10 threat as it stands *right now*, rather than as of the last
+ * window (`state.playerThreat`). Use this for a live meter; use the stored one
+ * when showing what the pod actually judged.
+ */
+export function currentPlayerThreat(state: GameState): number {
+  return playerThreatOf(playerSummaryOf(state));
+}
+
+/** Machine-readable payload for a pressure event, shared by every log entry. */
+function eventPayload(event: PressureEvent): Record<string, unknown> {
+  return {
+    eventId: event.id,
+    eventType: event.type,
+    seatId: event.seatId,
+    eventTurn: event.turn,
+    severity: event.severity,
+    variant: event.variant,
+    targetIid: event.targetIid,
+    state: event.state,
+  };
 }
 
 export interface GameState {
@@ -71,6 +218,28 @@ export interface GameState {
   lastAutoDrawTurn: number;
   /** Monotonic source for CardInstance.movedAt. Never reset mid-run. */
   moveCounter: number;
+
+  // --- M1 pressure state --------------------------------------------------
+  /** Queue behind `activeEvent` — the active one is NOT also in here. */
+  pendingEvents: PressureEvent[];
+  /** The event in front of the player right now, or null. */
+  activeEvent: PressureEvent | null;
+  /** The seat racing to win, and the last turn you may finish before losing. */
+  clock: ClockState | null;
+  /** A seat holding up interaction for the current turn, or null. */
+  counterArmed: CounterArmed | null;
+  /** Derived 0–10 rating of how scary the player looked at the last window. */
+  playerThreat: number;
+  /** How many opponent windows have resolved this run. */
+  windowCount: number;
+  /** Firings per event type this run, for the engine's caps. */
+  firedCounts: FiredCounts;
+  /** Window index of the last firing per type, for the engine's cooldowns. */
+  lastFiredWindow: LastFiredWindow;
+  /** Damage the player dealt to seats, keyed by the turn it landed on. */
+  damageDealtByTurn: Record<number, number>;
+  /** Monotonic suffix that keeps event ids unique without breaking determinism. */
+  eventSeq: number;
 
   startRun: (deck: Deck, cardData: Record<string, CardData>, seed?: string) => void;
   takeMulligan: () => void;
@@ -92,6 +261,19 @@ export interface GameState {
   endRun: (result: RunResult) => Promise<void>;
   logNote: (message: string) => void;
   undoLastLifeChange: () => void;
+
+  /**
+   * Resolve the opponent window that sits before `upcomingTurn`. Called
+   * automatically by the turn-advance path — the UI should not call it.
+   * Returns false when the run ended (the race clock ran out).
+   */
+  resolveOpponentWindow: (upcomingTurn?: number) => boolean;
+  /** "I had an answer." Negates the active event without applying anything. */
+  respondToActiveEvent: (note?: string) => void;
+  /** "It resolved." Applies the event's bookkeeping, then advances the queue. */
+  resolveActiveEvent: (payload?: ResolveEventPayload) => void;
+  /** Cancel the race clock by claiming held interaction (honor system). */
+  declareInteraction: () => void;
 }
 
 /** Display name for a card instance (token name, cached Scryfall name, or a fallback). */
@@ -245,15 +427,50 @@ export const useGameStore = create<GameState>((set, get) => {
     const byLife = seat.life <= 0;
     const byCommander = seat.commanderDamage >= LETHAL_COMMANDER_DAMAGE;
     if (!byLife && !byCommander) return;
+    // The seat is out: it stops growing, stops attacking, and its board is gone.
     set((s) => ({
-      seats: s.seats.map((x) => (x.id === seatId ? { ...x, eliminated: true } : x)),
+      seats: s.seats.map((x) =>
+        x.id === seatId
+          ? { ...x, eliminated: true, threat: 0, silhouette: emptySilhouette() }
+          : x,
+      ),
     }));
     appendLog('damage', `Seat ${seatId} eliminated`, {
       seatId,
       reason: byCommander ? 'commander-damage' : 'life',
       life: seat.life,
       commanderDamage: seat.commanderDamage,
+      threatAtDeath: seat.threat,
+      silhouetteAtDeath: seat.silhouette,
     });
+
+    // An eliminated seat cannot win the race it started.
+    if (get().clock?.seatId === seatId) {
+      const clock = get().clock;
+      set({ clock: null });
+      appendLog('threat', `Seat ${seatId} is out — its race clock is canceled.`, {
+        seatId,
+        canceled: true,
+        reason: 'elimination',
+        deadlineTurn: clock?.deadlineTurn,
+      });
+    }
+
+    // Pressure does not drop when a seat dies; it concentrates. Event frequency
+    // is already seat-independent, so only threat and board move here.
+    const updates = redistribute(
+      // The dead seat's own pre-death numbers are what the survivors inherit.
+      get().seats.map((x) => (x.id === seatId ? { ...toSnapshot(x), threat: seat.threat, silhouette: seat.silhouette } : toSnapshot(x))),
+      seatId,
+    );
+    if (updates.length > 0) {
+      applySeatUpdates(updates);
+      appendLog(
+        'threat',
+        `Pressure redistributed — ${updates.map((u) => `${u.id} ${u.threat.toFixed(1)}`).join(', ')}`,
+        { from: seatId, updates, reason: 'elimination' },
+      );
+    }
   }
 
   /** Untap everything on the battlefield without logging; returns how many untapped. */
@@ -284,6 +501,285 @@ export const useGameStore = create<GameState>((set, get) => {
     get().drawCards(1);
   }
 
+  // -------------------------------------------------------------------------
+  // Pressure plumbing
+  // -------------------------------------------------------------------------
+
+  /** Write threat/silhouette back onto the named seats. Leaves life alone. */
+  function applySeatUpdates(
+    updates: { id: SeatId; threat: number; silhouette: Silhouette }[],
+  ): void {
+    if (updates.length === 0) return;
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    set((s) => ({
+      seats: s.seats.map((seat) => {
+        const update = byId.get(seat.id);
+        return update ? { ...seat, threat: update.threat, silhouette: update.silhouette } : seat;
+      }),
+    }));
+  }
+
+  /** A seat that just did something gets scarier. */
+  function bumpSeatThreat(seatId: SeatId, type: EventType): void {
+    set((s) => ({
+      seats: s.seats.map((seat) =>
+        seat.id === seatId
+          ? {
+              ...seat,
+              threat: Math.min(
+                PRESSURE.threat.max,
+                Math.round((seat.threat + PRESSURE.threat.eventJump[type]) * 10) / 10,
+              ),
+            }
+          : seat,
+      ),
+    }));
+  }
+
+  /**
+   * Push events onto the queue, stamping each id with a monotonic suffix so
+   * two identical-looking events never collide as React keys. The first event
+   * becomes active when nothing is active already.
+   */
+  function enqueueEvents(events: PressureEvent[]): PressureEvent[] {
+    if (events.length === 0) return [];
+    const stamped: PressureEvent[] = [];
+    set((s) => {
+      let seq = s.eventSeq;
+      for (const event of events) stamped.push({ ...event, id: `${event.id}-${++seq}` });
+      const queue = [...s.pendingEvents, ...stamped];
+      const active = s.activeEvent ?? queue.shift() ?? null;
+      return { eventSeq: seq, pendingEvents: queue, activeEvent: active };
+    });
+    return stamped;
+  }
+
+  /** Retire the active event and pull the next one forward. */
+  function advanceQueue(): void {
+    set((s) => {
+      const queue = [...s.pendingEvents];
+      const next = queue.shift() ?? null;
+      return { activeEvent: next, pendingEvents: queue };
+    });
+    const next = get().activeEvent;
+    if (next) {
+      appendLog('event', `Next: ${next.prompt}`, { ...eventPayload(next), activated: true });
+    }
+  }
+
+  /** All battlefield instances a wipe of this scope would sweep away. */
+  function wipeVictims(nonlands: boolean): string[] {
+    const state = get();
+    return Object.values(state.cards)
+      .filter((c) => c.zone === 'battlefield')
+      .filter((c) => (nonlands ? !isLandCard(state, c) : isCreatureCard(state, c)))
+      .sort(byArrival)
+      .map((c) => c.iid);
+  }
+
+  /**
+   * The raw zone move. `moveCard` is this plus the counterspell interception,
+   * so anything that must move regardless of held-up mana calls straight in
+   * here: wipes, removal, a countered spell going to the graveyard, and a
+   * spell the player forced through.
+   */
+  function performMove(iid: string, toZone: ZoneId, options?: MoveArg): void {
+    const state = get();
+    const card = state.cards[iid];
+    if (!card || card.zone === toZone) return;
+    const fromZone = card.zone;
+    const name = cardName(state, iid);
+
+    const opts: MoveOptions = typeof options === 'string' ? { position: options } : (options ?? {});
+    const position = opts.position ?? 'top';
+    const entersTapped = toZone === 'battlefield' && opts.tapped === true;
+
+    set((s) => {
+      const next: CardInstance = {
+        ...s.cards[iid],
+        zone: toZone,
+        tapped: toZone === 'battlefield' ? s.cards[iid].tapped || entersTapped : false,
+        counters: toZone === 'battlefield' ? s.cards[iid].counters : {},
+        movedAt: s.moveCounter + 1,
+      };
+      const cards = { ...s.cards, [iid]: next };
+      let libraryOrder = s.libraryOrder.filter((x) => x !== iid);
+      if (toZone === 'library') {
+        libraryOrder = position === 'bottom' ? [...libraryOrder, iid] : [iid, ...libraryOrder];
+      }
+      return { cards, libraryOrder, moveCounter: s.moveCounter + 1 };
+    });
+
+    const suffix = toZone === 'library' ? ` (${position})` : entersTapped ? ' — enters tapped' : '';
+    appendLog('move', `${name}: ${ZONE_LABELS[fromZone]} → ${ZONE_LABELS[toZone]}${suffix}`, {
+      iid,
+      name,
+      from: fromZone,
+      to: toZone,
+      position: toZone === 'library' ? position : undefined,
+      tapped: entersTapped || undefined,
+      isCommander: card.isCommander,
+    });
+
+    if (card.isCommander && (toZone === 'graveyard' || toZone === 'exile')) {
+      appendLog(
+        'commander',
+        `${name} changed zones to ${ZONE_LABELS[toZone]} — commander may return to the command zone`,
+        { iid, name, to: toZone },
+      );
+    }
+  }
+
+  /**
+   * An armed seat catches a spell on its way to the battlefield. The card stays
+   * in hand until the player says what happened: `resolveActiveEvent` bins it,
+   * `respondToActiveEvent` forces it through.
+   */
+  function raiseCounterEvent(iid: string, armed: CounterArmed): void {
+    const state = get();
+    const card = state.cards[iid];
+    if (!card) return;
+    const manaValue = manaValueOf(state, card);
+    const event = makeCounterEvent(
+      state.windowCount,
+      armed.seatId,
+      state.turn,
+      iid,
+      cardName(state, iid),
+      armed.threshold,
+      manaValue,
+    );
+
+    // A counter is about the spell you just cast, so it jumps the queue; the
+    // event it displaced goes back to the front and returns after.
+    set((s) => {
+      const seq = s.eventSeq + 1;
+      const stamped: PressureEvent = { ...event, id: `${event.id}-${seq}` };
+      return {
+        eventSeq: seq,
+        activeEvent: stamped,
+        pendingEvents: s.activeEvent ? [s.activeEvent, ...s.pendingEvents] : s.pendingEvents,
+        counterArmed: null,
+        firedCounts: { ...s.firedCounts, counter: s.firedCounts.counter + 1 },
+        lastFiredWindow: { ...s.lastFiredWindow, counter: s.windowCount },
+      };
+    });
+
+    const active = get().activeEvent;
+    if (active) {
+      appendLog('event', active.prompt, { ...eventPayload(active), intercepted: true });
+    }
+    bumpSeatThreat(armed.seatId, 'counter');
+  }
+
+  /**
+   * Advance to `turn + 1` through the single path both `nextPhase` (wrapping
+   * off the end step) and `nextTurn` (skipping ahead) share. The opponent
+   * window resolves first — the pod takes its turns before yours begins.
+   */
+  function beginNextTurn(via: 'phase' | 'skip'): void {
+    const state = get();
+    if (!state.run) return;
+    const upcoming = state.turn + 1;
+
+    if (!runOpponentWindow(upcoming)) return;
+
+    set({ turn: upcoming, phase: 'untap' });
+    appendLog('turn', `Turn ${upcoming} begins`, {
+      turn: upcoming,
+      previousTurn: upcoming - 1,
+      from: via === 'phase' ? 'end' : undefined,
+      skipped: via === 'skip' || undefined,
+    });
+    performUntapStep();
+
+    if (via === 'skip') {
+      set({ phase: 'draw' });
+      performDrawStep();
+      set({ phase: 'main1' });
+      appendLog('phase', 'Phase: main1', { from: 'draw', to: 'main1', turn: upcoming });
+    }
+  }
+
+  /**
+   * Run the engine for the window before `upcomingTurn` and fold the result
+   * into state. Returns false when the race clock expired and the run ended.
+   */
+  function runOpponentWindow(upcomingTurn: number): boolean {
+    const state = get();
+    if (!state.run) return true;
+
+    const windowIndex = state.windowCount + 1;
+    const result = resolveWindow({
+      turn: upcomingTurn,
+      windowIndex,
+      bracket: state.run.bracket,
+      rng: rngOrFallback(),
+      seats: state.seats.map(toSnapshot),
+      player: playerSummaryOf(state),
+      permanents: playerPermanentsOf(state),
+      clock: state.clock,
+      counterArmed: state.counterArmed,
+      firedCounts: state.firedCounts,
+      lastFiredWindow: state.lastFiredWindow,
+    });
+
+    if (result.clockExpired) {
+      const clock = state.clock;
+      appendLog('window', result.summary, {
+        window: windowIndex,
+        windowBeforeTurn: upcomingTurn,
+        clockExpired: true,
+        clockSeatId: clock?.seatId,
+        deadlineTurn: clock?.deadlineTurn,
+      });
+      appendLog('run', `Lost the race — Seat ${clock?.seatId} won on the turn after turn ${clock?.deadlineTurn}.`, {
+        reason: 'clock-expired',
+        seatId: clock?.seatId,
+        deadlineTurn: clock?.deadlineTurn,
+        turn: upcomingTurn,
+      });
+      void get().endRun('loss');
+      return false;
+    }
+
+    applySeatUpdates(result.seats);
+
+    const firedCounts = { ...state.firedCounts };
+    const lastFiredWindow = { ...state.lastFiredWindow };
+    for (const event of result.events) {
+      firedCounts[event.type] += 1;
+      lastFiredWindow[event.type] = windowIndex;
+    }
+
+    set({
+      windowCount: windowIndex,
+      clock: result.clock,
+      counterArmed: result.counterArmed,
+      playerThreat: result.playerThreat,
+      firedCounts,
+      lastFiredWindow,
+    });
+
+    appendLog('window', result.summary, {
+      window: windowIndex,
+      windowBeforeTurn: upcomingTurn,
+      bracket: state.run.bracket,
+      playerThreat: result.playerThreat,
+      seats: result.seats,
+      eventTypes: result.events.map((e) => e.type),
+      counterArmed: result.counterArmed,
+      clock: result.clock,
+      notes: result.notes,
+    });
+
+    const stamped = enqueueEvents(result.events);
+    for (const event of stamped) {
+      appendLog('event', event.prompt, { ...eventPayload(event), queued: true });
+    }
+    return true;
+  }
+
   return {
     run: null,
     phase: 'main1',
@@ -299,6 +795,17 @@ export const useGameStore = create<GameState>((set, get) => {
     rng: null,
     lastAutoDrawTurn: 0,
     moveCounter: 0,
+
+    pendingEvents: [],
+    activeEvent: null,
+    clock: null,
+    counterArmed: null,
+    playerThreat: 0,
+    windowCount: 0,
+    firedCounts: zeroFiredCounts(),
+    lastFiredWindow: zeroLastFiredWindow(),
+    damageDealtByTurn: {},
+    eventSeq: 0,
 
     startRun(deck, cardData, seed) {
       const runSeed = seed ?? randomSeed();
@@ -321,6 +828,8 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       shuffleInPlace(libraryOrder, rng);
+      // Drawn after the shuffle so the rng sequence is fixed for a given seed.
+      const seats = freshSeats(rng);
 
       const run: RunRecord = {
         id: nanoid(12),
@@ -338,7 +847,7 @@ export const useGameStore = create<GameState>((set, get) => {
         phase: 'main1',
         turn: 1,
         playerLife: STARTING_LIFE,
-        seats: freshSeats(),
+        seats,
         cards,
         libraryOrder,
         commanderCasts: {},
@@ -347,6 +856,16 @@ export const useGameStore = create<GameState>((set, get) => {
         mulliganResolved: false,
         lastAutoDrawTurn: 1,
         moveCounter: stamp,
+        pendingEvents: [],
+        activeEvent: null,
+        clock: null,
+        counterArmed: null,
+        playerThreat: 0,
+        windowCount: 0,
+        firedCounts: zeroFiredCounts(),
+        lastFiredWindow: zeroLastFiredWindow(),
+        damageDealtByTurn: {},
+        eventSeq: 0,
       });
 
       appendLog('run', `Run started — ${deck.name} (seed ${runSeed})`, {
@@ -357,7 +876,13 @@ export const useGameStore = create<GameState>((set, get) => {
         bracket: deck.bracket,
         librarySize: libraryOrder.length,
         commanders: deck.commanderIds,
+        pressureVersion: PRESSURE.version,
       });
+      appendLog(
+        'threat',
+        `Seats seated — ${seats.map((s) => `${s.id} ${s.threat.toFixed(1)}`).join(', ')}`,
+        { seats: seats.map((s) => ({ id: s.id, threat: s.threat, silhouette: s.silhouette })) },
+      );
       appendLog('shuffle', `Library shuffled (${libraryOrder.length} cards)`, {
         size: libraryOrder.length,
         seed: runSeed,
@@ -432,47 +957,23 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       const card = state.cards[iid];
       if (!card || card.zone === toZone) return;
-      const fromZone = card.zone;
-      const name = cardName(state, iid);
 
-      const opts: MoveOptions = typeof options === 'string' ? { position: options } : (options ?? {});
-      const position = opts.position ?? 'top';
-      const entersTapped = toZone === 'battlefield' && opts.tapped === true;
-
-      set((s) => {
-        const next: CardInstance = {
-          ...s.cards[iid],
-          zone: toZone,
-          tapped: toZone === 'battlefield' ? s.cards[iid].tapped || entersTapped : false,
-          counters: toZone === 'battlefield' ? s.cards[iid].counters : {},
-          movedAt: s.moveCounter + 1,
-        };
-        const cards = { ...s.cards, [iid]: next };
-        let libraryOrder = s.libraryOrder.filter((x) => x !== iid);
-        if (toZone === 'library') {
-          libraryOrder = position === 'bottom' ? [...libraryOrder, iid] : [iid, ...libraryOrder];
-        }
-        return { cards, libraryOrder, moveCounter: s.moveCounter + 1 };
-      });
-
-      const suffix = toZone === 'library' ? ` (${position})` : entersTapped ? ' — enters tapped' : '';
-      appendLog('move', `${name}: ${ZONE_LABELS[fromZone]} → ${ZONE_LABELS[toZone]}${suffix}`, {
-        iid,
-        name,
-        from: fromZone,
-        to: toZone,
-        position: toZone === 'library' ? position : undefined,
-        tapped: entersTapped || undefined,
-        isCommander: card.isCommander,
-      });
-
-      if (card.isCommander && (toZone === 'graveyard' || toZone === 'exile')) {
-        appendLog('commander', `${name} changed zones to ${ZONE_LABELS[toZone]} — commander may return to the command zone`, {
-          iid,
-          name,
-          to: toZone,
-        });
+      // Counterspell seam. Every M0 path into the battlefield — drag,
+      // double-click, card menu — comes through here, so the interception lives
+      // here and the feature components stay untouched. Only hand → battlefield
+      // is a "cast"; scooping a card back from the graveyard is not.
+      const armed = state.counterArmed;
+      if (
+        armed &&
+        card.zone === 'hand' &&
+        toZone === 'battlefield' &&
+        manaValueOf(state, card) >= armed.threshold
+      ) {
+        raiseCounterEvent(iid, armed);
+        return;
       }
+
+      performMove(iid, toZone, options);
     },
 
     drawCards(n) {
@@ -657,13 +1158,30 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!seat) return;
       const before = seat.life;
       const after = before + delta;
-      set((s) => ({ seats: s.seats.map((x) => (x.id === target ? { ...x, life: after } : x)) }));
+      const damage = Math.max(0, -delta);
+      // Hurting a seat makes it less scary and shrinks the board it presents.
+      const shrunk = applyDamageToSeat(seat.threat, seat.silhouette, damage, before);
+
+      set((s) => ({
+        seats: s.seats.map((x) =>
+          x.id === target
+            ? { ...x, life: after, threat: shrunk.threat, silhouette: shrunk.silhouette }
+            : x,
+        ),
+        damageDealtByTurn: damage
+          ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + damage }
+          : s.damageDealtByTurn,
+      }));
+
       appendLog('life', `Seat ${target}: ${before} → ${after}`, {
         target,
         seatId: target,
         delta,
         before,
         after,
+        threatBefore: seat.threat,
+        threatAfter: shrunk.threat,
+        silhouetteBefore: seat.silhouette,
       });
       checkSeatElimination(target);
     },
@@ -676,11 +1194,29 @@ export const useGameStore = create<GameState>((set, get) => {
       const cmdAfter = Math.max(0, cmdBefore + amount);
       const lifeBefore = seat.life;
       const lifeAfter = lifeBefore - amount;
+      const shrunk = applyDamageToSeat(
+        seat.threat,
+        seat.silhouette,
+        Math.max(0, amount),
+        lifeBefore,
+      );
 
       set((s) => ({
         seats: s.seats.map((x) =>
-          x.id === seatId ? { ...x, commanderDamage: cmdAfter, life: lifeAfter } : x,
+          x.id === seatId
+            ? {
+                ...x,
+                commanderDamage: cmdAfter,
+                life: lifeAfter,
+                threat: shrunk.threat,
+                silhouette: shrunk.silhouette,
+              }
+            : x,
         ),
+        damageDealtByTurn:
+          amount > 0
+            ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + amount }
+            : s.damageDealtByTurn,
       }));
 
       appendLog(
@@ -693,6 +1229,9 @@ export const useGameStore = create<GameState>((set, get) => {
           commanderDamageAfter: cmdAfter,
           lifeBefore,
           lifeAfter,
+          threatBefore: seat.threat,
+          threatAfter: shrunk.threat,
+          silhouetteBefore: seat.silhouette,
         },
       );
       checkSeatElimination(seatId);
@@ -705,9 +1244,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const wrapping = from === 'end';
 
       if (wrapping) {
-        set((s) => ({ phase: 'untap', turn: s.turn + 1 }));
-        appendLog('turn', `Turn ${get().turn} begins`, { turn: get().turn, from: 'end' });
-        performUntapStep();
+        beginNextTurn('phase');
         return;
       }
 
@@ -719,15 +1256,7 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     nextTurn() {
-      if (!get().run) return;
-      const from = get().turn;
-      set((s) => ({ turn: s.turn + 1, phase: 'untap' }));
-      appendLog('turn', `Turn ${get().turn} begins`, { turn: get().turn, previousTurn: from, skipped: true });
-      performUntapStep();
-      set({ phase: 'draw' });
-      performDrawStep();
-      set({ phase: 'main1' });
-      appendLog('phase', 'Phase: main1', { from: 'draw', to: 'main1', turn: get().turn });
+      beginNextTurn('skip');
     },
 
     async endRun(result) {
@@ -741,6 +1270,11 @@ export const useGameStore = create<GameState>((set, get) => {
         turns: state.turn,
         playerLife: state.playerLife,
         seats: state.seats,
+        windows: state.windowCount,
+        firedCounts: state.firedCounts,
+        unresolvedEvents: (state.activeEvent ? 1 : 0) + state.pendingEvents.length,
+        clock: state.clock,
+        pressureVersion: PRESSURE.version,
       });
 
       const finished = get().run;
@@ -768,6 +1302,16 @@ export const useGameStore = create<GameState>((set, get) => {
         mulliganResolved: false,
         lastAutoDrawTurn: 0,
         moveCounter: 0,
+        pendingEvents: [],
+        activeEvent: null,
+        clock: null,
+        counterArmed: null,
+        playerThreat: 0,
+        windowCount: 0,
+        firedCounts: zeroFiredCounts(),
+        lastFiredWindow: zeroLastFiredWindow(),
+        damageDealtByTurn: {},
+        eventSeq: 0,
       });
     },
 
@@ -806,6 +1350,19 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
 
+      // Threat and silhouette were snapshotted on the entry being undone, so
+      // rolling back life rolls back the pressure it caused too.
+      const restoredThreat = target.payload.threatBefore as number | undefined;
+      const restoredSilhouette = target.payload.silhouetteBefore as Silhouette | undefined;
+
+      function restorePressure(seat: Seat): Seat {
+        return {
+          ...seat,
+          threat: restoredThreat ?? seat.threat,
+          silhouette: restoredSilhouette ?? seat.silhouette,
+        };
+      }
+
       if (target.kind === 'life') {
         const who = target.payload.target as LifeTarget;
         const life = target.payload.before as number;
@@ -816,7 +1373,11 @@ export const useGameStore = create<GameState>((set, get) => {
           set((s) => ({
             seats: s.seats.map((x) =>
               x.id === who
-                ? { ...x, life, eliminated: stillEliminated(x, life, x.commanderDamage) }
+                ? restorePressure({
+                    ...x,
+                    life,
+                    eliminated: stillEliminated(x, life, x.commanderDamage),
+                  })
                 : x,
             ),
           }));
@@ -826,6 +1387,7 @@ export const useGameStore = create<GameState>((set, get) => {
           undoOf: target.seq,
           target: who,
           restoredLife: life,
+          restoredThreat,
         });
         return;
       }
@@ -838,12 +1400,12 @@ export const useGameStore = create<GameState>((set, get) => {
       set((s) => ({
         seats: s.seats.map((x) =>
           x.id === seatId
-            ? {
+            ? restorePressure({
                 ...x,
                 life,
                 commanderDamage,
                 eliminated: stillEliminated(x, life, commanderDamage),
-              }
+              })
             : x,
         ),
       }));
@@ -854,7 +1416,156 @@ export const useGameStore = create<GameState>((set, get) => {
         seatId,
         restoredLife: life,
         restoredCommanderDamage: commanderDamage,
+        restoredThreat,
       });
+    },
+
+    resolveOpponentWindow(upcomingTurn) {
+      return runOpponentWindow(upcomingTurn ?? get().turn + 1);
+    },
+
+    respondToActiveEvent(note) {
+      const state = get();
+      const event = state.activeEvent;
+      if (!state.run || !event) return;
+
+      // A countered spell you force through actually resolves — the card
+      // finishes the trip to the battlefield the interception interrupted.
+      if (event.type === 'counter' && event.targetIid) {
+        const held = state.cards[event.targetIid];
+        if (held && held.zone === 'hand') performMove(event.targetIid, 'battlefield');
+      }
+
+      const answered: PressureEvent = { ...event, state: 'negated' };
+      const trimmed = note?.trim();
+      appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` — "${trimmed}"` : ''}`, {
+        ...eventPayload(answered),
+        responded: true,
+        negated: true,
+        note: trimmed,
+      });
+      advanceQueue();
+    },
+
+    resolveActiveEvent(payload) {
+      const state = get();
+      const event = state.activeEvent;
+      if (!state.run || !event) return;
+
+      const outcome: Record<string, unknown> = {};
+
+      switch (event.type) {
+        case 'wipe': {
+          const nonlands = payload?.wipeNonlands ?? event.variant === 'nonlands';
+          const victims = wipeVictims(nonlands);
+          for (const iid of victims) performMove(iid, 'graveyard');
+          outcome.scope = nonlands ? 'nonlands' : 'creatures';
+          outcome.swept = victims.length;
+          outcome.iids = victims;
+          break;
+        }
+
+        case 'removal': {
+          const iid = payload?.targetIid ?? event.targetIid;
+          const card = iid ? state.cards[iid] : undefined;
+          if (iid && card && card.zone === 'battlefield') {
+            outcome.targetIid = iid;
+            outcome.targetName = cardName(state, iid);
+            performMove(iid, 'graveyard');
+          } else {
+            outcome.noTarget = true;
+          }
+          break;
+        }
+
+        case 'counter': {
+          // The held spell never resolved: it goes from hand to the graveyard.
+          const iid = payload?.targetIid ?? event.targetIid;
+          const card = iid ? state.cards[iid] : undefined;
+          if (iid && card && card.zone !== 'graveyard') {
+            outcome.counteredIid = iid;
+            outcome.counteredName = cardName(state, iid);
+            performMove(iid, 'graveyard');
+          }
+          break;
+        }
+
+        case 'combat': {
+          const offered = event.severity.damage ?? 0;
+          const taken = payload?.damageTaken ?? offered;
+          outcome.offered = offered;
+          outcome.taken = taken;
+          if (taken > 0) get().adjustLife('player', -taken);
+          break;
+        }
+
+        case 'resource': {
+          const iid = payload?.discardIid ?? payload?.sacrificeIid;
+          const card = iid ? state.cards[iid] : undefined;
+          if (iid && card) {
+            outcome.mode = payload?.discardIid ? 'discard' : 'sacrifice';
+            outcome.iid = iid;
+            outcome.name = cardName(state, iid);
+            performMove(iid, 'graveyard');
+          } else {
+            // The 'tax' variant has no bookkeeping — acknowledging it is enough.
+            outcome.mode = event.variant ?? 'tax';
+            outcome.acknowledged = true;
+          }
+          break;
+        }
+
+        case 'clock': {
+          // A clock is a standing warning, not a one-off hit. Acknowledging it
+          // files the prompt away; the clock itself lives on in `state.clock`
+          // until you win, eliminate the seat, or declare interaction.
+          outcome.acknowledged = true;
+          outcome.deadlineTurn = event.severity.deadlineTurn;
+          break;
+        }
+      }
+
+      const resolved: PressureEvent = { ...event, state: 'resolved' };
+      const trimmed = payload?.note?.trim();
+      appendLog('event', `Resolved ${event.type}: ${event.prompt}${trimmed ? ` — "${trimmed}"` : ''}`, {
+        ...eventPayload(resolved),
+        resolved: true,
+        outcome,
+        note: trimmed,
+      });
+      advanceQueue();
+    },
+
+    declareInteraction() {
+      const state = get();
+      if (!state.run) return;
+      const clock = state.clock;
+      if (!clock) return;
+
+      set({ clock: null });
+      appendLog(
+        'respond',
+        `Declared held interaction — Seat ${clock.seatId}'s clock is answered.`,
+        {
+          seatId: clock.seatId,
+          deadlineTurn: clock.deadlineTurn,
+          spawnedTurn: clock.spawnedTurn,
+          canceled: true,
+          reason: 'declared-interaction',
+        },
+      );
+
+      // If the clock's own warning is still sitting in front of the player,
+      // retire it — it has just been answered.
+      const active = get().activeEvent;
+      if (active && active.type === 'clock' && active.seatId === clock.seatId) {
+        appendLog('respond', `Answered clock: ${active.prompt}`, {
+          ...eventPayload({ ...active, state: 'negated' }),
+          responded: true,
+          negated: true,
+        });
+        advanceQueue();
+      }
     },
   };
 });
