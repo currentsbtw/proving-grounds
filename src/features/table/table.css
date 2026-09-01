@@ -616,6 +616,25 @@
   color: var(--muted);
 }
 
+/* Inline "custom counter" name entry, in place of a window.prompt. */
+.tbl-menu-form {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px 6px;
+}
+
+.tbl-menu-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.tbl-menu-form button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
 /* Overlay ---------------------------------------------------------------- */
 
 .tbl-overlay {

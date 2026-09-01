@@ -24,6 +24,16 @@ export const LETHAL_COMMANDER_DAMAGE = 21;
 
 export type LifeTarget = 'player' | SeatId;
 
+/** Extra options for `moveCard`. The bare 'top' | 'bottom' form is still accepted. */
+export interface MoveOptions {
+  /** Only meaningful when moving to the library. Defaults to 'top'. */
+  position?: 'top' | 'bottom';
+  /** Arrive on the battlefield already tapped. Ignored for other zones. */
+  tapped?: boolean;
+}
+
+export type MoveArg = 'top' | 'bottom' | MoveOptions;
+
 const SEAT_IDS: SeatId[] = ['A', 'B', 'C'];
 
 const ZONE_LABELS: Record<ZoneId, string> = {
@@ -55,13 +65,17 @@ export interface GameState {
   commanderCasts: Record<string, number>;
   cardData: Record<string, CardData>;
   mulliganCount: number;
+  /** True once the opening hand has been kept. Reset by startRun and takeMulligan. */
+  mulliganResolved: boolean;
   rng: (() => number) | null;
   lastAutoDrawTurn: number;
+  /** Monotonic source for CardInstance.movedAt. Never reset mid-run. */
+  moveCounter: number;
 
   startRun: (deck: Deck, cardData: Record<string, CardData>, seed?: string) => void;
   takeMulligan: () => void;
   resolveMulligan: (bottomIids: string[]) => void;
-  moveCard: (iid: string, toZone: ZoneId, position?: 'top' | 'bottom') => void;
+  moveCard: (iid: string, toZone: ZoneId, options?: MoveArg) => void;
   drawCards: (n: number) => void;
   shuffleLibrary: () => void;
   millCards: (n: number) => void;
@@ -77,6 +91,7 @@ export interface GameState {
   nextTurn: () => void;
   endRun: (result: RunResult) => Promise<void>;
   logNote: (message: string) => void;
+  undoLastLifeChange: () => void;
 }
 
 /** Display name for a card instance (token name, cached Scryfall name, or a fallback). */
@@ -88,19 +103,35 @@ export function cardName(state: GameState, iid: string): string {
   return 'Unknown card';
 }
 
-/** All instances currently in a zone. Library results are returned in library order (top first). */
+/**
+ * All instances currently in a zone. The library is returned in library order
+ * (top first); every other zone is ordered by arrival, oldest first — so the
+ * last element is the most recently arrived card ("top of the graveyard").
+ */
 export function cardsInZone(state: GameState, zone: ZoneId): CardInstance[] {
   if (zone === 'library') {
     return state.libraryOrder.map((iid) => state.cards[iid]).filter(Boolean);
   }
-  return Object.values(state.cards).filter((c) => c.zone === zone);
+  return Object.values(state.cards)
+    .filter((c) => c.zone === zone)
+    .sort(byArrival);
+}
+
+/** Sort comparator for the unordered zones: oldest arrival first. */
+export function byArrival(a: CardInstance, b: CardInstance): number {
+  return a.movedAt - b.movedAt;
 }
 
 export function commanderTax(state: GameState, scryfallId: string): number {
   return 2 * (state.commanderCasts[scryfallId] ?? 0);
 }
 
-function makeInstance(scryfallId: string | null, zone: ZoneId, isCommander: boolean): CardInstance {
+function makeInstance(
+  scryfallId: string | null,
+  zone: ZoneId,
+  isCommander: boolean,
+  movedAt: number,
+): CardInstance {
   return {
     iid: nanoid(10),
     scryfallId,
@@ -110,7 +141,34 @@ function makeInstance(scryfallId: string | null, zone: ZoneId, isCommander: bool
     counters: {},
     isCommander,
     isToken: scryfallId === null,
+    movedAt,
   };
+}
+
+/**
+ * A log entry that `undoLastLifeChange` knows how to reverse: a life adjustment
+ * or a commander-damage hit. Elimination notices (kind 'damage' with a `reason`
+ * but no `amount`) and undo entries themselves are deliberately excluded.
+ */
+function isUndoableLifeEntry(entry: LogEntry): boolean {
+  if (entry.payload.undoOf !== undefined) return false;
+  if (entry.kind === 'life') {
+    return typeof entry.payload.before === 'number' && typeof entry.payload.target === 'string';
+  }
+  if (entry.kind === 'damage') {
+    return (
+      typeof entry.payload.amount === 'number' &&
+      typeof entry.payload.lifeBefore === 'number' &&
+      typeof entry.payload.commanderDamageBefore === 'number'
+    );
+  }
+  return false;
+}
+
+/** Whether a seat that is currently eliminated stays eliminated at the restored totals. */
+function stillEliminated(seat: Seat, life: number, commanderDamage: number): boolean {
+  if (!seat.eliminated) return false;
+  return life <= 0 || commanderDamage >= LETHAL_COMMANDER_DAMAGE;
 }
 
 export const useGameStore = create<GameState>((set, get) => {
@@ -145,10 +203,12 @@ export const useGameStore = create<GameState>((set, get) => {
     if (taken.length === 0) return [];
     set((s) => {
       const cards = { ...s.cards };
+      let stamp = s.moveCounter;
       for (const iid of taken) {
-        cards[iid] = { ...cards[iid], zone: 'hand', tapped: false };
+        stamp += 1;
+        cards[iid] = { ...cards[iid], zone: 'hand', tapped: false, movedAt: stamp };
       }
-      return { cards, libraryOrder: s.libraryOrder.slice(taken.length) };
+      return { cards, libraryOrder: s.libraryOrder.slice(taken.length), moveCounter: stamp };
     });
     return taken;
   }
@@ -218,8 +278,10 @@ export const useGameStore = create<GameState>((set, get) => {
     commanderCasts: {},
     cardData: {},
     mulliganCount: 0,
+    mulliganResolved: false,
     rng: null,
     lastAutoDrawTurn: 0,
+    moveCounter: 0,
 
     startRun(deck, cardData, seed) {
       const runSeed = seed ?? randomSeed();
@@ -227,16 +289,17 @@ export const useGameStore = create<GameState>((set, get) => {
 
       const cards: Record<string, CardInstance> = {};
       const libraryOrder: string[] = [];
+      let stamp = 0;
 
       for (const ref of deck.cards) {
         for (let i = 0; i < ref.qty; i++) {
-          const inst = makeInstance(ref.scryfallId, 'library', false);
+          const inst = makeInstance(ref.scryfallId, 'library', false, ++stamp);
           cards[inst.iid] = inst;
           libraryOrder.push(inst.iid);
         }
       }
       for (const commanderId of deck.commanderIds) {
-        const inst = makeInstance(commanderId, 'command', true);
+        const inst = makeInstance(commanderId, 'command', true, ++stamp);
         cards[inst.iid] = inst;
       }
 
@@ -264,7 +327,9 @@ export const useGameStore = create<GameState>((set, get) => {
         commanderCasts: {},
         cardData,
         mulliganCount: 0,
+        mulliganResolved: false,
         lastAutoDrawTurn: 1,
+        moveCounter: stamp,
       });
 
       appendLog('run', `Run started — ${deck.name} (seed ${runSeed})`, {
@@ -294,10 +359,18 @@ export const useGameStore = create<GameState>((set, get) => {
       const hand = cardsInZone(get(), 'hand').map((c) => c.iid);
       set((s) => {
         const cards = { ...s.cards };
+        let stamp = s.moveCounter;
         for (const iid of hand) {
-          cards[iid] = { ...cards[iid], zone: 'library' };
+          stamp += 1;
+          cards[iid] = { ...cards[iid], zone: 'library', movedAt: stamp };
         }
-        return { cards, libraryOrder: [...s.libraryOrder, ...hand], mulliganCount: s.mulliganCount + 1 };
+        return {
+          cards,
+          libraryOrder: [...s.libraryOrder, ...hand],
+          mulliganCount: s.mulliganCount + 1,
+          mulliganResolved: false,
+          moveCounter: stamp,
+        };
       });
       shuffleSilently();
       const count = get().mulliganCount;
@@ -316,15 +389,20 @@ export const useGameStore = create<GameState>((set, get) => {
     resolveMulligan(bottomIids) {
       if (!get().run) return;
       const valid = bottomIids.filter((iid) => get().cards[iid]?.zone === 'hand');
-      if (valid.length > 0) {
-        set((s) => {
-          const cards = { ...s.cards };
-          for (const iid of valid) {
-            cards[iid] = { ...cards[iid], zone: 'library' };
-          }
-          return { cards, libraryOrder: [...s.libraryOrder, ...valid] };
-        });
-      }
+      set((s) => {
+        const cards = { ...s.cards };
+        let stamp = s.moveCounter;
+        for (const iid of valid) {
+          stamp += 1;
+          cards[iid] = { ...cards[iid], zone: 'library', movedAt: stamp };
+        }
+        return {
+          cards,
+          libraryOrder: [...s.libraryOrder, ...valid],
+          mulliganResolved: true,
+          moveCounter: stamp,
+        };
+      });
       const names = valid.map((iid) => cardName(get(), iid));
       appendLog('mull', `Kept ${cardsInZone(get(), 'hand').length}; ${valid.length} to the bottom`, {
         mulliganCount: get().mulliganCount,
@@ -333,35 +411,41 @@ export const useGameStore = create<GameState>((set, get) => {
       });
     },
 
-    moveCard(iid, toZone, position = 'top') {
+    moveCard(iid, toZone, options) {
       const state = get();
       const card = state.cards[iid];
       if (!card || card.zone === toZone) return;
       const fromZone = card.zone;
       const name = cardName(state, iid);
 
+      const opts: MoveOptions = typeof options === 'string' ? { position: options } : (options ?? {});
+      const position = opts.position ?? 'top';
+      const entersTapped = toZone === 'battlefield' && opts.tapped === true;
+
       set((s) => {
         const next: CardInstance = {
           ...s.cards[iid],
           zone: toZone,
-          tapped: toZone === 'battlefield' ? s.cards[iid].tapped : false,
+          tapped: toZone === 'battlefield' ? s.cards[iid].tapped || entersTapped : false,
           counters: toZone === 'battlefield' ? s.cards[iid].counters : {},
+          movedAt: s.moveCounter + 1,
         };
         const cards = { ...s.cards, [iid]: next };
         let libraryOrder = s.libraryOrder.filter((x) => x !== iid);
         if (toZone === 'library') {
           libraryOrder = position === 'bottom' ? [...libraryOrder, iid] : [iid, ...libraryOrder];
         }
-        return { cards, libraryOrder };
+        return { cards, libraryOrder, moveCounter: s.moveCounter + 1 };
       });
 
-      const suffix = toZone === 'library' ? ` (${position})` : '';
+      const suffix = toZone === 'library' ? ` (${position})` : entersTapped ? ' — enters tapped' : '';
       appendLog('move', `${name}: ${ZONE_LABELS[fromZone]} → ${ZONE_LABELS[toZone]}${suffix}`, {
         iid,
         name,
         from: fromZone,
         to: toZone,
         position: toZone === 'library' ? position : undefined,
+        tapped: entersTapped || undefined,
         isCommander: card.isCommander,
       });
 
@@ -412,10 +496,12 @@ export const useGameStore = create<GameState>((set, get) => {
       }
       set((s) => {
         const cards = { ...s.cards };
+        let stamp = s.moveCounter;
         for (const iid of milled) {
-          cards[iid] = { ...cards[iid], zone: 'graveyard', tapped: false, counters: {} };
+          stamp += 1;
+          cards[iid] = { ...cards[iid], zone: 'graveyard', tapped: false, counters: {}, movedAt: stamp };
         }
-        return { cards, libraryOrder: s.libraryOrder.slice(milled.length) };
+        return { cards, libraryOrder: s.libraryOrder.slice(milled.length), moveCounter: stamp };
       });
       const names = milled.map((iid) => cardName(get(), iid));
       appendLog('move', `Milled ${milled.length}: ${names.join(', ')}`, {
@@ -452,9 +538,13 @@ export const useGameStore = create<GameState>((set, get) => {
       const priorCasts = state.commanderCasts[key] ?? 0;
 
       set((s) => ({
-        cards: { ...s.cards, [iid]: { ...s.cards[iid], zone: 'battlefield', counters: {} } },
+        cards: {
+          ...s.cards,
+          [iid]: { ...s.cards[iid], zone: 'battlefield', counters: {}, movedAt: s.moveCounter + 1 },
+        },
         libraryOrder: s.libraryOrder.filter((x) => x !== iid),
         commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 },
+        moveCounter: s.moveCounter + 1,
       }));
 
       appendLog('commander', `Cast ${name} (cast #${priorCasts + 1}, tax +${tax})`, {
@@ -515,13 +605,14 @@ export const useGameStore = create<GameState>((set, get) => {
       const created: string[] = [];
       set((s) => {
         const cards = { ...s.cards };
+        let stamp = s.moveCounter;
         for (let i = 0; i < n; i++) {
-          const inst = makeInstance(null, 'battlefield', false);
+          const inst = makeInstance(null, 'battlefield', false, ++stamp);
           inst.tokenSpec = spec;
           cards[inst.iid] = inst;
           created.push(inst.iid);
         }
-        return { cards };
+        return { cards, moveCounter: stamp };
       });
       const size = spec.power && spec.toughness ? `${spec.power}/${spec.toughness} ` : '';
       appendLog('token', `Created ${n} ${size}${spec.name} token${n === 1 ? '' : 's'}`, {
@@ -657,7 +748,9 @@ export const useGameStore = create<GameState>((set, get) => {
         commanderCasts: {},
         cardData: {},
         mulliganCount: 0,
+        mulliganResolved: false,
         lastAutoDrawTurn: 0,
+        moveCounter: 0,
       });
     },
 
@@ -665,6 +758,86 @@ export const useGameStore = create<GameState>((set, get) => {
       const text = message.trim();
       if (!get().run || !text) return;
       appendLog('note', text, { note: text, playerAuthored: true });
+    },
+
+    undoLastLifeChange() {
+      const run = get().run;
+      if (!run) return;
+
+      // The log is append-only: an undo never removes the entry it reverses, it
+      // marks it with `undoOf`. So "already undone" is read back off the log.
+      const undone = new Set<number>();
+      for (const entry of run.log) {
+        const of = entry.payload.undoOf;
+        if (typeof of === 'number') undone.add(of);
+      }
+
+      let target: LogEntry | undefined;
+      for (let i = run.log.length - 1; i >= 0; i--) {
+        const entry = run.log[i];
+        if (isUndoableLifeEntry(entry) && !undone.has(entry.seq)) {
+          target = entry;
+          break;
+        }
+      }
+
+      if (!target) {
+        appendLog('note', 'Nothing to undo — no life change left in the log', {
+          undo: true,
+          noop: true,
+        });
+        return;
+      }
+
+      if (target.kind === 'life') {
+        const who = target.payload.target as LifeTarget;
+        const life = target.payload.before as number;
+
+        if (who === 'player') {
+          set({ playerLife: life });
+        } else {
+          set((s) => ({
+            seats: s.seats.map((x) =>
+              x.id === who
+                ? { ...x, life, eliminated: stillEliminated(x, life, x.commanderDamage) }
+                : x,
+            ),
+          }));
+        }
+
+        appendLog('life', `Undid: ${target.message}`, {
+          undoOf: target.seq,
+          target: who,
+          restoredLife: life,
+        });
+        return;
+      }
+
+      // Commander damage: life and the commander-damage tally both roll back.
+      const seatId = target.payload.seatId as SeatId;
+      const life = target.payload.lifeBefore as number;
+      const commanderDamage = target.payload.commanderDamageBefore as number;
+
+      set((s) => ({
+        seats: s.seats.map((x) =>
+          x.id === seatId
+            ? {
+                ...x,
+                life,
+                commanderDamage,
+                eliminated: stillEliminated(x, life, commanderDamage),
+              }
+            : x,
+        ),
+      }));
+
+      appendLog('life', `Undid: ${target.message}`, {
+        undoOf: target.seq,
+        target: seatId,
+        seatId,
+        restoredLife: life,
+        restoredCommanderDamage: commanderDamage,
+      });
     },
   };
 });

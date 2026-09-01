@@ -36,6 +36,13 @@ export interface CardInstance {
   isCommander: boolean;
   isToken: boolean;
   tokenSpec?: TokenSpec;
+  /**
+   * Monotonic stamp from the store's move counter, bumped every time this card
+   * is created or changes zone. Orders the unordered zones (hand, battlefield,
+   * graveyard, exile, command) — higher is more recently arrived. Deterministic
+   * per run, not wall-clock, so replaying a seed reproduces the same ordering.
+   */
+  movedAt: number;
 }
 
 export type SeatId = 'A' | 'B' | 'C';

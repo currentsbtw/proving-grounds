@@ -23,11 +23,13 @@ interface ZoneEntry {
   zone: ZoneId;
   label: string;
   position?: 'top' | 'bottom';
+  tapped?: boolean;
 }
 
 const ZONE_ENTRIES: ZoneEntry[] = [
   { zone: 'hand', label: 'Hand' },
   { zone: 'battlefield', label: 'Battlefield (untapped)' },
+  { zone: 'battlefield', label: 'To battlefield tapped', tapped: true },
   { zone: 'graveyard', label: 'Graveyard' },
   { zone: 'exile', label: 'Exile' },
   { zone: 'command', label: 'Command zone' },
@@ -48,6 +50,9 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
   const addCounter = useGameStore((s) => s.addCounter);
   const castCommander = useGameStore((s) => s.castCommander);
   const toggleTapped = useGameStore((s) => s.toggleTapped);
+
+  /** null = the "Custom counter…" row; a string = the inline name input is open. */
+  const [custom, setCustom] = useState<string | null>(null);
 
   useEffect(() => {
     if (!card) onClose();
@@ -87,7 +92,9 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
       {zoneEntries.map((entry) => (
         <MenuItem
           key={entry.label}
-          onSelect={run(() => moveCard(iid, entry.zone, entry.position))}
+          onSelect={run(() =>
+            moveCard(iid, entry.zone, { position: entry.position, tapped: entry.tapped }),
+          )}
         >
           {entry.label}
         </MenuItem>
@@ -108,15 +115,32 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
         Remove loyalty
       </MenuItem>
       <MenuItem onSelect={run(() => addCounter(iid, 'charge', 1))}>Add charge counter</MenuItem>
-      <MenuItem
-        onSelect={run(() => {
-          const kind = window.prompt('Counter name:', '');
-          const trimmed = kind?.trim();
-          if (trimmed) addCounter(iid, trimmed, 1);
-        })}
-      >
-        Custom counter…
-      </MenuItem>
+
+      {custom === null ? (
+        <MenuItem onSelect={() => setCustom('')}>Custom counter…</MenuItem>
+      ) : (
+        <form
+          className="tbl-menu-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const kind = custom.trim();
+            if (kind) addCounter(iid, kind, 1);
+            onClose();
+          }}
+        >
+          <input
+            type="text"
+            autoFocus
+            value={custom}
+            placeholder="Counter name… ↵"
+            aria-label="Custom counter name"
+            onChange={(e) => setCustom(e.target.value)}
+          />
+          <button type="submit" disabled={custom.trim() === ''}>
+            Add
+          </button>
+        </form>
+      )}
     </PopMenu>
   );
 }

@@ -19,8 +19,11 @@ export const HOTKEYS: { key: string; label: string; action: string }[] = [
   { key: 'U', label: 'U', action: 'Untap all' },
   { key: 'Space', label: 'Space', action: 'Next phase' },
   { key: 'T', label: 'T', action: 'Next turn' },
-  { key: 'N', label: 'N', action: 'Add a note' },
+  { key: 'N', label: 'N', action: 'Jump to the note box' },
 ];
+
+/** Fired by the N hotkey; the HUD's run-log note input focuses itself on it. */
+export const FOCUS_NOTE_EVENT = 'pg:focus-note';
 
 /** Global keyboard shortcuts. No-ops while no run is active. */
 export function useHotkeys(): void {
@@ -55,12 +58,10 @@ export function useHotkeys(): void {
           e.preventDefault();
           state.nextTurn();
           break;
-        case 'n': {
+        case 'n':
           e.preventDefault();
-          const note = window.prompt('Note for the run log:');
-          if (note) state.logNote(note);
+          window.dispatchEvent(new CustomEvent(FOCUS_NOTE_EVENT));
           break;
-        }
         default:
           break;
       }

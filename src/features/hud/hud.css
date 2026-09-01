@@ -132,6 +132,24 @@
 
 /* ── 2. Life ────────────────────────────────────────────────────────────── */
 
+.hud-life-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hud-life-head .panel-heading {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.hud-life-undo {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .hud-life-grid {
   display: flex;
   flex-direction: column;

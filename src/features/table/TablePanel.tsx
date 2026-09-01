@@ -10,7 +10,7 @@ import {
 import type { CollisionDetection, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useCallback, useMemo, useState } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
-import { commanderTax, useGameStore } from '../../state/gameStore';
+import { byArrival, commanderTax, useGameStore } from '../../state/gameStore';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
 import { CardMenuProvider } from './CardMenu';
@@ -69,6 +69,7 @@ function TableSurface() {
   const turn = useGameStore((s) => s.turn);
   const phase = useGameStore((s) => s.phase);
   const mulliganCount = useGameStore((s) => s.mulliganCount);
+  const mulliganResolved = useGameStore((s) => s.mulliganResolved);
 
   const moveCard = useGameStore((s) => s.moveCard);
   const drawCards = useGameStore((s) => s.drawCards);
@@ -81,7 +82,6 @@ function TableSurface() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
   const [libMenu, setLibMenu] = useState<{ x: number; y: number } | null>(null);
-  const [mullDone, setMullDone] = useState(false);
   const [bottoming, setBottoming] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -98,6 +98,8 @@ function TableSurface() {
     for (const card of Object.values(cards)) {
       if (card.zone !== 'library') buckets[card.zone].push(card);
     }
+    // Arrival order, so the graveyard / exile previews show the newest card last.
+    for (const bucket of Object.values(buckets)) bucket.sort(byArrival);
     return buckets;
   }, [cards]);
 
@@ -116,7 +118,9 @@ function TableSurface() {
     [cards],
   );
 
-  const showMulligan = turn === 1 && phase === 'main1' && !mullDone && openingHand;
+  // The store flag is authoritative; `openingHand` still auto-hides the bar the
+  // moment a card is actually played without a keep having been recorded.
+  const showMulligan = turn === 1 && phase === 'main1' && !mulliganResolved && openingHand;
 
   // Derived so a chosen card that leaves the hand drops out of the selection.
   const selection = useMemo(
@@ -206,10 +210,7 @@ function TableSurface() {
                   setSelected([]);
                   takeMulligan();
                 }}
-                onKeep={() => {
-                  resolveMulligan([]);
-                  setMullDone(true);
-                }}
+                onKeep={() => resolveMulligan([])}
                 onStartBottoming={() => {
                   setSelected([]);
                   setBottoming(true);
@@ -222,7 +223,6 @@ function TableSurface() {
                   resolveMulligan(selection);
                   setBottoming(false);
                   setSelected([]);
-                  setMullDone(true);
                 }}
               />
             )}

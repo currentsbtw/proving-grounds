@@ -8,12 +8,11 @@ import './decks.css';
 
 type View = { kind: 'list' } | { kind: 'import'; deck?: Deck };
 
+/** Read-only run facts. Ending the run lives in the HUD, not here. */
 function ActiveRun() {
   const run = useGameStore((s) => s.run);
   const turn = useGameStore((s) => s.turn);
   const phase = useGameStore((s) => s.phase);
-  const endRun = useGameStore((s) => s.endRun);
-  const [confirm, setConfirm] = useState(false);
 
   if (!run) return null;
 
@@ -31,28 +30,7 @@ function ActiveRun() {
         <dt>Bracket</dt>
         <dd className="num">{run.bracket}</dd>
       </dl>
-
-      {confirm ? (
-        <div className="dk-row">
-          <button
-            type="button"
-            className="dk-btn-quiet dk-btn-danger"
-            onClick={() => {
-              setConfirm(false);
-              void endRun('concede');
-            }}
-          >
-            Concede run
-          </button>
-          <button type="button" className="dk-btn-quiet" onClick={() => setConfirm(false)}>
-            Keep playing
-          </button>
-        </div>
-      ) : (
-        <button type="button" className="dk-btn-quiet dk-btn-danger" onClick={() => setConfirm(true)}>
-          Concede run
-        </button>
-      )}
+      <p className="muted">End the run from the HUD.</p>
     </div>
   );
 }

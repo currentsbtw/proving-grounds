@@ -94,10 +94,21 @@ function SeatCard({ seat }: { seat: Seat }) {
 /** Life totals for the player and the three opposing seats, plus commander damage. */
 export default function LifePanel() {
   const seats = useGameStore((s) => s.seats);
+  const undoLastLifeChange = useGameStore((s) => s.undoLastLifeChange);
 
   return (
     <div className="pg-hud-block">
-      <span className="panel-heading">Life</span>
+      <div className="hud-life-head">
+        <span className="panel-heading">Life</span>
+        <button
+          type="button"
+          className="hud-life-undo"
+          title="Reverse the last life or commander-damage change (the log keeps both entries)"
+          onClick={() => undoLastLifeChange()}
+        >
+          Undo
+        </button>
+      </div>
       <div className="hud-life-grid">
         <PlayerCard />
         {seats.map((seat) => (

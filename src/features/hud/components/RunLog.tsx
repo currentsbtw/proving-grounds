@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useGameStore } from '../../../state/gameStore';
+import { FOCUS_NOTE_EVENT } from '../../../hooks/useHotkeys';
 import type { LogEntry, LogKind } from '../../../domain/types';
 
 const EMPTY: LogEntry[] = [];
@@ -16,6 +17,7 @@ export default function RunLog() {
   const logNote = useGameStore((s) => s.logNote);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const stickRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
   const [note, setNote] = useState('');
@@ -25,6 +27,18 @@ export default function RunLog() {
     if (!el || !stickRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [log.length]);
+
+  // The N hotkey aims here instead of opening a window.prompt.
+  useEffect(() => {
+    function focusNote(): void {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.select();
+    }
+    window.addEventListener(FOCUS_NOTE_EVENT, focusNote);
+    return () => window.removeEventListener(FOCUS_NOTE_EVENT, focusNote);
+  }, []);
 
   function handleScroll(): void {
     const el = scrollRef.current;
@@ -93,9 +107,10 @@ export default function RunLog() {
 
       <form className="hud-note-form" data-hotkeys="off" onSubmit={submitNote}>
         <input
+          ref={inputRef}
           type="text"
           value={note}
-          placeholder="Log a note… ↵"
+          placeholder="Log a note… (N)"
           aria-label="Log a note"
           onChange={(e) => setNote(e.target.value)}
         />
