@@ -22,6 +22,22 @@ function counterClass(kind: string): string {
   return '';
 }
 
+/**
+ * The number for the mana-value badge, or null when the badge would be noise:
+ * tokens, face-down cards, cards whose Scryfall data has not resolved, and
+ * plain lands (which are always mana value 0).
+ */
+function manaValueBadge(
+  card: CardInstance,
+  data: CardData | undefined,
+  faceDown?: boolean,
+): number | null {
+  if (card.isToken || card.faceDown || faceDown) return null;
+  if (!data) return null;
+  if (data.manaValue === 0 && data.typeLine.includes('Land')) return null;
+  return data.manaValue;
+}
+
 export interface CardViewProps {
   card: CardInstance;
   /** Rendered width in px; height is derived from the card aspect. */
@@ -36,6 +52,8 @@ export interface CardViewProps {
   lifted?: boolean;
   /** Right-click context menu. Defaults to true. */
   menu?: boolean;
+  /** Mana-value badge. Defaults to true; off for tiny stack previews. */
+  badge?: boolean;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   onDoubleClick?: (e: MouseEvent<HTMLDivElement>) => void;
   title?: string;
@@ -115,6 +133,7 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
     ghost,
     lifted,
     menu = true,
+    badge = true,
     onClick,
     onDoubleClick,
     title,
@@ -135,6 +154,7 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
   if (interactive) classes.push('is-interactive');
 
   const counters = Object.entries(card.counters).filter(([, n]) => n > 0);
+  const manaValue = badge ? manaValueBadge(card, data, faceDown) : null;
 
   const inner = (
     <div
@@ -158,6 +178,11 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
       <div className="tbl-card-face">
         <CardArt card={card} data={data} small={small} faceDown={faceDown} />
       </div>
+      {manaValue !== null && (
+        <span className="tbl-mv num" aria-label={`Mana value ${manaValue}`}>
+          {manaValue}
+        </span>
+      )}
       {counters.length > 0 && (
         <div className="tbl-counters">
           {counters.map(([kind, n]) => (

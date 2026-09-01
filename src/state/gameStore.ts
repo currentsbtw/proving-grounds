@@ -122,6 +122,23 @@ export function byArrival(a: CardInstance, b: CardInstance): number {
   return a.movedAt - b.movedAt;
 }
 
+/**
+ * Whether the opening hand is still undecided — the condition the mulligan bar
+ * and the mulligan hotkey both key off. The `mulliganResolved` flag is
+ * authoritative; the zone check also retires the bar the moment a card is
+ * actually played without a keep having been recorded.
+ */
+export function canMulligan(state: GameState): boolean {
+  if (!state.run) return false;
+  if (state.turn !== 1 || state.phase !== 'main1') return false;
+  if (state.mulliganResolved) return false;
+  return !Object.values(state.cards).some(
+    (c) =>
+      !c.isCommander &&
+      (c.zone === 'battlefield' || c.zone === 'graveyard' || c.zone === 'exile'),
+  );
+}
+
 export function commanderTax(state: GameState, scryfallId: string): number {
   return 2 * (state.commanderCasts[scryfallId] ?? 0);
 }

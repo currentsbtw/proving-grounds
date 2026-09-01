@@ -52,14 +52,23 @@
 .tbl-bf-row {
   display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
   column-gap: 28px;
   row-gap: 16px;
   padding: 4px 0;
   min-height: 0;
 }
 
+/* Nonlands take whatever space is left and stay top-aligned. */
+.tbl-bf-row.is-nonlands {
+  flex: 1 1 auto;
+  align-content: flex-start;
+}
+
+/* The land row is anchored to the bottom of the battlefield and holds its
+   height open, so playing the first land does not move anything else. */
 .tbl-bf-row.is-lands {
+  flex: 0 0 auto;
+  align-content: flex-end;
   border-top: 1px dashed var(--line);
   padding-top: 12px;
 }
@@ -254,21 +263,63 @@
   min-width: 0;
 }
 
+/* The hand never scrolls: Hand.tsx sizes and overlaps the cards to the measured
+   width. Vertical overflow stays visible so the hover lift can rise out of the
+   box; horizontal is clipped purely as a backstop for a squeezed-to-nothing
+   column, with a margin so the hover scale still shows at the edges. */
 .tbl-hand {
   position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
-  gap: 8px;
   align-items: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 6px 8px 8px;
+  overflow-x: clip;
+  overflow-y: visible;
+  overflow-clip-margin: 10px;
+  padding: 12px 10px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  min-height: 180px;
+  min-height: 196px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.tbl-hand-slot {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: var(--hand-z, 1);
+}
+
+.tbl-hand-slot .tbl-slot {
+  transition: transform 110ms ease;
+}
+
+/* Hover un-overlaps the card so it stays readable at any hand size. */
+.tbl-hand-slot:hover {
+  z-index: 60;
+}
+
+.tbl-hand-slot:hover .tbl-slot {
+  transform: translateY(-8px) scale(1.06);
+}
+
+.tbl-hand-slot:hover .tbl-card-face {
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
+}
+
+/* No peeking mid-drag — the drag overlay is the card you are moving. */
+.tbl-dragging .tbl-hand-slot:hover .tbl-slot {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tbl-hand-slot .tbl-slot {
+    transition: none;
+  }
+
+  .tbl-hand-slot:hover .tbl-slot {
+    transform: translateY(-8px);
+  }
 }
 
 .tbl-hand-empty {
@@ -463,6 +514,27 @@
   background:
     repeating-linear-gradient(135deg, rgba(201, 168, 92, 0.09) 0 6px, transparent 6px 12px),
     var(--raised);
+}
+
+/* Mana value badge ------------------------------------------------------- */
+
+.tbl-mv {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 4;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* Counters --------------------------------------------------------------- */

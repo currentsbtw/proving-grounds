@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useGameStore } from '../../../state/gameStore';
 import { FOCUS_NOTE_EVENT } from '../../../hooks/useHotkeys';
+import { keyLabel, useHotkeyStore } from '../../../state/hotkeyStore';
 import type { LogEntry, LogKind } from '../../../domain/types';
 
 const EMPTY: LogEntry[] = [];
@@ -15,6 +16,7 @@ function isFlow(kind: LogKind): boolean {
 export default function RunLog() {
   const log = useGameStore((s) => s.run?.log) ?? EMPTY;
   const logNote = useGameStore((s) => s.logNote);
+  const noteKey = useHotkeyStore((s) => s.keymap.focusNote);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -110,7 +112,7 @@ export default function RunLog() {
           ref={inputRef}
           type="text"
           value={note}
-          placeholder="Log a note… (N)"
+          placeholder={`Log a note… (${keyLabel(noteKey)})`}
           aria-label="Log a note"
           onChange={(e) => setNote(e.target.value)}
         />

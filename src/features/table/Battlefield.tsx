@@ -2,9 +2,12 @@ import { useDroppable } from '@dnd-kit/core';
 import { useMemo } from 'react';
 import type { CardData, CardInstance } from '../../domain/types';
 import { useGameStore } from '../../state/gameStore';
-import { DraggableCardView } from './CardView';
+import { cardHeight, DraggableCardView } from './CardView';
 
 const BF_CARD_WIDTH = 140;
+
+/** Height the land row holds open, so the first land does not shove the board. */
+const LAND_ROW_MIN = cardHeight(BF_CARD_WIDTH) + 16;
 
 function isLand(card: CardInstance, cardData: Record<string, CardData>): boolean {
   const typeLine = card.isToken
@@ -27,6 +30,18 @@ export function Battlefield({ cards }: { cards: CardInstance[] }) {
     return [l, n];
   }, [cards, cardData]);
 
+  function renderCard(card: CardInstance) {
+    return (
+      <DraggableCardView
+        key={card.iid}
+        card={card}
+        width={BF_CARD_WIDTH}
+        onClick={() => toggleTapped(card.iid)}
+        title="Click to tap / untap · right-click for options"
+      />
+    );
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -39,34 +54,13 @@ export function Battlefield({ cards }: { cards: CardInstance[] }) {
         </p>
       )}
 
+      {/* Both rows always render: nonlands grow downward from the top, lands
+          stay pinned to the bottom edge from the very first one. */}
       <div className="tbl-bf-rows">
-        {nonlands.length > 0 && (
-          <div className="tbl-bf-row">
-            {nonlands.map((card) => (
-              <DraggableCardView
-                key={card.iid}
-                card={card}
-                width={BF_CARD_WIDTH}
-                onClick={() => toggleTapped(card.iid)}
-                title="Click to tap / untap · right-click for options"
-              />
-            ))}
-          </div>
-        )}
-
-        {lands.length > 0 && (
-          <div className={`tbl-bf-row${nonlands.length > 0 ? ' is-lands' : ''}`}>
-            {lands.map((card) => (
-              <DraggableCardView
-                key={card.iid}
-                card={card}
-                width={BF_CARD_WIDTH}
-                onClick={() => toggleTapped(card.iid)}
-                title="Click to tap / untap · right-click for options"
-              />
-            ))}
-          </div>
-        )}
+        <div className="tbl-bf-row is-nonlands">{nonlands.map(renderCard)}</div>
+        <div className="tbl-bf-row is-lands" style={{ minHeight: LAND_ROW_MIN }}>
+          {lands.map(renderCard)}
+        </div>
       </div>
     </div>
   );

@@ -10,7 +10,8 @@ import {
 import type { CollisionDetection, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useCallback, useMemo, useState } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
-import { byArrival, commanderTax, useGameStore } from '../../state/gameStore';
+import { byArrival, canMulligan, commanderTax, useGameStore } from '../../state/gameStore';
+import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
 import { CardMenuProvider } from './CardMenu';
@@ -66,10 +67,8 @@ function CastButton({ card, onDone }: { card: CardInstance; onDone: () => void }
 function TableSurface() {
   const cards = useGameStore((s) => s.cards);
   const libraryOrder = useGameStore((s) => s.libraryOrder);
-  const turn = useGameStore((s) => s.turn);
-  const phase = useGameStore((s) => s.phase);
   const mulliganCount = useGameStore((s) => s.mulliganCount);
-  const mulliganResolved = useGameStore((s) => s.mulliganResolved);
+  const showMulligan = useGameStore(canMulligan);
 
   const moveCard = useGameStore((s) => s.moveCard);
   const drawCards = useGameStore((s) => s.drawCards);
@@ -78,12 +77,17 @@ function TableSurface() {
   const revealTop = useGameStore((s) => s.revealTop);
   const takeMulligan = useGameStore((s) => s.takeMulligan);
   const resolveMulligan = useGameStore((s) => s.resolveMulligan);
+  const keymap = useHotkeyStore((s) => s.keymap);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
   const [libMenu, setLibMenu] = useState<{ x: number; y: number } | null>(null);
-  const [bottoming, setBottoming] = useState(false);
+  // Which mulligan the bottoming UI belongs to. Deriving `bottoming` from it
+  // means a mulligan taken from anywhere — button or hotkey — resets the
+  // choice, with no effect needed.
+  const [bottomingFor, setBottomingFor] = useState<number | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const bottoming = bottomingFor === mulliganCount;
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -107,20 +111,6 @@ function TableSurface() {
     () => libraryOrder.map((iid) => cards[iid]).filter(Boolean),
     [libraryOrder, cards],
   );
-
-  const openingHand = useMemo(
-    () =>
-      !Object.values(cards).some(
-        (c) =>
-          !c.isCommander &&
-          (c.zone === 'battlefield' || c.zone === 'graveyard' || c.zone === 'exile'),
-      ),
-    [cards],
-  );
-
-  // The store flag is authoritative; `openingHand` still auto-hides the bar the
-  // moment a card is actually played without a keep having been recorded.
-  const showMulligan = turn === 1 && phase === 'main1' && !mulliganResolved && openingHand;
 
   // Derived so a chosen card that leaves the hand drops out of the selection.
   const selection = useMemo(
@@ -206,22 +196,22 @@ function TableSurface() {
                 selecting={bottoming}
                 selectedCount={selection.length}
                 onMulligan={() => {
-                  setBottoming(false);
+                  setBottomingFor(null);
                   setSelected([]);
                   takeMulligan();
                 }}
                 onKeep={() => resolveMulligan([])}
                 onStartBottoming={() => {
                   setSelected([]);
-                  setBottoming(true);
+                  setBottomingFor(mulliganCount);
                 }}
                 onCancelBottoming={() => {
-                  setBottoming(false);
+                  setBottomingFor(null);
                   setSelected([]);
                 }}
                 onConfirmBottoming={() => {
                   resolveMulligan(selection);
-                  setBottoming(false);
+                  setBottomingFor(null);
                   setSelected([]);
                 }}
               />
@@ -255,7 +245,11 @@ function TableSurface() {
       {libMenu && (
         <PopMenu x={libMenu.x} y={libMenu.y} onClose={closeLibMenu}>
           <MenuTitle>Library · {library.length} cards</MenuTitle>
-          <MenuItem accent onSelect={runLibraryAction(() => drawCards(1))} hint="D">
+          <MenuItem
+            accent
+            onSelect={runLibraryAction(() => drawCards(1))}
+            hint={keyLabel(keymap.draw)}
+          >
             Draw 1
           </MenuItem>
           <MenuItem
@@ -266,7 +260,7 @@ function TableSurface() {
           >
             Draw N…
           </MenuItem>
-          <MenuItem onSelect={runLibraryAction(shuffleLibrary)} hint="S">
+          <MenuItem onSelect={runLibraryAction(shuffleLibrary)} hint={keyLabel(keymap.shuffle)}>
             Shuffle
           </MenuItem>
           <MenuSep />

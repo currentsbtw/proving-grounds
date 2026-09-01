@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { PHASES, PHASE_LABELS, phaseIndex } from '../../../domain/phases';
 import { useGameStore } from '../../../state/gameStore';
+import { keyLabel, useHotkeyStore } from '../../../state/hotkeyStore';
 import type { Phase } from '../../../domain/types';
 
 /** Turn number, the seven-phase pill strip, and the phase/turn advance buttons. */
@@ -10,6 +11,7 @@ export default function TurnTracker() {
   const nextPhase = useGameStore((s) => s.nextPhase);
   const nextTurn = useGameStore((s) => s.nextTurn);
   const untapAll = useGameStore((s) => s.untapAll);
+  const keymap = useHotkeyStore((s) => s.keymap);
 
   const current = phaseIndex(phase);
 
@@ -57,13 +59,13 @@ export default function TurnTracker() {
 
       <div className="hud-turn-actions">
         <button type="button" onClick={() => nextPhase()}>
-          Next phase<span className="hud-key">Space</span>
+          Next phase<span className="hud-key">{keyLabel(keymap.nextPhase)}</span>
         </button>
         <button type="button" onClick={() => nextTurn()}>
-          Next turn<span className="hud-key">T</span>
+          Next turn<span className="hud-key">{keyLabel(keymap.nextTurn)}</span>
         </button>
         <button type="button" onClick={() => untapAll()}>
-          Untap all<span className="hud-key">U</span>
+          Untap all<span className="hud-key">{keyLabel(keymap.untap)}</span>
         </button>
       </div>
     </div>

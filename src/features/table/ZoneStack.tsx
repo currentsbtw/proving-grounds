@@ -42,6 +42,7 @@ export function ZoneStack({ zone, label, cards, onOpen }: ZoneStackProps) {
           card={top}
           width={STACK_CARD_WIDTH}
           small
+          badge={false}
           title="Drag out, or right-click for options"
         />
       ) : (
@@ -62,7 +63,7 @@ function CommanderCell({ card }: { card: CardInstance }) {
       <div className="tbl-stack-head">
         <span>Command</span>
       </div>
-      <DraggableCardView card={card} width={STACK_CARD_WIDTH} small />
+      <DraggableCardView card={card} width={STACK_CARD_WIDTH} small badge={false} />
       <button
         type="button"
         className="tbl-tax"
