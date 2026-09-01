@@ -1,0 +1,698 @@
+/* ── Proving Grounds — table surface ─────────────────────────────────────── */
+
+.pg-table.tbl-root {
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+/* Empty state ------------------------------------------------------------ */
+
+.pg-table.tbl-root.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.tbl-empty-hint {
+  max-width: 320px;
+  padding: 24px;
+}
+
+.tbl-empty-hint h2 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+/* Battlefield ------------------------------------------------------------ */
+
+.tbl-battlefield {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.tbl-bf-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tbl-bf-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 28px;
+  row-gap: 16px;
+  padding: 4px 0;
+  min-height: 0;
+}
+
+.tbl-bf-row.is-lands {
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+}
+
+.tbl-bf-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 18px 2px;
+}
+
+/* Bottom strip ----------------------------------------------------------- */
+
+.tbl-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+  padding: 10px 12px 12px;
+  background: var(--ground);
+  border-top: 1px solid var(--line);
+}
+
+.tbl-stack-group {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* Zone stacks ------------------------------------------------------------ */
+
+.tbl-stack {
+  position: relative;
+  width: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  text-align: left;
+}
+
+.tbl-stack:hover {
+  border-color: var(--accent);
+}
+
+.tbl-stack.is-wide {
+  width: auto;
+  min-width: 92px;
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.tbl-stack-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tbl-stack-count {
+  color: var(--ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-stack-slot {
+  position: relative;
+  width: 80px;
+  height: 112px;
+  border-radius: 5px;
+  background: var(--raised);
+  border: 1px dashed var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.tbl-stack-slot.is-filled {
+  border-style: solid;
+  border-color: transparent;
+  background: transparent;
+}
+
+.tbl-stack-empty {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tbl-commander-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.tbl-tax {
+  font-size: 11px;
+  padding: 3px 6px;
+  line-height: 1.2;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Library ---------------------------------------------------------------- */
+
+.tbl-lib-back {
+  width: 80px;
+  height: 112px;
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(135deg, rgba(201, 168, 92, 0.09) 0 6px, transparent 6px 12px),
+    var(--raised);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.tbl-lib-count {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-lib-sub {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tbl-lib-strip {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 50%;
+  pointer-events: none;
+  border-radius: 4px;
+  border: 1px dashed transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: transparent;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.tbl-lib-strip.is-top {
+  top: 24px;
+}
+
+.tbl-lib-strip.is-bottom {
+  bottom: 6px;
+}
+
+.tbl-dragging .tbl-lib-strip {
+  border-color: var(--line);
+  color: var(--muted);
+  background: rgba(23, 24, 28, 0.55);
+}
+
+.tbl-dragging .tbl-lib-strip.is-over {
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--accent);
+  background: rgba(201, 168, 92, 0.16);
+}
+
+/* Hand ------------------------------------------------------------------- */
+
+.tbl-hand-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tbl-hand {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 8px 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: 180px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.tbl-hand-empty {
+  color: var(--muted);
+  font-size: 13px;
+  margin: auto;
+}
+
+.tbl-hand-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 2px;
+}
+
+.tbl-hand-head .tbl-hand-n {
+  color: var(--ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-hand-tip {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Drop highlight --------------------------------------------------------- */
+
+.tbl-dragging .tbl-drop {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tbl-dragging .tbl-drop.is-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background-color: rgba(201, 168, 92, 0.06);
+}
+
+.tbl-dragging .tbl-stack.tbl-drop.is-over {
+  border-color: var(--accent);
+}
+
+/* Card ------------------------------------------------------------------- */
+
+.tbl-slot {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.tbl-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: var(--raised);
+  overflow: visible;
+  transition: transform 110ms ease, box-shadow 110ms ease, opacity 110ms ease;
+  transform-origin: 50% 50%;
+  touch-action: none;
+  outline: none;
+}
+
+.tbl-card.is-tapped {
+  transform: rotate(90deg);
+  z-index: 2;
+}
+
+.tbl-card.is-interactive {
+  cursor: pointer;
+}
+
+.tbl-card.is-ghost {
+  opacity: 0.32;
+}
+
+.tbl-card.is-lifted {
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55);
+  cursor: grabbing;
+}
+
+.tbl-card.is-commander .tbl-card-face {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.tbl-card.is-selected .tbl-card-face {
+  box-shadow: 0 0 0 2px var(--ok);
+}
+
+.tbl-card:focus-visible .tbl-card-face {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.tbl-card-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--raised);
+  border: 1px solid var(--line);
+}
+
+.tbl-card-img {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+/* Text frame fallback */
+
+.tbl-frame {
+  width: 100%;
+  height: 100%;
+  padding: 7px 7px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--raised);
+}
+
+.tbl-frame-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.tbl-frame-name {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.tbl-frame-cost {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-frame-type {
+  margin-top: auto;
+  font-size: 9px;
+  line-height: 1.3;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tbl-frame.is-token {
+  border: 1px solid rgba(201, 168, 92, 0.45);
+  border-radius: 5px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.tbl-frame.is-token .tbl-frame-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+}
+
+.tbl-frame-pt {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-frame.is-facedown {
+  background:
+    repeating-linear-gradient(135deg, rgba(201, 168, 92, 0.09) 0 6px, transparent 6px 12px),
+    var(--raised);
+}
+
+/* Counters --------------------------------------------------------------- */
+
+.tbl-counters {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.tbl-counter {
+  font-size: 9px;
+  line-height: 1.35;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(14, 15, 18, 0.86);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-counter.is-plus {
+  color: var(--ok);
+  border-color: rgba(143, 196, 158, 0.5);
+}
+
+.tbl-counter.is-loyalty {
+  color: var(--accent);
+  border-color: rgba(201, 168, 92, 0.5);
+}
+
+/* Mulligan bar ----------------------------------------------------------- */
+
+.tbl-mull {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 5px 8px;
+  background: var(--raised);
+  border: 1px solid rgba(201, 168, 92, 0.4);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.tbl-mull-label {
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.tbl-mull-spacer {
+  flex: 1;
+}
+
+.tbl-mull button {
+  padding: 3px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.tbl-mull .is-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Pop menus -------------------------------------------------------------- */
+
+.tbl-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 208px;
+  max-width: 260px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tbl-menu-title {
+  padding: 5px 8px 6px;
+  font-size: 11px;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tbl-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tbl-menu-item:hover:not(:disabled) {
+  background: var(--raised);
+  border-color: transparent;
+}
+
+.tbl-menu-item:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+.tbl-menu-item.is-accent {
+  color: var(--accent);
+}
+
+.tbl-menu-item .tbl-menu-hint {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl-menu-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 3px 2px;
+}
+
+.tbl-menu-head {
+  padding: 6px 8px 3px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Overlay ---------------------------------------------------------------- */
+
+.tbl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(10, 11, 13, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.tbl-overlay-panel {
+  width: min(1040px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.tbl-overlay-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tbl-overlay-head h3 {
+  font-size: 16px;
+}
+
+.tbl-overlay-head .tbl-mull-spacer {
+  flex: 1;
+}
+
+.tbl-overlay-body {
+  overflow: auto;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  align-content: start;
+}
+
+.tbl-overlay-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+
+.tbl-overlay-cell .tbl-cell-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tbl-overlay-cell button {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.tbl-overlay-empty {
+  color: var(--muted);
+  padding: 24px 4px;
+}
+
+.tbl-overlay-foot {
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}

@@ -1,0 +1,474 @@
+/* ── HUD rail ───────────────────────────────────────────────────────────── */
+
+.pg-rail.pg-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.pg-hud .hud-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pg-hud-block {
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px;
+  flex: none;
+}
+
+.pg-hud-block > .panel-heading {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+/* Dense buttons throughout the rail */
+.pg-hud button {
+  padding: 3px 7px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.pg-hud input {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+/* ── 1. Turn & phase ────────────────────────────────────────────────────── */
+
+.hud-turn-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.hud-turn-number {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.hud-turn-phase {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hud-phase-strip {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 7px;
+}
+
+.hud-phase-pill {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 2px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+
+.hud-phase-pill.is-past {
+  color: var(--ink);
+  opacity: 0.65;
+}
+
+.hud-phase-pill.is-ahead:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.hud-phase-pill.is-current {
+  background: var(--raised);
+  border-color: var(--accent);
+  color: var(--accent);
+  cursor: default;
+}
+
+.hud-phase-pill:disabled {
+  opacity: 1;
+}
+
+.hud-phase-pill.is-past:disabled {
+  opacity: 0.5;
+}
+
+.hud-turn-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.hud-turn-actions button {
+  flex: 1 1 0;
+}
+
+.hud-key {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: 3px;
+}
+
+/* ── 2. Life ────────────────────────────────────────────────────────────── */
+
+.hud-life-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-life-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  overflow: hidden;
+}
+
+.hud-life-card.is-you {
+  border-color: var(--raised);
+  background: var(--raised);
+}
+
+.hud-life-card.is-eliminated {
+  opacity: 0.4;
+}
+
+.hud-life-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.24em;
+  color: var(--danger);
+  border: 2px solid var(--danger);
+  border-radius: 3px;
+  padding: 1px 8px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hud-life-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-life-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  width: 42px;
+  flex: none;
+}
+
+.hud-life-total {
+  font-size: 26px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  min-width: 46px;
+  text-align: right;
+}
+
+.hud-life-total.is-high {
+  color: var(--accent);
+}
+
+.hud-life-total.is-low {
+  color: var(--danger);
+}
+
+.hud-life-buttons {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.hud-life-buttons button {
+  min-width: 30px;
+  padding: 3px 4px;
+}
+
+.hud-cmdr-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--line);
+}
+
+.hud-cmdr-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.hud-cmdr-value {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.hud-cmdr-value .hud-cmdr-max {
+  color: var(--muted);
+}
+
+.hud-cmdr-row .hud-life-buttons button {
+  min-width: 28px;
+}
+
+/* ── 3. Tokens ──────────────────────────────────────────────────────────── */
+
+.hud-token-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hud-token-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hud-token-count input {
+  width: 46px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-token-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hud-token-presets button {
+  flex: 1 1 auto;
+}
+
+.hud-token-form {
+  display: grid;
+  grid-template-columns: 1fr 44px 44px 44px;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  align-items: center;
+}
+
+.hud-token-form input {
+  min-width: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-token-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.hud-token-form-labels {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ── 4. Run log ─────────────────────────────────────────────────────────── */
+
+.pg-hud-log {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow: hidden;
+}
+
+.hud-log-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+}
+
+.hud-log-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.hud-log-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 1px 0;
+  color: var(--ink);
+}
+
+.hud-log-turn {
+  flex: none;
+  width: 26px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.hud-log-msg {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hud-log-row.kind-life .hud-log-msg,
+.hud-log-row.kind-damage .hud-log-msg {
+  color: var(--danger);
+}
+
+.hud-log-row.kind-commander .hud-log-msg {
+  color: var(--accent);
+}
+
+.hud-log-row.kind-run .hud-log-msg {
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.hud-log-row.kind-note .hud-log-msg {
+  font-style: italic;
+  color: var(--ink);
+}
+
+.hud-log-row.is-flow {
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.7;
+  padding: 0;
+}
+
+.hud-log-row.is-flow .hud-log-msg {
+  color: var(--muted);
+}
+
+.hud-log-row.is-collapsed {
+  margin-top: -1px;
+}
+
+.hud-log-jump {
+  align-self: center;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.hud-note-form {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.hud-note-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ── 5. End run ─────────────────────────────────────────────────────────── */
+
+.hud-endrun {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
+.hud-endrun-spacer {
+  flex: 1 1 auto;
+}
+
+.hud-endrun button.is-win {
+  color: var(--ok);
+}
+
+.hud-endrun button.is-loss,
+.hud-endrun button.is-concede {
+  color: var(--danger);
+}
+
+.hud-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 11px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.hud-confirm button {
+  padding: 0 5px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.hud-confirm button.is-yes {
+  color: var(--ok);
+}
+
+.hud-confirm button.is-no {
+  color: var(--danger);
+}
+
+.hud-seed {
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 2px 4px;
+}
+
+.hud-seed:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line);
+}
