@@ -76,6 +76,19 @@ const DECK_HEADERS = [
 /** `Ramp (10)` / `Creatures (34):` — a bare label with a parenthesized count is a section header. */
 const COUNTED_HEADER_RE = /^([^(]+?)\s*\(\s*\d+\s*\)\s*:?$/;
 
+/**
+ * Ceiling on one line's quantity. A run builds one card instance per copy, so a
+ * pasted `999999999999 Mountain` is not a big deck, it is a hung tab. Basics are
+ * the only cards printed in real bulk and no Commander list needs a hundred.
+ */
+const MAX_QTY = 250;
+
+/** Ceiling on a card name. Nothing Scryfall prints comes close; garbage does. */
+const MAX_NAME = 120;
+
+/** Ceiling on distinct names. Past this the paste is not a decklist. */
+const MAX_ENTRIES = 1000;
+
 function headerKind(label: string): SectionKind | null {
   const key = label.trim().replace(/:$/, '').trim().toLowerCase();
   if (!key) return null;
@@ -102,9 +115,21 @@ function detectSection(line: string): { kind: SectionKind; label: string } | nul
   return null;
 }
 
+/**
+ * Control and format characters: NUL and friends, plus the bidi overrides. Both
+ * have to go before a name is used. A NUL makes the browser refuse to send the
+ * Scryfall request at all, and a right-to-left override reorders whatever the
+ * app prints next to the name. Neither appears in any printed card name, and one
+ * bad line used to take the other ninety-nine down with it.
+ */
+const CONTROL_RE = /[\p{Cc}\p{Cf}]/gu;
+
+/** Nothing Scryfall prints contains these, and a body carrying them is refused. */
+const MARKUP_RE = /[<>]/;
+
 /** Strips markers, category tags, and set/collector suffixes. Returns the bare card name. */
 function cleanName(raw: string): { name: string; isCommander: boolean } {
-  let text = raw;
+  let text = raw.replace(CONTROL_RE, ' ');
   let isCommander = false;
 
   // *CMDR* marker anywhere on the line (also *Commander*).
@@ -132,6 +157,7 @@ export function parseDecklist(input: string): ParseResult {
 
   let section: SectionKind = 'deck';
   let ignoredCards = 0;
+  let overLimit = 0;
   const ignoredSections = new Set<string>();
 
   const lines = input.split(/\r?\n/);
@@ -162,16 +188,30 @@ export function parseDecklist(input: string): ParseResult {
       return;
     }
 
-    const qty = match[1] ? Number.parseInt(match[1], 10) : 1;
+    const parsedQty = match[1] ? Number.parseInt(match[1], 10) : 1;
     const { name, isCommander: marked } = cleanName(match[2]);
 
     if (!name) {
       warnings.push(`Line ${index + 1}: could not read "${line}"`);
       return;
     }
-    if (!Number.isFinite(qty) || qty <= 0) {
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
       warnings.push(`Line ${index + 1}: ignored quantity in "${line}"`);
       return;
+    }
+    if (name.length > MAX_NAME) {
+      warnings.push(`Line ${index + 1}: name too long to be a card, skipped`);
+      return;
+    }
+    if (MARKUP_RE.test(name)) {
+      warnings.push(`Line ${index + 1}: not a card name, skipped`);
+      return;
+    }
+    // Clamped rather than skipped: the line names a real card, only the count is
+    // nonsense, and a silently dropped card is worse than a capped one.
+    const qty = Math.min(parsedQty, MAX_QTY);
+    if (qty !== parsedQty) {
+      warnings.push(`Line ${index + 1}: ${parsedQty} copies capped at ${MAX_QTY}`);
     }
 
     if (section === 'ignore') {
@@ -183,13 +223,21 @@ export function parseDecklist(input: string): ParseResult {
     const isCommander = marked || section === 'commander';
     const existing = byKey.get(key);
     if (existing) {
-      existing.qty += qty;
+      existing.qty = Math.min(existing.qty + qty, MAX_QTY);
       existing.isCommander = existing.isCommander || isCommander;
     } else {
+      if (byKey.size >= MAX_ENTRIES) {
+        overLimit += 1;
+        return;
+      }
       byKey.set(key, { name, qty, isCommander });
       order.push(key);
     }
   });
+
+  if (overLimit > 0) {
+    warnings.push(`Stopped at ${MAX_ENTRIES} distinct cards; ${overLimit} later lines skipped`);
+  }
 
   if (ignoredCards > 0) {
     const where = [...ignoredSections].join(', ') || 'sideboard';

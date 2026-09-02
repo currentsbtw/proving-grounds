@@ -7,7 +7,11 @@ import {
   useHotkeyStore,
 } from '../state/hotkeyStore';
 
-function isTypingTarget(target: EventTarget | null): boolean {
+/**
+ * Whether a key press belongs to whatever the player is typing into. Exported so
+ * component-level key handlers can stand down on the same terms this one does.
+ */
+export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   return (
@@ -17,6 +21,19 @@ function isTypingTarget(target: EventTarget | null): boolean {
     target.isContentEditable ||
     target.closest('[data-hotkeys="off"]') !== null
   );
+}
+
+/**
+ * Whether this press belongs to a card the keyboard is sitting on. A focused
+ * card answers Enter and Space itself — play it, tap it — so the global
+ * listener has to let those two through rather than stepping the phase behind
+ * it. Only the keyboard ever leaves a card focused: `CardView` blurs on pointer
+ * release, so a mouse click on a permanent does not quietly reassign Space.
+ */
+function isCardActivation(e: KeyboardEvent): boolean {
+  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return false;
+  if (!(e.target instanceof HTMLElement)) return false;
+  return e.target.closest('[data-card-activate]') !== null;
 }
 
 /**
@@ -30,8 +47,18 @@ function blurActiveControl(): void {
   if (el.matches('button, [role="button"], a[href], summary, [tabindex]')) el.blur();
 }
 
-/** Fired by the note hotkey; the HUD's run-log note input focuses itself on it. */
+/** Fired by the note hotkey; the run log's note input focuses itself on it. */
 export const FOCUS_NOTE_EVENT = 'pg:focus-note';
+
+/**
+ * Fired by the two response hotkeys. The active event card answers it, because
+ * the second response often carries table detail the card is holding — the
+ * damage figure, the retargeted permanent, the card being pitched — and only it
+ * knows whether that detail is complete enough to resolve on.
+ */
+export const EVENT_RESPONSE_EVENT = 'pg:event-response';
+
+export type EventResponseDetail = { slot: 1 | 2 };
 
 /**
  * The single global keyboard listener. Registered in the capture phase on
@@ -79,7 +106,10 @@ export function useHotkeys(): void {
 
       if (isTypingTarget(e.target)) return;
 
-      // 3. Help opens with or without a run in progress.
+      // 3. A focused card owns Enter and Space; the table is where the player is.
+      if (isCardActivation(e)) return;
+
+      // 4. Help opens with or without a run in progress.
       if (key === hk.keymap.help) {
         e.preventDefault();
         e.stopPropagation();
@@ -119,6 +149,18 @@ export function useHotkeys(): void {
           break;
         case 'focusNote':
           window.dispatchEvent(new CustomEvent(FOCUS_NOTE_EVENT));
+          break;
+        case 'respondOne':
+        case 'respondTwo':
+          // A standing race clock is answerable on key 1 with no event in front
+          // of it, so the clock alone is enough to make the responses live.
+          if (state.activeEvent || state.clock) {
+            window.dispatchEvent(
+              new CustomEvent<EventResponseDetail>(EVENT_RESPONSE_EVENT, {
+                detail: { slot: action === 'respondOne' ? 1 : 2 },
+              }),
+            );
+          }
           break;
         case 'help':
           break;

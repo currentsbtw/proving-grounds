@@ -29,7 +29,7 @@ interface ZoneEntry {
 const ZONE_ENTRIES: ZoneEntry[] = [
   { zone: 'hand', label: 'Hand' },
   { zone: 'battlefield', label: 'Battlefield (untapped)' },
-  { zone: 'battlefield', label: 'To battlefield tapped', tapped: true },
+  { zone: 'battlefield', label: 'Battlefield (tapped)', tapped: true },
   { zone: 'graveyard', label: 'Graveyard' },
   { zone: 'exile', label: 'Exile' },
   { zone: 'command', label: 'Command zone' },
@@ -76,7 +76,7 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
       {card.isCommander && card.zone === 'command' && (
         <>
           <MenuItem accent onSelect={run(() => castCommander(iid))} hint={`+${tax}`}>
-            Cast commander (tax: {tax})
+            Cast commander
           </MenuItem>
           <MenuSep />
         </>
@@ -114,7 +114,7 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
       >
         Remove loyalty
       </MenuItem>
-      <MenuItem onSelect={run(() => addCounter(iid, 'charge', 1))}>Add charge counter</MenuItem>
+      <MenuItem onSelect={run(() => addCounter(iid, 'charge', 1))}>Add charge</MenuItem>
 
       {custom === null ? (
         <MenuItem onSelect={() => setCustom('')}>Custom counter…</MenuItem>
@@ -132,7 +132,7 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
             type="text"
             autoFocus
             value={custom}
-            placeholder="Counter name… ↵"
+            placeholder="e.g. stun"
             aria-label="Custom counter name"
             onChange={(e) => setCustom(e.target.value)}
           />

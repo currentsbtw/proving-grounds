@@ -11,6 +11,26 @@ const OPTIONS: { result: RunResult; label: string; cls: string }[] = [
   { result: 'concede', label: 'Concede', cls: 'is-concede' },
 ];
 
+/** The confirm button says the word it is about to write into the log. */
+const RESULT_WORD: Partial<Record<RunResult, string>> = {
+  win: 'Win',
+  loss: 'Loss',
+  concede: 'Concede',
+};
+
+/** The question, and the same sentence as the confirm button's accessible name. */
+const CONFIRM_ASK: Partial<Record<RunResult, string>> = {
+  win: 'End the run as a win?',
+  loss: 'End the run as a loss?',
+  concede: 'Concede and end the run?',
+};
+
+const CONFIRM_DO: Partial<Record<RunResult, string>> = {
+  win: 'End the run as a win',
+  loss: 'End the run as a loss',
+  concede: 'Concede and end the run',
+};
+
 /** Footer: Win / Loss / Concede with a 3s inline confirm, plus click-to-copy seed. */
 export default function EndRunControls() {
   const endRun = useGameStore((s) => s.endRun);
@@ -59,17 +79,17 @@ export default function EndRunControls() {
     <div className="hud-endrun">
       {pending ? (
         <span className="hud-confirm">
-          Really {pending}?
+          {CONFIRM_ASK[pending] ?? 'End the run?'}
           <button
             type="button"
             className="is-yes"
-            aria-label={`Confirm end run as ${pending}`}
+            aria-label={CONFIRM_DO[pending] ?? 'End the run'}
             onClick={() => commit(pending)}
           >
-            ✓
+            {RESULT_WORD[pending] ?? 'End run'}
           </button>
-          <button type="button" className="is-no" aria-label="Cancel" onClick={cancel}>
-            ✕
+          <button type="button" className="is-no" onClick={cancel}>
+            Keep playing
           </button>
         </span>
       ) : (
@@ -91,7 +111,7 @@ export default function EndRunControls() {
         type="button"
         className="hud-seed"
         title="Copy run seed"
-        aria-label={`Run seed ${seed}. Click to copy.`}
+        aria-label={copied ? `Run seed ${seed} copied` : `Copy run seed ${seed}`}
         onClick={copySeed}
       >
         {copied ? 'copied' : `seed ${seed}`}

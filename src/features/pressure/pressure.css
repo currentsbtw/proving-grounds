@@ -1,19 +1,5 @@
 /* ── Proving Grounds — M1 pressure layer ─────────────────────────────────── */
 
-/* The strip above the battlefield. Collapses to nothing when the pod is quiet. */
-.pgp-layer {
-  position: relative;
-  /* Above the battlefield so the dock's picker can hang over the cards. */
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.pgp-layer:empty {
-  display: none;
-}
-
 /* ── Shared bits ────────────────────────────────────────────────────────── */
 
 .pgp-dock-spacer {
@@ -23,27 +9,38 @@
 
 .pgp-btn {
   flex: none;
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 4px 9px;
+  font-size: 13px;
   white-space: nowrap;
-  background: var(--raised);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink);
 }
 
+/* The answer the table is waiting on wears the accent; nothing else here does. */
 .pgp-btn.is-primary {
-  border-color: var(--pgp-accent, var(--accent));
-  color: var(--pgp-accent, var(--accent));
-  font-weight: 600;
+  border-color: var(--accent);
 }
 
 .pgp-btn.is-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--pgp-accent, var(--accent)) 16%, var(--raised));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+/* The underlined word keeps its printed size; the box is padded out to the
+   24px pointer minimum and the growth handed back as negative margin, so the
+   dock's rows sit exactly where they sat. */
 .pgp-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   background: none;
   border: none;
+  border-radius: 0;
   padding: 0 2px;
-  font-size: 11px;
+  margin-top: -4px;
+  margin-bottom: -4px;
+  font-size: 12px;
   color: var(--muted);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -56,76 +53,57 @@
   border-color: transparent;
 }
 
-/* ── Race clock banner ──────────────────────────────────────────────────── */
+/* ── Active event card ──────────────────────────────────────────────────── */
 
-.pgp-clock {
-  --pgp-accent: var(--mana-g);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 10px 4px 0;
-  background: var(--ground);
-  border: 1px solid var(--line);
-  border-left: 5px solid var(--mana-g);
-  border-radius: var(--radius);
-  font-size: 11px;
-}
-
-.pgp-clock-text {
-  padding-left: 10px;
-  font-family: var(--font-display);
-  letter-spacing: 0.14em;
-  color: var(--mana-g);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pgp-clock-left {
-  flex: none;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.pgp-clock.is-urgent {
-  border-color: var(--mana-g);
-  animation: pgp-pulse 1.6s ease-in-out infinite;
-}
-
-.pgp-clock.is-urgent .pgp-clock-left {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
-@keyframes pgp-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(143, 196, 158, 0);
-  }
-  50% {
-    box-shadow: 0 0 0 3px rgba(143, 196, 158, 0.18);
-  }
-}
-
-/* ── Event dock ─────────────────────────────────────────────────────────── */
-
+/* Not a card: a block in the column, ruled off at the top by .rd-event. */
 .pgp-dock {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--ground);
-  border: 1px solid var(--line);
-  border-left: 6px solid var(--pgp-accent, var(--accent));
-  border-radius: var(--radius);
+  gap: 7px;
   animation: pgp-dock-in 140ms ease-out;
 }
 
-/* Event class stripe + primary-action colour. */
+/* The spoken half of the dock: head, seat and class, prompt. It carries the
+   dock's own column rhythm so wrapping it in a live region changed nothing
+   about how the three rows sit. */
+.pgp-say {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pgp-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* One printed-label recipe for the dock: the head, the damage field and the
+   picker's head are the same caption in three places. */
+.pgp-head-label,
+.pgp-field,
+.pgp-picker-head {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pgp-head-label {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.pgp-dock.is-quiet .pgp-head-label {
+  color: var(--muted);
+}
+
+/* The class chip carries the mana-colour mnemonic, and carries its own name with
+   it, so the event never reads by colour alone. */
 .pgp-dock.type-wipe {
   --pgp-accent: var(--mana-w);
 }
@@ -158,59 +136,114 @@
   .pgp-dock {
     animation: none;
   }
-
-  .pgp-clock.is-urgent {
-    animation: none;
-    box-shadow: 0 0 0 2px rgba(143, 196, 158, 0.22);
-  }
-
-  .pgp-tell-dot {
-    animation: none;
-  }
 }
 
 .pgp-dock-main {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.pgp-seat {
+/* Seat and class are chips of the same anatomy as the seat states above. The
+   seat is a fact, so it stays neutral; the class chip wears its mana colour as
+   the mnemonic, and carries its own name so it never reads by colour alone. */
+.pgp-seat,
+.pgp-type {
   flex: none;
-  font-family: var(--font-display);
+  padding: 2px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
   font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--pgp-accent, var(--accent));
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .pgp-type {
-  flex: none;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--muted);
+  border-color: var(--pgp-accent, var(--accent));
+  color: var(--pgp-accent, var(--accent));
 }
 
 .pgp-prompt {
-  flex: 1 1 260px;
   min-width: 0;
   margin: 0;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--ink);
+  /* The prompt names cards, and a card name can run past any column width. */
+  overflow-wrap: anywhere;
 }
 
 .pgp-more {
   flex: none;
-  padding: 1px 7px;
-  border: 1px solid var(--pgp-accent, var(--accent));
-  border-radius: 999px;
-  font-size: 10px;
-  color: var(--pgp-accent, var(--accent));
-  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── The two numbered responses ─────────────────────────────────────────── */
+
+.pgp-answers {
+  display: flex;
+  gap: 6px;
+}
+
+.pgp-answers .pgp-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 4px 9px 4px 5px;
+  font-size: 13px;
+  white-space: normal;
+  text-align: left;
+}
+
+/* The answer names the card it destroys, and card names run to 141 characters.
+   Unclamped, the button grew to 200px tall and pushed SEATS and YOU into a
+   scroll. Two lines, the rest in the tooltip, and the column keeps its shape. */
+.pgp-btn-label {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* The key rides in its own small square, the way it is printed on the board. */
+.pgp-answer-key {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pgp-btn.is-primary .pgp-answer-key {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pgp-declare {
+  align-self: flex-start;
+}
+
+/* A clock with no event in front of it: the same card, nothing to answer. */
+.pgp-dock.is-quiet .pgp-prompt {
+  color: var(--muted);
 }
 
 .pgp-dock-extras {
@@ -223,15 +256,14 @@
 .pgp-field {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+  gap: 6px;
 }
 
+/* The one number the player types under a deadline. It clears the pointer
+   minimum on both axes rather than landing a hair under it. */
 .pgp-field input {
   width: 62px;
+  min-height: 25px;
   padding: 3px 6px;
   font-size: 13px;
   text-align: right;
@@ -251,11 +283,24 @@
   font-weight: 600;
 }
 
+/* Same treatment for the card named in the extras line: two lines, tooltip for
+   the whole name, and `isolate` so a name carrying a bidi control character
+   cannot reorder the caption printed beside it. */
+.pgp-name {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
 .pgp-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 12px;
   color: var(--muted);
   cursor: pointer;
 }
@@ -275,19 +320,7 @@
   flex: 1 1 auto;
   min-width: 0;
   padding: 4px 8px;
-  font-size: 12px;
-}
-
-.pgp-hint {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius);
-  font-size: 11.5px;
-  color: var(--muted);
-  background: var(--ground);
+  font-size: 13px;
 }
 
 /* ── Picker (hangs over the top of the battlefield) ─────────────────────── */
@@ -302,7 +335,7 @@
   background: var(--surface);
   border: 1px solid var(--pgp-accent, var(--accent));
   border-radius: var(--radius);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 26px var(--shadow);
 }
 
 .pgp-picker-head {
@@ -310,18 +343,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
+  margin-bottom: 7px;
 }
 
 .pgp-picker-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin: -4px -4px -4px 0;
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 16px;
   line-height: 1;
   padding: 0 4px;
 }
@@ -334,7 +368,6 @@
 .pgp-picker-empty {
   margin: 0;
   font-size: 12px;
-  font-style: italic;
   color: var(--muted);
 }
 
@@ -364,57 +397,21 @@
 
 .pgp-pick.is-picked {
   border-color: var(--pgp-accent, var(--accent));
-  background: rgba(201, 168, 92, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .pgp-pick-name {
   width: 100%;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.2;
   color: var(--muted);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  unicode-bidi: isolate;
 }
 
-/* ── Counter-armed tell (over the hand) ─────────────────────────────────── */
-
-.pgp-tell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  padding: 2px 8px;
-  border: 1px solid var(--mana-u);
-  border-radius: 999px;
-  background: rgba(143, 193, 232, 0.08);
-  color: var(--mana-u);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-}
-
-.pgp-tell-sub {
-  color: var(--muted);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.pgp-tell-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--mana-u);
-  animation: pgp-blink 2s ease-in-out infinite;
-}
-
-@keyframes pgp-blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
+/* The counter-armed tell has exactly two renderings: the ARMED n+ chip on the
+   seat row that locates it, and the sentence in the readout's TELLS block. It
+   no longer rides over the hand, so nothing here blinks. */

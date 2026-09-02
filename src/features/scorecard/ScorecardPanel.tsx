@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getDeck } from '../../db/db';
+import { SCORING } from '../../data/scorecard';
 import { aggregateProfile, compareScorecards } from '../../engine/scorecard';
 import type { EventLedgerRow, Scorecard } from '../../engine/scorecard';
 import type { Deck, RunResult } from '../../domain/types';
@@ -32,9 +33,12 @@ const RESULT_CLASS: Record<RunResult, string> = {
   abandoned: 'is-abandoned',
 };
 
+/** Printed wherever a metric has no value for this run. */
+const NO_VALUE = 'n/a';
+
 const CLOCK_WORD: Record<string, string> = {
   won: 'won first',
-  'eliminated-seat': 'killed the seat',
+  'eliminated-seat': 'eliminated the seat',
   'declared-interaction': 'held interaction',
   expired: 'ran out',
   standing: 'still standing',
@@ -48,12 +52,12 @@ function num(value: number, digits = 1): string {
 }
 
 function pct(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value * 100)}%`;
+  return value === null ? NO_VALUE : `${Math.round(value * 100)}%`;
 }
 
-/** "—", "1 turn", "2.5 turns". Averages are rounded before the noun is chosen. */
+/** "n/a", "1 turn", "2.5 turns". Averages are rounded before the noun is chosen. */
 function turns(value: number | null): string {
-  if (value === null) return '—';
+  if (value === null) return NO_VALUE;
   const text = num(value);
   return `${text} ${text === '1' ? 'turn' : 'turns'}`;
 }
@@ -125,13 +129,101 @@ function eventOutcome(row: EventLedgerRow): string {
   }
 }
 
+// --- the verdict ------------------------------------------------------------
+
+/**
+ * The one line the debrief opens with. Seven figures at equal weight say
+ * nothing on their own; this names the worst thing the run did, in the same
+ * table-talk the events are written in, and the slots below are its evidence.
+ *
+ * Every threshold comes from `src/data/scorecard.ts` — the same numbers the
+ * profile's tags are cut against — so a tuning change moves the verdict and the
+ * tags together. Findings are ranked by how far past their threshold they sit,
+ * as a share of the threshold, so turns and percentages can be compared; a
+ * failure with no "how far" (never rebuilt, clock expired) outranks all of them.
+ */
+const TERMINAL = 1000;
+
+interface Finding {
+  text: string;
+  over: number;
+}
+
+function verdictOf(card: Scorecard): { text: string; clear: boolean } {
+  const t = SCORING.tags;
+  const found: Finding[] = [];
+
+  const landed = card.wipes.filter((w) => !w.negated);
+  const firstWipe = landed[0];
+  if (firstWipe) {
+    if (firstWipe.turnsToRecover === null) {
+      found.push({ text: `Never rebuilt after the wrath on T${firstWipe.turn}.`, over: TERMINAL });
+    } else if (firstWipe.turnsToRecover > t.brittleTurnsToRecover) {
+      found.push({
+        text: `${firstWipe.turnsToRecover} turns to rebuild after T${firstWipe.turn}, past ${t.brittleTurnsToRecover}.`,
+        over: firstWipe.turnsToRecover / t.brittleTurnsToRecover - 1,
+      });
+    }
+  }
+
+  if (card.clock.faced && !card.clock.beatClock && card.clock.outcome === 'expired') {
+    found.push({ text: `Lost the race. The clock ran out on T${card.clock.deadlineTurn}.`, over: TERMINAL });
+  }
+
+  const downtime = card.commander.downtimeTurns;
+  if (downtime > t.commanderDowntimeTurns) {
+    found.push({
+      text: `Commander off the table ${downtime} turns, past ${t.commanderDowntimeTurns}.`,
+      over: downtime / t.commanderDowntimeTurns - 1,
+    });
+  }
+
+  const cast = card.deployment.firstCommanderCastTurn;
+  if (cast === null && card.turns >= t.slowFirstCastTurn) {
+    found.push({ text: `Commander never cast in ${card.turns} turns.`, over: TERMINAL });
+  } else if (cast !== null && cast > t.slowFirstCastTurn) {
+    found.push({
+      text: `Commander landed T${cast}, past T${t.slowFirstCastTurn}.`,
+      over: cast / t.slowFirstCastTurn - 1,
+    });
+  }
+
+  const rate = card.answers.rate;
+  if (rate !== null && rate < t.interactiveAnswerRate) {
+    found.push({
+      text: `Answered ${pct(rate)} of what ended, under ${pct(t.interactiveAnswerRate)}.`,
+      over: t.interactiveAnswerRate / Math.max(rate, 0.01) - 1,
+    });
+  }
+
+  if (found.length === 0) {
+    return {
+      text:
+        card.events.length === 0
+          ? 'The pod never presented an event. Nothing was tested.'
+          : 'No metric crossed its threshold this run.',
+      clear: true,
+    };
+  }
+
+  found.sort((a, b) => b.over - a.over);
+  return { text: found[0].text, clear: false };
+}
+
 // --- small pieces -----------------------------------------------------------
+
+/** A figure, or the muted "n/a" that says there was nothing to measure. */
+function Figure({ value, className }: { value: string; className: string }) {
+  return (
+    <span className={`${className} num${value === NO_VALUE ? ' is-na' : ''}`}>{value}</span>
+  );
+}
 
 function Tile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="sc-tile">
       <span className="sc-tile-label">{label}</span>
-      <span className="sc-tile-value num">{value}</span>
+      <Figure className="sc-tile-value" value={value} />
       <span className="sc-tile-sub">{sub}</span>
     </div>
   );
@@ -177,7 +269,7 @@ function MetricTiles({ card }: { card: Scorecard }) {
       <Tile
         label="Answer rate"
         value={pct(card.answers.rate)}
-        sub={`${card.answers.total.responded} answered, ${card.answers.total.resolved} resolved of ${terminal} terminal events`}
+        sub={`${card.answers.total.responded} answered, ${card.answers.total.resolved} resolved of ${terminal} events that ended`}
       />
       <Tile
         label="Threat output"
@@ -187,7 +279,7 @@ function MetricTiles({ card }: { card: Scorecard }) {
       <Tile
         label="Clock"
         value={
-          !card.clock.faced ? 'none' : card.clock.beatClock ? 'beaten' : (CLOCK_WORD[card.clock.outcome ?? ''] ?? '—')
+          !card.clock.faced ? 'none' : card.clock.beatClock ? 'beaten' : (CLOCK_WORD[card.clock.outcome ?? ''] ?? NO_VALUE)
         }
         sub={
           !card.clock.faced
@@ -220,7 +312,7 @@ function EventLedger({ card }: { card: Scorecard }) {
             <th scope="col">T</th>
             <th scope="col">Seat</th>
             <th scope="col">Event</th>
-            <th scope="col">What it was</th>
+            <th scope="col">Detail</th>
             <th scope="col">State</th>
             <th scope="col">Outcome</th>
           </tr>
@@ -277,7 +369,7 @@ function Profile({ cards }: { cards: Scorecard[] }) {
   if (cards.length < 2) {
     return (
       <p className="sc-empty">
-        Play more runs for a profile — one game is a story, not a tendency.
+        Play more runs for a profile. One game is a story, not a tendency.
       </p>
     );
   }
@@ -291,23 +383,38 @@ function Profile({ cards }: { cards: Scorecard[] }) {
         </div>
         <div>
           <dt>Win rate</dt>
-          <dd className="num">
-            {pct(profile.winRate)} <span className="sc-dim">({profile.wins}W {profile.losses}L)</span>
+          <dd>
+            <Figure className="" value={pct(profile.winRate)} />{' '}
+            <span className="sc-dim">({profile.wins}W {profile.losses}L)</span>
           </dd>
         </div>
         <div>
           <dt>Avg turns</dt>
-          <dd className="num">{profile.avgTurns === null ? '—' : num(profile.avgTurns)}</dd>
+          <dd>
+            <Figure className="" value={profile.avgTurns === null ? NO_VALUE : num(profile.avgTurns)} />
+          </dd>
         </div>
         <div>
           <dt>Avg first cast</dt>
-          <dd className="num">
-            {profile.avgFirstCommanderCast === null ? '—' : `T${num(profile.avgFirstCommanderCast)}`}
+          <dd>
+            <Figure
+              className=""
+              value={
+                profile.avgFirstCommanderCast === null
+                  ? NO_VALUE
+                  : `T${num(profile.avgFirstCommanderCast)}`
+              }
+            />
           </dd>
         </div>
         <div>
           <dt>Avg MV / turn</dt>
-          <dd className="num">{profile.avgMvPerTurn === null ? '—' : num(profile.avgMvPerTurn)}</dd>
+          <dd>
+            <Figure
+              className=""
+              value={profile.avgMvPerTurn === null ? NO_VALUE : num(profile.avgMvPerTurn)}
+            />
+          </dd>
         </div>
         <div>
           <dt>Wipes faced</dt>
@@ -315,19 +422,27 @@ function Profile({ cards }: { cards: Scorecard[] }) {
         </div>
         <div>
           <dt>Avg rebuild</dt>
-          <dd className="num">{turns(profile.avgTurnsToRecover)}</dd>
+          <dd>
+            <Figure className="" value={turns(profile.avgTurnsToRecover)} />
+          </dd>
         </div>
         <div>
           <dt>Never rebuilt</dt>
-          <dd className="num">{pct(profile.unrecoveredWipeRate)}</dd>
+          <dd>
+            <Figure className="" value={pct(profile.unrecoveredWipeRate)} />
+          </dd>
         </div>
         <div>
           <dt>Cmdr downtime</dt>
-          <dd className="num">{turns(profile.avgCommanderDowntime)}</dd>
+          <dd>
+            <Figure className="" value={turns(profile.avgCommanderDowntime)} />
+          </dd>
         </div>
         <div>
           <dt>Answer rate</dt>
-          <dd className="num">{pct(profile.answerRate)}</dd>
+          <dd>
+            <Figure className="" value={pct(profile.answerRate)} />
+          </dd>
         </div>
         <div>
           <dt>Clocks</dt>
@@ -337,7 +452,9 @@ function Profile({ cards }: { cards: Scorecard[] }) {
         </div>
         <div>
           <dt>Mulligan rate</dt>
-          <dd className="num">{pct(profile.mulliganRate)}</dd>
+          <dd>
+            <Figure className="" value={pct(profile.mulliganRate)} />
+          </dd>
         </div>
       </dl>
 
@@ -368,12 +485,12 @@ function CompareView({ a, b, onClose }: { a: Scorecard; b: Scorecard; onClose: (
 
       <p className={`sc-banner${comparison.sameSeed ? ' is-good' : ''}`}>
         {comparison.sameSeed
-          ? 'Same seed — like-for-like. Same shuffle, same pressure schedule; the deck is the only variable.'
-          : 'Different seeds — pressure schedules differ, so these two runs were not asked the same questions.'}
+          ? 'Same seed. Same shuffle, same pressure schedule: the deck is the only variable.'
+          : 'Different seeds. Pressure schedules differ, so these two runs were not asked the same questions.'}
       </p>
       {!comparison.sameBracket && (
         <p className="sc-banner is-warn">
-          Different brackets (B{a.bracket} vs B{b.bracket}) — the pod hit harder in one of these.
+          Different brackets (B{a.bracket} vs B{b.bracket}). The pod hit harder in one of these.
         </p>
       )}
 
@@ -389,7 +506,7 @@ function CompareView({ a, b, onClose }: { a: Scorecard; b: Scorecard; onClose: (
               <th scope="col">
                 B · <span className="sc-seed-inline num">{b.seed}</span>
               </th>
-              <th scope="col">Δ</th>
+              <th scope="col" title="B minus A">Δ</th>
             </tr>
           </thead>
           <tbody>
@@ -403,10 +520,14 @@ function CompareView({ a, b, onClose }: { a: Scorecard; b: Scorecard; onClose: (
               return (
                 <tr key={m.key}>
                   <td>{m.label}</td>
-                  <td className="num">{m.a === null ? '—' : num(m.a, 2)}</td>
-                  <td className="num">{m.b === null ? '—' : num(m.b, 2)}</td>
-                  <td className={`num sc-delta ${better}`}>
-                    {m.delta === null ? '—' : `${m.delta > 0 ? '+' : ''}${num(m.delta, 2)}`}
+                  <td className={`num${m.a === null ? ' is-na' : ''}`}>
+                    {m.a === null ? NO_VALUE : num(m.a, 2)}
+                  </td>
+                  <td className={`num${m.b === null ? ' is-na' : ''}`}>
+                    {m.b === null ? NO_VALUE : num(m.b, 2)}
+                  </td>
+                  <td className={`num sc-delta ${m.delta === null ? 'is-na' : better}`}>
+                    {m.delta === null ? NO_VALUE : `${m.delta > 0 ? '+' : ''}${num(m.delta, 2)}`}
                   </td>
                 </tr>
               );
@@ -477,7 +598,7 @@ export default function ScorecardPanel() {
   if (selected === null) {
     return (
       <section className="pg-table sc-root" aria-label="Scorecard">
-        <p className="sc-empty">That run is no longer stored.</p>
+        <p className="sc-empty">That run is no longer stored. Pick another run from History.</p>
       </section>
     );
   }
@@ -508,7 +629,9 @@ export default function ScorecardPanel() {
     try {
       await startDeckRun(deck, run.seed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start the run');
+      setError(
+        err instanceof Error ? err.message : 'Could not start the run. Check the deck and try again.',
+      );
       setBusy(null);
     }
   }
@@ -522,7 +645,9 @@ export default function ScorecardPanel() {
       setShare({ url: URL.createObjectURL(blob), blob });
     } catch (err) {
       setError(
-        err instanceof Error ? `Share image — ${err.message}` : 'Could not render the share image',
+        err instanceof Error
+          ? `Could not render the share image. ${err.message}`
+          : 'Could not render the share image.',
       );
     } finally {
       setBusy(null);
@@ -534,12 +659,16 @@ export default function ScorecardPanel() {
     try {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
     } catch (err) {
-      setError(err instanceof Error ? `Copy — ${err.message}` : 'Could not copy the image');
+      setError(
+        err instanceof Error ? `Could not copy the image. ${err.message}` : 'Could not copy the image.',
+      );
     }
   }
 
   const canCopyImage =
     typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
+
+  const verdict = verdictOf(card);
 
   return (
     <section className="pg-table sc-root" aria-label="Scorecard">
@@ -557,6 +686,9 @@ export default function ScorecardPanel() {
               type="button"
               className="sc-seed"
               title="Copy run seed"
+              aria-label={
+                copiedSeed ? `Run seed ${card.seed} copied` : `Copy run seed ${card.seed}`
+              }
               onClick={copySeed}
             >
               {copiedSeed ? 'copied' : `seed ${card.seed}`}
@@ -575,7 +707,7 @@ export default function ScorecardPanel() {
             title={
               deck
                 ? `Start a new run of ${card.deckName} on seed ${card.seed}`
-                : 'This deck has been deleted — the seed cannot be replayed'
+                : 'This deck has been deleted, so the seed cannot be replayed'
             }
             onClick={() => void handleReplay()}
           >
@@ -598,10 +730,18 @@ export default function ScorecardPanel() {
         </div>
       </header>
 
+      {/* The finding, before the evidence for it. */}
+      <p className="sc-verdict-line">
+        <span className="panel-heading">Verdict</span>
+        <span className={'sc-verdict-text' + (verdict.clear ? ' is-clear' : '')}>
+          {verdict.text}
+        </span>
+      </p>
+
       {card.partial && (
         <p className="sc-banner is-warn">
-          Partial — this run was imported before card facts were stored, so board value is a
-          lower bound.
+          Partial: this run was imported before card facts were stored, so board value is a lower
+          bound.
         </p>
       )}
       {error && <p className="sc-banner is-error">{error}</p>}
@@ -646,30 +786,22 @@ export default function ScorecardPanel() {
       <MetricTiles card={card} />
 
       <section className="sc-section">
-        <div className="sc-section-head">
-          <h3 className="panel-heading">Turn by turn</h3>
-        </div>
+        <h3 className="panel-heading">Turn by turn</h3>
         <TimelineChart card={card} />
       </section>
 
       <section className="sc-section">
-        <div className="sc-section-head">
-          <h3 className="panel-heading">Event ledger</h3>
-        </div>
+        <h3 className="panel-heading">Event ledger</h3>
         <EventLedger card={card} />
       </section>
 
       <section className="sc-section">
-        <div className="sc-section-head">
-          <h3 className="panel-heading">Seats</h3>
-        </div>
+        <h3 className="panel-heading">Seats</h3>
         <Seats card={card} />
       </section>
 
       <section className="sc-section">
-        <div className="sc-section-head">
-          <h3 className="panel-heading">Deck profile</h3>
-        </div>
+        <h3 className="panel-heading">Deck profile</h3>
         {deckRuns ? <Profile cards={deckRuns.cards} /> : <p className="sc-empty">Scoring…</p>}
         <p className="sc-hint">Replay the seed after a deck edit to compare like for like.</p>
       </section>

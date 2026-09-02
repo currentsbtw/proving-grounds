@@ -1,19 +1,8 @@
-/* ── HUD rail ───────────────────────────────────────────────────────────── */
-
-.pg-rail.pg-hud {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  overflow: hidden;
-}
-
-.pg-hud .hud-empty {
-  margin: auto;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-}
+/* ── HUD panels ─────────────────────────────────────────────────────────── */
+/*
+   What is left of the old right-hand rail: the panels the readout column's
+   drawer opens — tokens, the run log, and ending the run.
+*/
 
 .pg-hud-block {
   background: var(--ground);
@@ -21,13 +10,6 @@
   border-radius: var(--radius);
   padding: 8px;
   flex: none;
-}
-
-.pg-hud-block > .panel-heading {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 11px;
-  letter-spacing: 0.14em;
 }
 
 /* Dense buttons throughout the rail */
@@ -43,359 +25,14 @@
   font-size: 12px;
 }
 
-/* ── 1. Turn & phase ────────────────────────────────────────────────────── */
-
-.hud-turn-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 7px;
-}
-
-.hud-turn-number {
-  font-family: var(--font-display);
-  font-size: 22px;
-  letter-spacing: 0.16em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-
-.hud-turn-phase {
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.hud-phase-strip {
-  display: flex;
-  gap: 3px;
-  margin-bottom: 7px;
-}
-
-.hud-phase-pill {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 3px 2px;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  color: var(--muted);
-}
-
-.hud-phase-pill.is-past {
-  color: var(--ink);
-  opacity: 0.65;
-}
-
-.hud-phase-pill.is-ahead:hover {
-  border-color: var(--accent);
-  color: var(--ink);
-}
-
-.hud-phase-pill.is-current {
-  background: var(--raised);
-  border-color: var(--accent);
-  color: var(--accent);
-  cursor: default;
-}
-
-.hud-phase-pill:disabled {
-  opacity: 1;
-}
-
-.hud-phase-pill.is-past:disabled {
-  opacity: 0.5;
-}
-
-.hud-turn-actions {
-  display: flex;
-  gap: 5px;
-}
-
-.hud-turn-actions button {
-  flex: 1 1 0;
-}
-
-.hud-key {
-  color: var(--muted);
-  font-size: 10px;
-  margin-left: 3px;
-}
-
-/* ── 2. Life ────────────────────────────────────────────────────────────── */
-
-.hud-life-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.hud-life-head .panel-heading {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-}
-
-.hud-life-undo {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.hud-life-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.hud-life-card {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 6px 8px;
-  overflow: hidden;
-}
-
-.hud-life-card.is-you {
-  border-color: var(--raised);
-  background: var(--raised);
-}
-
-.hud-life-card.is-eliminated {
-  opacity: 0.4;
-}
-
-/* A dead seat's life buttons are disabled anyway, so the stamp takes their place
-   in the row rather than floating over the card. Centred and rotated, it crossed
-   the threat meter and the silhouette — the two things still worth reading on a
-   seat that is out — and at 320px there is no corner wide enough to pin it to. */
-.hud-life-stamp {
-  margin-left: auto;
-  flex: none;
-  font-family: var(--font-display);
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0.14em;
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 3px;
-  padding: 4px 6px;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.hud-life-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.hud-life-name {
-  font-family: var(--font-display);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  color: var(--muted);
-  width: 42px;
-  flex: none;
-}
-
-.hud-life-total {
-  font-size: 26px;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-  min-width: 46px;
-  text-align: right;
-}
-
-.hud-life-total.is-high {
-  color: var(--accent);
-}
-
-.hud-life-total.is-low {
-  color: var(--danger);
-}
-
-.hud-life-buttons {
-  display: flex;
-  gap: 3px;
-  margin-left: auto;
-}
-
-.hud-life-buttons button {
-  min-width: 30px;
-  padding: 3px 4px;
-}
-
-/* Threat meter ----------------------------------------------------------- */
-
-.hud-threat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 5px;
-}
-
-.hud-threat-prefix {
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.hud-threat-bar {
-  display: flex;
-  gap: 2px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.hud-threat-seg {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 5px;
-  border-radius: 1px;
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.hud-life-card.is-you .hud-threat-seg {
-  background: var(--surface);
-}
-
-.hud-threat.is-low .hud-threat-seg.is-on {
-  background: var(--muted);
-  box-shadow: none;
-}
-
-.hud-threat.is-mid .hud-threat-seg.is-on {
-  background: var(--accent);
-  box-shadow: none;
-}
-
-.hud-threat.is-high .hud-threat-seg.is-on {
-  background: var(--danger);
-  box-shadow: none;
-}
-
-.hud-threat-num {
-  flex: none;
-  min-width: 14px;
-  text-align: right;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.hud-threat.is-mid .hud-threat-num {
-  color: var(--accent);
-}
-
-.hud-threat.is-high .hud-threat-num {
-  color: var(--danger);
-}
-
-.hud-threat-max {
-  color: var(--muted);
-  font-size: 9px;
-}
-
-/* Silhouette row --------------------------------------------------------- */
-
-.hud-sil {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 4px;
-  font-size: 10.5px;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.hud-sil.is-dead {
-  color: var(--muted);
-  letter-spacing: 0.2em;
-}
-
-.hud-sil-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-/* Dimmed, never hidden — the row must not change height as a board grows. */
-.hud-sil-cell.is-zero {
-  opacity: 0.38;
-}
-
-.hud-sil-sub {
-  color: var(--muted);
-  font-size: 9.5px;
-}
-
-.hud-sil-dot {
-  color: var(--line);
-}
-
-.hud-sil .pgp-glyph {
-  flex: none;
-  color: var(--muted);
-  vertical-align: -1px;
-}
-
-.hud-cmdr-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 1px solid var(--line);
-}
-
-.hud-cmdr-label {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-}
-
-.hud-cmdr-value {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-}
-
-.hud-cmdr-value .hud-cmdr-max {
-  color: var(--muted);
-}
-
-.hud-cmdr-row .hud-life-buttons button {
-  min-width: 28px;
-}
-
-/* ── 3. Tokens ──────────────────────────────────────────────────────────── */
-
-.hud-token-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
+/* ── 1. Tokens ──────────────────────────────────────────────────────────── */
 
 .hud-token-count {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  margin-bottom: 6px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -440,12 +77,12 @@
 
 .hud-token-form-labels {
   grid-column: 1 / -1;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   letter-spacing: 0.06em;
 }
 
-/* ── 4. Run log ─────────────────────────────────────────────────────────── */
+/* ── 2. Run log ─────────────────────────────────────────────────────────── */
 
 .pg-hud-log {
   display: flex;
@@ -462,10 +99,25 @@
   padding-right: 2px;
 }
 
+/* The scroll region is a tab stop, so it shows where the keyboard is. */
+.hud-log-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .hud-log-empty {
   color: var(--muted);
   font-size: 12px;
   font-style: italic;
+}
+
+/* Says what is not on screen, so a long run's log does not read as a short one. */
+.hud-log-trimmed {
+  margin: 0 0 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .hud-log-row {
@@ -478,14 +130,16 @@
   color: var(--ink);
 }
 
+/* The turn number is the log's index — the column a pilot scans to find the
+   wipe — so it is set at the muted token's full strength. The extra dimming
+   that used to ride on top of it was what put 10px text under 4.5:1. */
 .hud-log-turn {
   flex: none;
   width: 26px;
   text-align: right;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.75;
 }
 
 .hud-log-msg {
@@ -523,7 +177,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--muted);
   white-space: nowrap;
@@ -545,16 +199,15 @@
 .hud-log-window-sum {
   margin-top: 2px;
   padding-left: 18px;
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.35;
   color: var(--muted);
-  opacity: 0.8;
   overflow-wrap: anywhere;
 }
 
 .hud-log-row.kind-threat .hud-log-msg {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* Default for a response that answered no typed event (a declared interaction);
@@ -586,9 +239,10 @@
 }
 
 .hud-log-row.is-flow {
-  font-size: 10.5px;
+  /* Phase and turn chatter recedes by colour alone. The opacity that used to
+     ride on top of --muted is what put the log's smallest text under 4.5:1. */
+  font-size: 12px;
   color: var(--muted);
-  opacity: 0.7;
   padding: 0;
 }
 
@@ -603,7 +257,7 @@
 .hud-log-jump {
   align-self: center;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -620,7 +274,7 @@
   min-width: 0;
 }
 
-/* ── 5. End run ─────────────────────────────────────────────────────────── */
+/* ── 3. End run ─────────────────────────────────────────────────────────── */
 
 .hud-endrun {
   display: flex;
@@ -649,7 +303,7 @@
   padding: 2px 5px;
   border: 1px solid var(--accent);
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--accent);
   white-space: nowrap;
 }
@@ -668,17 +322,33 @@
   color: var(--danger);
 }
 
+/* The seed is whatever the player typed in the deck rail, so it truncates like
+   any other player text and keeps its whole value in the button's label. */
 .hud-seed {
-  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
-  font-size: 10px;
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
   letter-spacing: 0.06em;
   color: var(--muted);
   background: transparent;
   border: 1px solid transparent;
   padding: 2px 4px;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: isolate;
 }
 
 .hud-seed:hover:not(:disabled) {
   color: var(--ink);
   border-color: var(--line);
+}
+
+/* The log echoes card names and player notes, both arbitrary text: `isolate`
+   keeps a bidi control character inside one from reordering the turn number
+   printed beside it or the lines after it. */
+.hud-log-msg,
+.hud-note-form input {
+  unicode-bidi: isolate;
 }

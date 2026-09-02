@@ -544,18 +544,54 @@ async function main(): Promise<void> {
       drawn.includes(l),
     ),
   );
-  check('the fan-content footer is drawn', drawn.includes('unofficial fan content'));
+  check(
+    'the full Fan Content line is drawn',
+    drawn.some(
+      (t) =>
+        t.startsWith('Unofficial Fan Content permitted under the Wizards of the Coast') &&
+        t.endsWith('Not approved or endorsed by Wizards.'),
+    ),
+    drawn.find((t) => t.startsWith('Unofficial')) ?? '(no legal line)',
+  );
   check(
     'the profile tags are drawn as chips',
     ['fast', 'interactive'].every((tag) => drawn.includes(tag)),
   );
 
+  // --- the type contract ----------------------------------------------------
+  // OWN-WORLD: one grotesk for every word and every figure, and the display
+  // face confined to the wordmark. The receipt is the only artefact that leaves
+  // the app, so it is the one most able to stop looking like it.
+  const displayRuns = recording.texts.filter((t) => /Marcellus|Georgia/.test(t.font));
+  check(
+    'the display face is used for the wordmark and nothing else',
+    displayRuns.length === 1 && displayRuns[0].text === 'PROVING GROUNDS',
+    displayRuns.map((t) => `"${t.text}" in ${t.font}`).join('; ') || '(no display run at all)',
+  );
+  const strayFonts = recording.texts.filter(
+    (t) => !/IBM Plex Sans/.test(t.font) && !/Marcellus|Georgia/.test(t.font),
+  );
+  check(
+    'every other run is set in the app grotesk',
+    strayFonts.length === 0,
+    strayFonts.map((t) => `"${t.text}" in ${t.font}`).join('; '),
+  );
+  check(
+    'no run is set below 9px',
+    recording.texts.every((t) => fontSizeOf(t.font) >= 9),
+    recording.texts
+      .filter((t) => fontSizeOf(t.font) < 9)
+      .map((t) => `"${t.text}" at ${fontSizeOf(t.font)}px`)
+      .join('; '),
+  );
+
   // --- the chart ------------------------------------------------------------
-  // A bar is a filled path sitting on the axis: bottom at y=500, inside the plot
-  // band, and narrow. The stub does not know what a bar is — only what one
-  // looks like — so this catches a chart that silently drew nothing.
+  // A bar is a filled path sitting on the axis: bottom at the axis line, inside
+  // the plot band, and narrow. The stub does not know what a bar is — only what
+  // one looks like — so this catches a chart that silently drew nothing.
+  const AXIS_Y = 486;
   const bars = recording.filled.filter(
-    (s) => Math.abs(s.bottom - 500) < 0.6 && s.top >= 328 && s.right - s.left <= 40 && s.left >= 56,
+    (s) => Math.abs(s.bottom - AXIS_Y) < 0.6 && s.top >= 328 && s.right - s.left <= 40 && s.left >= 56,
   );
   check(
     `the chart draws at least one bar per turn (${scorecard.turns})`,
@@ -566,13 +602,21 @@ async function main(): Promise<void> {
     'every bar sits inside the content width',
     bars.every((s) => s.left >= 55 && s.right <= 1145),
   );
-  const eventDots = recording.filled.filter(
-    (s) => s.bottom <= 325 && s.top >= 285 && s.right - s.left <= 8,
+  // Events are marked with the class letter, not a coloured dot: the receipt
+  // goes to Discord, where hue is not a channel every reader has.
+  const MARKS = new Set(['W', 'R', 'S', 'C', 'A', 'K']);
+  const eventMarks = recording.texts.filter(
+    (t) => MARKS.has(t.text) && t.y > 285 && t.y < 330 && t.align === 'center',
   );
   check(
-    'events are marked above the columns',
-    scorecard.events.length === 0 || eventDots.length > 0,
-    `${eventDots.length} dots for ${scorecard.events.length} events`,
+    'events are marked above the columns by class letter',
+    scorecard.events.length === 0 || eventMarks.length > 0,
+    `${eventMarks.length} marks for ${scorecard.events.length} events`,
+  );
+  check(
+    'the marker key names every class',
+    ['wrath', 'removal', 'resource', 'counter', 'attack', 'clock'].every((w) => drawn.includes(w)),
+    drawn.filter((t) => ['wrath', 'removal', 'clock'].includes(t)).join(', ') || '(no key drawn)',
   );
   check(
     'the turn axis is labelled',
@@ -613,7 +657,7 @@ async function main(): Promise<void> {
     emptyRecording.texts.some((t) => t.text === 'UNFINISHED'),
   );
   const emptyBars = emptyRecording.filled.filter(
-    (s) => Math.abs(s.bottom - 500) < 0.6 && s.top >= 328 && s.right - s.left <= 40,
+    (s) => Math.abs(s.bottom - AXIS_Y) < 0.6 && s.top >= 328 && s.right - s.left <= 40,
   );
   check('the empty run draws no bars', emptyBars.length === 0, `${emptyBars.length}`);
   checkNoOverflow('empty run', emptyRecording);
@@ -648,7 +692,7 @@ async function main(): Promise<void> {
   check('a one-turn run renders without throwing', oneThrew === '', oneThrew);
   check(
     'a one-turn run still draws its column',
-    oneRecording.filled.some((s) => Math.abs(s.bottom - 500) < 0.6 && s.right - s.left <= 40),
+    oneRecording.filled.some((s) => Math.abs(s.bottom - AXIS_Y) < 0.6 && s.right - s.left <= 40),
   );
   checkNoOverflow('one-turn run', oneRecording);
 
@@ -658,7 +702,7 @@ async function main(): Promise<void> {
     `image               ${SHARE_IMAGE_WIDTH}×${SHARE_IMAGE_HEIGHT} logical, ${DEVICE_SCALE}× backing`,
     `canvas calls        ${recording.calls.length}`,
     `text runs           ${recording.texts.length}`,
-    `bars                ${bars.length}, event dots ${eventDots.length}`,
+    `bars                ${bars.length}, event marks ${eventMarks.length}`,
     `events / wipes      ${scorecard.events.length} / ${scorecard.wipes.length}`,
     `widest text run     ${Math.max(...recording.texts.map((t) => extentOf(t).right)).toFixed(0)}px (edge 1144)`,
   ];

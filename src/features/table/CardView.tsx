@@ -56,6 +56,13 @@ export interface CardViewProps {
   badge?: boolean;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   onDoubleClick?: (e: MouseEvent<HTMLDivElement>) => void;
+  /**
+   * What Enter and Space do to this card while it holds keyboard focus: play it
+   * from hand, tap or untap it on the battlefield. The drag library already
+   * makes every card a `role="button"` tab stop, so without this the cards were
+   * the one thing on the table the keyboard could reach and not use.
+   */
+  onActivate?: () => void;
   title?: string;
 }
 
@@ -118,6 +125,12 @@ function CardArt({
         loading="lazy"
         decoding="async"
         draggable={false}
+        // Scryfall's images come off a CDN this app does not control. An image
+        // that never arrives leaves the printed frame underneath as the card,
+        // which is readable; a broken-image glyph laid over it is not.
+        onError={(e) => {
+          e.currentTarget.hidden = true;
+        }}
       />
     </>
   );
@@ -136,6 +149,7 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
     badge = true,
     onClick,
     onDoubleClick,
+    onActivate,
     title,
   } = props;
 
@@ -161,8 +175,35 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
       ref={dnd?.setNodeRef}
       className={classes.join(' ')}
       title={title}
+      // The global hotkey listener stands down for a keyboard-focused card
+      // carrying this attribute, which is what lets Space reach the card here
+      // instead of stepping the phase behind it.
+      data-card-activate={onActivate ? '' : undefined}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      // A mouse press focuses the card, and a focused card owns Enter and
+      // Space. The pilot who just clicked a permanent still means "next phase"
+      // when they hit Space, so the pointer hands focus straight back; only Tab
+      // leaves a card holding it. (`:focus-visible` cannot be used to tell the
+      // two apart here: pressing a key on a pointer-focused element makes it
+      // match, which is exactly the moment the answer is needed.)
+      onPointerUp={
+        onActivate
+          ? (e) => {
+              e.currentTarget.blur();
+            }
+          : undefined
+      }
+      onKeyDown={
+        onActivate
+          ? (e) => {
+              if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+              e.preventDefault();
+              e.stopPropagation();
+              onActivate();
+            }
+          : undefined
+      }
       onContextMenu={
         menu
           ? (e) => {

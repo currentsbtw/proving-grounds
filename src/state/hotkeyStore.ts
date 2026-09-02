@@ -9,6 +9,8 @@ export type ActionId =
   | 'untap'
   | 'mulligan'
   | 'focusNote'
+  | 'respondOne'
+  | 'respondTwo'
   | 'help';
 
 export interface HotkeyAction {
@@ -32,8 +34,20 @@ export const HOTKEY_ACTIONS: readonly HotkeyAction[] = [
     note: 'only while the opening hand is undecided',
     defaultKey: 'm',
   },
-  { id: 'focusNote', label: 'Jump to the note box', defaultKey: 'n' },
-  { id: 'help', label: 'Show this help', defaultKey: '?' },
+  { id: 'focusNote', label: 'Log a note', defaultKey: 'n' },
+  {
+    id: 'respondOne',
+    label: 'Event: answer it',
+    note: 'only while an event is waiting',
+    defaultKey: '1',
+  },
+  {
+    id: 'respondTwo',
+    label: 'Event: let it resolve',
+    note: 'only while an event is waiting',
+    defaultKey: '2',
+  },
+  { id: 'help', label: 'Keyboard help', defaultKey: '?' },
 ];
 
 export type Keymap = Record<ActionId, string>;
@@ -44,8 +58,6 @@ export const DEFAULT_KEYMAP: Keymap = Object.fromEntries(
 
 /** Dexie settings key the keymap persists under. */
 export const KEYMAP_SETTING = 'keymap';
-
-const ACTION_IDS = new Set<string>(HOTKEY_ACTIONS.map((a) => a.id));
 
 /** Keys we refuse to bind: they carry meaning the app should not steal. */
 const UNBINDABLE = new Set([
@@ -88,15 +100,37 @@ export function actionForKey(keymap: Keymap, token: string): ActionId | null {
   return null;
 }
 
+/**
+ * A stored keymap, merged over the defaults without ever handing one key to two
+ * actions. The stored bindings are laid down first — they are the player's own
+ * choices — and an action whose default key was taken by one of them is left
+ * unbound rather than silently shadowed. The help overlay shows that as a blank
+ * chip, which is the truth: the action has no key until it is rebound.
+ */
 function sanitize(raw: unknown): Keymap {
-  const map: Keymap = { ...DEFAULT_KEYMAP };
-  if (!raw || typeof raw !== 'object') return map;
-  for (const [id, key] of Object.entries(raw as Record<string, unknown>)) {
-    if (!ACTION_IDS.has(id)) continue;
+  const stored = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const map = {} as Keymap;
+  const claimed = new Set<string>();
+
+  for (const action of HOTKEY_ACTIONS) {
+    const key = stored[action.id];
     if (typeof key !== 'string' || key.length === 0) continue;
-    if (!isBindable(key)) continue;
-    map[id as ActionId] = key;
+    if (!isBindable(key) || claimed.has(key)) continue;
+    map[action.id] = key;
+    claimed.add(key);
   }
+
+  for (const action of HOTKEY_ACTIONS) {
+    if (map[action.id] !== undefined) continue;
+    const fallback = DEFAULT_KEYMAP[action.id];
+    if (claimed.has(fallback)) {
+      map[action.id] = '';
+      continue;
+    }
+    map[action.id] = fallback;
+    claimed.add(fallback);
+  }
+
   return map;
 }
 
@@ -148,7 +182,7 @@ export const useHotkeyStore = create<HotkeyState>((set, get) => ({
 
   bind(action, key) {
     if (!isBindable(key)) {
-      set({ bindError: `${keyLabel(key)} can’t be bound.` });
+      set({ bindError: `${keyLabel(key)} is reserved. Pick another key.` });
       return false;
     }
     const { keymap } = get();
@@ -159,7 +193,7 @@ export const useHotkeyStore = create<HotkeyState>((set, get) => ({
     const taken = actionForKey(keymap, key);
     if (taken) {
       const label = HOTKEY_ACTIONS.find((a) => a.id === taken)?.label ?? taken;
-      set({ bindError: `${keyLabel(key)} is already “${label}”.` });
+      set({ bindError: `${keyLabel(key)} already runs “${label}”. Pick another key.` });
       return false;
     }
     const next: Keymap = { ...keymap, [action]: key };

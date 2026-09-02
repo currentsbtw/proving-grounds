@@ -10,6 +10,12 @@ import { CommanderPicker } from './CommanderPicker';
 const BRACKETS: Deck['bracket'][] = [1, 2, 3, 4, 5];
 const DECK_SIZE = 100;
 
+/**
+ * How many lines of either list the review prints. A list of garbage produces a
+ * warning per line, and an uncapped column of them pushes Save off the rail.
+ */
+const LISTED = 12;
+
 interface ResolvedRow {
   entry: ParsedEntry;
   card: CardData;
@@ -89,7 +95,7 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
     setError(null);
     const parsed = parseDecklist(text);
     if (parsed.entries.length === 0) {
-      setError('Nothing to import — paste a decklist first.');
+      setError('Nothing to import. Paste a decklist first.');
       return;
     }
 
@@ -123,10 +129,14 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
         if (lead) setName(lead.card.name);
       }
     } catch (err: unknown) {
+      // A status from Scryfall is worth repeating; the browser's own wording for
+      // a dead connection ("Failed to fetch") tells the reader nothing and
+      // offers no next move, so that case gets a sentence with one in it.
+      const answered = err instanceof Error && err.message.startsWith('Scryfall responded');
       setError(
-        err instanceof Error
-          ? `Could not reach Scryfall — ${err.message}`
-          : 'Could not reach Scryfall',
+        answered
+          ? `${(err as Error).message}. Resolve the list again in a moment.`
+          : 'Could not reach Scryfall. Check your connection, then resolve the list again.',
       );
     } finally {
       setBusy(null);
@@ -160,7 +170,9 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
       await saveDeck(deck);
       onSaved();
     } catch (err: unknown) {
-      setError(err instanceof Error ? `Could not save deck — ${err.message}` : 'Could not save deck');
+      setError(
+        err instanceof Error ? `Could not save deck. ${err.message}` : 'Could not save deck.',
+      );
       setBusy(null);
     }
   }
@@ -250,22 +262,35 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
 
           {review.notFound.length > 0 && (
             <div className="dk-warn">
-              <div>{review.notFound.length} card names were not found on Scryfall:</div>
+              <div>
+                {review.notFound.length} card name{review.notFound.length === 1 ? ' was' : 's were'} not
+                found on Scryfall. Go Back to fix the spelling, or save the deck without them.
+              </div>
               <ul className="dk-warn-list">
-                {review.notFound.slice(0, 12).map((n) => (
-                  <li key={n}>{n}</li>
+                {review.notFound.slice(0, LISTED).map((n) => (
+                  <li key={n} className="dk-user-text">
+                    {n}
+                  </li>
                 ))}
-                {review.notFound.length > 12 && <li>+{review.notFound.length - 12} more</li>}
+                {review.notFound.length > LISTED && (
+                  <li>+{review.notFound.length - LISTED} more</li>
+                )}
               </ul>
             </div>
           )}
 
           {review.parseWarnings.length > 0 && (
             <div className="dk-warn">
+              <div>Problems in the pasted list:</div>
               <ul className="dk-warn-list">
-                {review.parseWarnings.map((w) => (
-                  <li key={w}>{w}</li>
+                {review.parseWarnings.slice(0, LISTED).map((w) => (
+                  <li key={w} className="dk-user-text">
+                    {w}
+                  </li>
                 ))}
+                {review.parseWarnings.length > LISTED && (
+                  <li>+{review.parseWarnings.length - LISTED} more</li>
+                )}
               </ul>
             </div>
           )}

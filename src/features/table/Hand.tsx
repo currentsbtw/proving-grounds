@@ -53,6 +53,10 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
 
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [avail, setAvail] = useState(0);
+  // Where the keyboard was when a card was played out of the hand. The card it
+  // was sitting on unmounts, and focus would otherwise fall to the document —
+  // one keyboard play would cost the player their place in the hand.
+  const refocus = useRef<number | null>(null);
 
   const setRefs = useCallback(
     (el: HTMLDivElement | null) => {
@@ -89,6 +93,17 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
     return () => observer.disconnect();
   }, []);
 
+  // Runs after the played card has gone, so the index that was under the
+  // keyboard now holds the card that slid into its place.
+  useLayoutEffect(() => {
+    const index = refocus.current;
+    if (index === null) return;
+    refocus.current = null;
+    const stops = boxRef.current?.querySelectorAll<HTMLElement>('.tbl-card');
+    if (!stops || stops.length === 0) return;
+    stops[Math.min(index, stops.length - 1)].focus();
+  }, [cards.length]);
+
   const { width, step } = handLayout(avail, cards.length);
   const overlap = step - width;
 
@@ -98,7 +113,7 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
       className={`tbl-hand tbl-drop${isOver ? ' is-over' : ''}`}
       aria-label="Hand"
     >
-      {cards.length === 0 && <p className="tbl-hand-empty">Hand is empty</p>}
+      {cards.length === 0 && <p className="tbl-hand-empty">Hand is empty. Draw from the library.</p>}
 
       {/* Nothing renders until the container has been measured, so the row can
           never briefly overflow at its default width. */}
@@ -124,10 +139,18 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
               onDoubleClick={
                 selecting ? undefined : () => moveCard(card.iid, 'battlefield')
               }
+              onActivate={
+                selecting
+                  ? () => onToggleSelect(card.iid)
+                  : () => {
+                      refocus.current = i;
+                      moveCard(card.iid, 'battlefield');
+                    }
+              }
               title={
                 selecting
-                  ? 'Click to put on the bottom'
-                  : 'Double-click to play · right-click for options'
+                  ? 'Click or Enter to put on the bottom'
+                  : 'Double-click or Enter to play · right-click for options'
               }
             />
           </div>

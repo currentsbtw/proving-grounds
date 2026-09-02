@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { deleteDeck, getCachedCardsByIds, listDecks } from '../../db/db';
 import type { Deck } from '../../domain/types';
@@ -29,6 +29,21 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
     return { decks, names };
   }, []);
 
+  // A browser with storage switched off (a private window does this) leaves the
+  // live query with nothing to attach to: it never calls the querier and never
+  // errors, so the rail printed "Loading decks…" for the rest of the session.
+  // One direct read settles the question and the rail says what is wrong.
+  const [storageBlocked, setStorageBlocked] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void listDecks().catch(() => {
+      if (live) setStorageBlocked(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
   return (
     <div className="dk-stack">
       <div className="dk-head">
@@ -40,9 +55,17 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
 
       {error && <p className="dk-error">{error}</p>}
 
-      {!data && <p className="dk-empty">Loading decks…</p>}
-      {data && data.decks.length === 0 && (
-        <p className="dk-empty">No decks yet. Import a plain-text decklist to get started.</p>
+      {storageBlocked && (
+        <p className="dk-error">
+          This browser is not letting the app store anything, so decks and runs cannot be
+          saved here. A normal window, or one with site data allowed, will work.
+        </p>
+      )}
+      {!data && !storageBlocked && <p className="dk-empty">Loading decks…</p>}
+      {data && !storageBlocked && data.decks.length === 0 && (
+        <p className="dk-empty">
+          No decks yet. Import a plain-text decklist from Moxfield, Archidekt or MTGO.
+        </p>
       )}
 
       {data?.decks.map((deck) => {
@@ -67,7 +90,7 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
                 disabled={busy}
                 onClick={() => onStart(deck, seeds[deck.id] ?? '')}
               >
-                {starting ? 'Starting…' : 'Start Run'}
+                {starting ? 'Starting…' : 'Start run'}
               </button>
               <input
                 className="dk-seed"
@@ -82,7 +105,9 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
             <div className="dk-deck-secondary">
               {confirmId === deck.id ? (
                 <>
-                  <span className="dk-deck-meta dk-grow">Delete this deck?</span>
+                  <span className="dk-deck-meta dk-grow">
+                    Delete this deck? Its runs stay, but you cannot replay them.
+                  </span>
                   <button
                     type="button"
                     className="dk-btn-quiet dk-btn-danger"

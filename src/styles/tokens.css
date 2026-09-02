@@ -1,17 +1,23 @@
+/* Dark ships by default. Light is the same design with swapped values — a token
+   swap, never a redesign — and is selected by data-theme on the root element. */
 :root {
   /* Surfaces */
   --ground: #17181c;
   --surface: #1f2127;
   --raised: #262932;
+  /* Hairline that separates blocks; never carries meaning on its own. */
   --line: #33353c;
+  /* The heavier printed rule: chip borders, empty threat segments, key squares. */
+  --rule: #6a6d77;
 
   /* Text */
   --ink: #e8e6e1;
   --muted: #a0a3aa;
 
-  /* Signals */
+  /* Signals. Danger is held a hue away from --mana-r: a combat event and a life
+     loss can sit on the same screen, and they must not read as the same signal. */
   --accent: #c9a85c;
-  --danger: #e58a76;
+  --danger: #f0899f;
   --ok: #8fc49e;
 
   /* Mana chips */
@@ -21,14 +27,54 @@
   --mana-r: #e58a76;
   --mana-g: #8fc49e;
 
+  /* Depth. Translucent black is not theme-neutral: a near-opaque near-black
+     scrim over a paper ground is a dark design with a light patch in it, so
+     both the scrim and the two shadow strengths swap with everything else. */
+  --scrim: rgb(10 11 13 / 72%);
+  --shadow: rgb(0 0 0 / 30%);
+  --shadow-strong: rgb(0 0 0 / 55%);
+
   /* Type */
-  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
   --font-display: 'Marcellus', Georgia, 'Times New Roman', serif;
+  /* A decklist is columnar text, so the paste box is the one monospace surface.
+     Declared here so the type system is readable in one file. */
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
 
   /* Layout */
   --rail-left: 280px;
   --rail-right: 320px;
-  --titlebar-h: 52px;
+  --titlebar-h: 44px;
   --radius: 6px;
   --gap: 12px;
+}
+
+:root[data-theme='light'] {
+  /* Surfaces */
+  --ground: #f5f2ec;
+  --surface: #efece4;
+  --raised: #fbf9f4;
+  --line: #d0c9b9;
+  --rule: #8d8478;
+
+  /* Text */
+  --ink: #1a1a17;
+  --muted: #6b6b63;
+
+  /* Signals */
+  --accent: #7d5f16;
+  --danger: #9c1f45;
+  --ok: #2f6b45;
+
+  /* Depth: a warm dark at a lower alpha, so the paper ground stays paper. */
+  --scrim: rgb(43 36 26 / 55%);
+  --shadow: rgb(74 62 44 / 16%);
+  --shadow-strong: rgb(74 62 44 / 30%);
+
+  /* Mana chips */
+  --mana-w: #6f6224;
+  --mana-u: #275b80;
+  --mana-b: #57406d;
+  --mana-r: #9d3b1f;
+  --mana-g: #2f6b45;
 }

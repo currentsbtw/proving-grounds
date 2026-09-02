@@ -1,42 +1,135 @@
+/* The single column is floored at zero: without it the shell takes its width
+   from the body's min-content and a narrow window pushes the right rail off the
+   screen instead of narrowing the columns. */
 .pg-app {
   display: grid;
-  grid-template-rows: var(--titlebar-h) 1fr;
+  grid-template-rows: var(--titlebar-h) 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
 }
 
+/* A ruled line under the title, not a bar sitting on its own surface. */
 .pg-titlebar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
   padding: 0 16px;
-  background: var(--surface);
+  background: var(--ground);
   border-bottom: 1px solid var(--line);
 }
 
+/* The one place the display face is allowed. It is the page's h1, so it also
+   has to undo the two things `base.css` gives every heading: the grotesk, and a
+   600 weight the single Marcellus face would have to fake. */
 .pg-wordmark {
+  flex: none;
   font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: 0.22em;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.03em;
   color: var(--ink);
 }
 
-.pg-subtitle {
-  font-size: 11px;
-  letter-spacing: 0.08em;
+/* Run identity, moved off the deck rail that stands down while a run is live. */
+.pg-run-chip {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 9ch;
+  max-width: 52ch;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.3;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* The chip truncates at the deck name rather than at its own right edge: a long
+   name used to push "bracket 3 · seed …" past the ellipsis and take the run's
+   identity with it. `isolate` keeps a name carrying a bidi control character
+   from reordering the two facts printed after it. */
+.pg-run-name {
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: isolate;
+}
+
+.pg-run-fixed {
+  flex: none;
+}
+
+.pg-run-sep {
+  flex: none;
+  color: var(--line);
+}
+
+/* The seed is player-typed too, so it truncates on the same terms. */
+.pg-run-seed {
+  display: inline-block;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  unicode-bidi: isolate;
+  color: var(--ink);
 }
 
 .pg-titlebar-spacer {
   flex: 1;
 }
 
+/* The Fan Content line ships in full, so it gets its own footer row under the
+   shell rather than competing for width in the title bar. It wraps; it is never
+   truncated or abbreviated. */
+.pg-legal {
+  padding: 5px 16px 6px;
+  background: var(--ground);
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* Keyboard and Theme sit as printed labels with a bordered key square. */
+.pg-titlebar .pg-help-btn {
+  flex: none;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+}
+
+.pg-titlebar .pg-help-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+/* Between runs there is no rail to the right of the centre panel: the readout
+   only exists while a run is live, so its width is not held open. */
 .pg-body {
   display: grid;
-  grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+  grid-template-columns: var(--rail-left) minmax(0, 1fr);
   gap: var(--gap);
   padding: var(--gap);
   min-height: 0;
+  min-width: 0;
+}
+
+/* During a run the board and hand take the whole left, full height, and the
+   readout is the only rail. The two are separated by one rule rather than by a
+   gap between two floating panels. */
+.pg-body.is-live {
+  grid-template-columns: minmax(0, 1fr) var(--rail-right);
+  gap: 0;
+  padding: 0;
 }
 
 .pg-rail,
@@ -47,9 +140,56 @@
   padding: 14px;
   overflow: auto;
   min-height: 0;
+  min-width: 0;
+}
+
+.pg-body.is-live .pg-table {
+  background: var(--ground);
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
 }
 
 .pg-rail > h2,
 .pg-table > h2 {
   margin-bottom: 10px;
+}
+
+/* Responsive floor: the readout gives up width before the board does, and the
+   board never drops under the 260px of card width the hand needs. */
+@media (max-width: 1280px) {
+  .pg-body.is-live {
+    --rail-right: 280px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .pg-body.is-live {
+    --rail-right: 250px;
+  }
+}
+
+/* Short window: the shell's own chrome gives up its slack before the readout
+   does. The Fan Content line still ships in full — it just sets tighter. */
+@media (max-height: 820px) {
+  .pg-app {
+    --titlebar-h: 38px;
+  }
+
+  .pg-legal {
+    padding: 3px 16px 4px;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+}
+
+/* Narrow *and* short is the hard case: at 250px every row in the column doubles
+   up — the turn caption, the two turn buttons, the event's two answers — and the
+   doubled lines are what push LIFE, CLOCK and the turn controls off the bottom.
+   A little width back costs the board nothing (it keeps well over its 260px of
+   card width) and buys the column a whole line back on five separate rows. */
+@media (max-width: 1100px) and (max-height: 820px) {
+  .pg-body.is-live {
+    --rail-right: 276px;
+  }
 }

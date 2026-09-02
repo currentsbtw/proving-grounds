@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Impeccable: keep reports, contracts, approved mocks and the final captures; drop working state and interim captures
+.impeccable/hook.cache.json
+.impeccable/questions/
+.impeccable/config.local.json
+.impeccable/build/
+.impeccable/review/*.png
+!.impeccable/review/polish-*.png
+!.impeccable/review/final-eliminated-1440.png

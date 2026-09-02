@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PressureEvent } from '../../domain/types';
 import type { ResolveEventPayload } from '../../state/gameStore';
 import { cardName, isCreatureCard, useGameStore } from '../../state/gameStore';
+import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
+import { EVENT_RESPONSE_EVENT } from '../../hooks/useHotkeys';
+import type { EventResponseDetail } from '../../hooks/useHotkeys';
 import { CardView } from '../table/CardView';
 import { collectChoices, EVENT_LABEL, seatLabel } from './pressureUi';
 import type { Choice } from './pressureUi';
-
-/** Shown once after a wipe resolves; the board it swept is not the whole truth. */
-const WIPE_HINT = 'Drag back anything that survives (indestructible, regenerated, protected).';
 
 interface PickerProps {
   title: string;
@@ -19,9 +19,9 @@ interface PickerProps {
 }
 
 /**
- * A small card picker that hangs below the dock, so it covers the top of the
- * battlefield without taking the pointer away from the rest of the table.
- * Escape closes it; nothing is focus-trapped.
+ * A small card picker that hangs off the event card, over the battlefield, so it
+ * covers cards rather than the readout. Escape closes it; nothing is
+ * focus-trapped.
  */
 function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: PickerProps) {
   useEffect(() => {
@@ -40,7 +40,9 @@ function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: Pi
       <div className="pgp-picker-head">
         <span>{title}</span>
         <button type="button" className="pgp-picker-close" onClick={onClose} aria-label="Close picker">
-          ×
+          <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false">
+            <path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" strokeWidth="1.2" fill="none" />
+          </svg>
         </button>
       </div>
       {choices.length === 0 ? (
@@ -67,22 +69,24 @@ function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: Pi
 
 interface DockBodyProps {
   event: PressureEvent;
-  pendingCount: number;
-  /** Called as the event leaves the dock; `hint` asks for the wipe aftermath note. */
+  /** Called as the event leaves the card; true asks for the post-wipe tell. */
   onRetired: (hint: boolean) => void;
 }
 
 /**
- * The dock's per-event contents. Mounted with the event id as its key, so every
+ * The card's per-event controls. Mounted with the event id as its key, so every
  * new event arrives with a clean note, damage figure and target choice — which
- * also covers a counter event jumping the queue mid-`moveCard`.
+ * also covers a counter event jumping the queue mid-`moveCard`. The reading
+ * above it is not keyed: it is a live region and has to outlive the event.
  */
-function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
+function DockBody({ event, onRetired }: DockBodyProps) {
   const respondToActiveEvent = useGameStore((s) => s.respondToActiveEvent);
   const resolveActiveEvent = useGameStore((s) => s.resolveActiveEvent);
   const declareInteraction = useGameStore((s) => s.declareInteraction);
+  const clock = useGameStore((s) => s.clock);
   // The card cache never changes mid-run, so `cards` alone keys the pickers.
   const cards = useGameStore((s) => s.cards);
+  const keymap = useHotkeyStore((s) => s.keymap);
 
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -154,44 +158,69 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
     resolveActiveEvent(payload);
   }
 
+  /**
+   * The two numbered responses, answered by the keyboard as well as the mouse.
+   * Held in a ref so the listener below is registered once and still calls the
+   * current closures — every one of them reads local state that moves.
+   */
+  const answers = useRef<{ first: () => void; second: () => void; blocked: boolean }>({
+    first: doRespond,
+    second: doResolve,
+    blocked: false,
+  });
+
+  useEffect(() => {
+    answers.current = {
+      first: event.type === 'clock' ? doDeclare : doRespond,
+      second: doResolve,
+      blocked: resolveBlocked,
+    };
+  });
+
+  useEffect(() => {
+    function onResponse(e: Event): void {
+      const slot = (e as CustomEvent<EventResponseDetail>).detail?.slot;
+      const current = answers.current;
+      if (slot === 1) current.first();
+      // A resolution still missing the card it needs is a no-op, not a guess.
+      if (slot === 2 && !current.blocked) current.second();
+    }
+    window.addEventListener(EVENT_RESPONSE_EVENT, onResponse);
+    return () => window.removeEventListener(EVENT_RESPONSE_EVENT, onResponse);
+  }, []);
+
   /** Mana-cost-free wording: the button says what happens at the table. */
   function resolveLabel(): string {
     switch (event.type) {
       case 'wipe':
         return nonlands ? 'Destroy all nonlands' : 'Destroy all creatures';
       case 'removal':
-        return targetOnBoard && targetName ? `Destroy ${targetName}` : 'It resolves';
+        return targetOnBoard && targetName ? `Destroy ${targetName}` : 'Nothing to destroy';
       case 'counter':
         return 'It gets countered';
       case 'combat':
         return `Take ${Math.max(0, Math.round(damage) || 0)}`;
       case 'resource':
         if (variant === 'discard') return pickName ? `Discard ${pickName}` : 'Discard a card';
-        if (variant === 'sacrifice') return pickName ? `Sacrifice ${pickName}` : 'Sacrifice a permanent';
-        return 'It resolves';
+        if (variant === 'sacrifice') return pickName ? `Sacrifice ${pickName}` : 'Sacrifice a creature';
+        return 'Pay the tax';
       case 'clock':
-        return 'Acknowledge';
+        return 'The clock stands';
       default:
         return 'It resolves';
     }
   }
 
-  const respondLabel =
-    event.type === 'counter' ? 'Resolve spell (I answer it)' : 'I have an answer';
+  const respondLabel = event.type === 'counter' ? 'Force it through' : 'I answer it';
+  const firstKey = keyLabel(keymap.respondOne);
+  const secondKey = keyLabel(keymap.respondTwo);
+  // Card names have no length limit worth designing to (the longest printed one
+  // runs 141 characters), and this label carries one. It is clamped to two lines
+  // in CSS and the whole string rides in the tooltip.
+  const resolveText = resolveLabel();
 
   return (
     <>
-      <div className="pgp-dock-main">
-        <span className="pgp-seat">{seatLabel(event.seatId)}</span>
-        <span className="pgp-type">{EVENT_LABEL[event.type]}</span>
-        <p className="pgp-prompt">{event.prompt}</p>
-        {pendingCount > 0 && (
-          <span className="pgp-more" title={`${pendingCount} more event(s) waiting behind this one`}>
-            +{pendingCount} more
-          </span>
-        )}
-      </div>
-
       <div className="pgp-dock-extras">
         {event.type === 'combat' && (
           <label className="pgp-field">
@@ -212,10 +241,13 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
           <span className="pgp-target">
             {targetOnBoard && targetName ? (
               <>
-                target: <strong>{targetName}</strong>
+                target:{' '}
+                <strong className="pgp-name" title={targetName}>
+                  {targetName}
+                </strong>
               </>
             ) : (
-              <em className="muted">
+              <em className="muted pgp-name" title={targetName ?? undefined}>
                 {targetName ? `${targetName} already left the battlefield` : 'no target chosen'}
               </em>
             )}
@@ -244,7 +276,10 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
           <span className="pgp-target">
             {pickName ? (
               <>
-                {variant === 'discard' ? 'discarding' : 'sacrificing'}: <strong>{pickName}</strong>
+                {variant === 'discard' ? 'discarding' : 'sacrificing'}:{' '}
+                <strong className="pgp-name" title={pickName}>
+                  {pickName}
+                </strong>
               </>
             ) : (
               <em className="muted">
@@ -254,7 +289,7 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
                     : 'pick a card to pitch'
                   : creatures.length === 0
                     ? 'no creatures to sacrifice'
-                    : 'pick a permanent to give up'}
+                    : 'pick a creature to give up'}
               </em>
             )}
             {(needsDiscard || needsSacrifice || pickIid) && (
@@ -279,32 +314,6 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
         >
           {noteOpen ? 'hide note' : 'add note'}
         </button>
-
-        {event.type === 'clock' ? (
-          <>
-            <button type="button" className="pgp-btn is-primary" onClick={doDeclare}>
-              Declare held interaction
-            </button>
-            <button type="button" className="pgp-btn" onClick={doResolve}>
-              Acknowledge
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="pgp-btn" onClick={doRespond}>
-              {respondLabel}
-            </button>
-            <button
-              type="button"
-              className="pgp-btn is-primary"
-              disabled={resolveBlocked}
-              title={resolveBlocked ? 'Choose a card first' : undefined}
-              onClick={doResolve}
-            >
-              {resolveLabel()}
-            </button>
-          </>
-        )}
       </div>
 
       {noteOpen && (
@@ -320,12 +329,55 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
         </div>
       )}
 
+      <div className="pgp-answers">
+        {event.type === 'clock' ? (
+          <>
+            <button type="button" className="pgp-btn is-primary" onClick={doDeclare}>
+              <span className="pgp-answer-key">{firstKey}</span>Declare held interaction
+            </button>
+            <button type="button" className="pgp-btn" onClick={doResolve}>
+              <span className="pgp-answer-key">{secondKey}</span>The clock stands
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="pgp-btn" onClick={doRespond}>
+              <span className="pgp-answer-key">{firstKey}</span>
+              <span className="pgp-btn-label">{respondLabel}</span>
+            </button>
+            <button
+              type="button"
+              className="pgp-btn is-primary"
+              disabled={resolveBlocked}
+              title={resolveBlocked ? 'Choose a card first' : resolveText}
+              onClick={doResolve}
+            >
+              <span className="pgp-answer-key">{secondKey}</span>
+              <span className="pgp-btn-label">{resolveText}</span>
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* A clock outlives the warning that announced it, so its escape hatch
+          rides along with whatever event is in front of the player. It answers
+          the clock only: the event in front stays on the card, unretired. */}
+      {clock && event.type !== 'clock' && (
+        <button
+          type="button"
+          className="pgp-link pgp-declare"
+          onClick={() => declareInteraction()}
+        >
+          declare held interaction · answers {seatLabel(clock.seatId)}'s clock
+        </button>
+      )}
+
       {pickerOpen && event.type === 'removal' && (
         <CardPicker
-          title="Retarget — pick the permanent that actually died"
+          title="Retarget: pick the permanent that actually died"
           choices={battlefield}
           selected={targetIid}
-          emptyText="Nothing on your battlefield."
+          emptyText="Nothing on your battlefield. Resolve it with nothing to destroy."
           onPick={(iid) => {
             setTargetIid(iid);
             closePicker();
@@ -336,10 +388,10 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
 
       {pickerOpen && event.type === 'resource' && variant === 'discard' && (
         <CardPicker
-          title="Discard — pick the card you pitch"
+          title="Discard: pick the card you pitch"
           choices={hand}
           selected={pickIid}
-          emptyText="Your hand is empty."
+          emptyText="Your hand is empty. Resolve it with nothing to discard."
           onPick={(iid) => {
             setPickIid(iid);
             closePicker();
@@ -350,10 +402,10 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
 
       {pickerOpen && event.type === 'resource' && variant === 'sacrifice' && (
         <CardPicker
-          title="Sacrifice — pick the creature you give up"
+          title="Sacrifice: pick the creature you give up"
           choices={creatures}
           selected={pickIid}
-          emptyText="No creatures on your battlefield."
+          emptyText="No creatures on your battlefield. Resolve it with nothing to sacrifice."
           onPick={(iid) => {
             setPickIid(iid);
             closePicker();
@@ -365,36 +417,108 @@ function DockBody({ event, pendingCount, onRetired }: DockBodyProps) {
   );
 }
 
-/**
- * The non-modal pressure dock: a banner across the top of the table that never
- * takes control of the board away, so the player can tap mana and move cards
- * while deciding how the event resolves.
- */
-export default function EventDock() {
-  const event = useGameStore((s) => s.activeEvent);
-  const pendingCount = useGameStore((s) => s.pendingEvents.length);
-  // Set as an event leaves the dock, and cleared by the next one leaving — so a
-  // wipe's aftermath note never outlives the event that follows it.
-  const [wipeHint, setWipeHint] = useState(false);
+/** Standing race clock with no event in front of it — the declare hatch stays reachable. */
+function ClockAnswer() {
+  const declareInteraction = useGameStore((s) => s.declareInteraction);
+  const keymap = useHotkeyStore((s) => s.keymap);
 
-  if (!event) {
-    if (!wipeHint) return null;
-    return (
-      <div className="pgp-hint" role="status">
-        <span>{WIPE_HINT}</span>
-        <button type="button" className="pgp-link" onClick={() => setWipeHint(false)}>
-          dismiss
-        </button>
-      </div>
-    );
-  }
+  // The clock is the only thing to answer here, so it owns the first response
+  // key just as an event card's first button would.
+  useEffect(() => {
+    function onResponse(e: Event): void {
+      if ((e as CustomEvent<EventResponseDetail>).detail?.slot !== 1) return;
+      declareInteraction();
+    }
+    window.addEventListener(EVENT_RESPONSE_EVENT, onResponse);
+    return () => window.removeEventListener(EVENT_RESPONSE_EVENT, onResponse);
+  }, [declareInteraction]);
+
+  return (
+    <div className="pgp-answers">
+      <button
+        type="button"
+        className="pgp-btn is-primary"
+        onClick={() => declareInteraction()}
+      >
+        <span className="pgp-answer-key">{keyLabel(keymap.respondOne)}</span>
+        Declare held interaction
+      </button>
+    </div>
+  );
+}
+
+interface EventDockProps {
+  /** Raised when a wipe resolves, so the readout can post the survivor tell. */
+  onWipeResolved: (hint: boolean) => void;
+}
+
+/**
+ * The active event, pinned to the foot of the readout. Non-modal by design: the
+ * player can tap mana and move cards while deciding how the event resolves, and
+ * the hand never leaves the screen.
+ *
+ * One section serves the event and the bare race clock alike, because the
+ * reading at the top of it — seat, class, prompt — is a live region, and a live
+ * region only speaks if it was already mounted when its text changed. Keying the
+ * controls beneath it is what resets the note, the damage figure and the target
+ * choice per event; the reading itself is never keyed.
+ */
+export default function EventDock({ onWipeResolved }: EventDockProps) {
+  const event = useGameStore((s) => s.activeEvent);
+  const clock = useGameStore((s) => s.clock);
+  const pendingCount = useGameStore((s) => s.pendingEvents.length);
+
+  const standing = event ?? clock;
+  const type = event?.type ?? 'clock';
+  const seatId = standing?.seatId;
+  const prompt = event
+    ? event.prompt
+    : clock
+      ? `${seatLabel(clock.seatId)} wins after your turn ${clock.deadlineTurn}.`
+      : null;
 
   return (
     <section
-      className={`pgp-dock type-${event.type}`}
-      aria-label={`Pressure event from seat ${event.seatId}`}
+      className={
+        `pgp-dock type-${type}` + (event ? '' : ' is-quiet') + (standing ? '' : ' is-empty')
+      }
+      aria-label={
+        event
+          ? `Active event: ${EVENT_LABEL[event.type]} from ${seatLabel(event.seatId)}`
+          : 'Race clock'
+      }
     >
-      <DockBody key={event.id} event={event} pendingCount={pendingCount} onRetired={setWipeHint} />
+      {/* Mounted whether or not anything is standing, and clipped to nothing
+          when nothing is: a live region only speaks if it was already there
+          when its text arrived, so the first event of a run has to land in a
+          region that existed before it did. */}
+      <div className="pgp-say" role="status">
+        {standing && (
+          <>
+            <div className="pgp-dock-head">
+              <span className="pgp-head-label">{event ? 'active event' : 'race clock'}</span>
+              {event && pendingCount > 0 && (
+                <span
+                  className="pgp-more"
+                  title={`${pendingCount} more event${pendingCount === 1 ? '' : 's'} waiting behind this one`}
+                >
+                  {pendingCount} more queued
+                </span>
+              )}
+            </div>
+
+            <div className="pgp-dock-main">
+              <span className="pgp-seat">{seatLabel(seatId!)}</span>
+              <span className={`pgp-type type-${type}`}>{EVENT_LABEL[type]}</span>
+            </div>
+
+            <p className="pgp-prompt">{prompt}</p>
+          </>
+        )}
+      </div>
+
+      {event && <DockBody key={event.id} event={event} onRetired={onWipeResolved} />}
+      {!event && clock && <ClockAnswer />}
     </section>
   );
 }

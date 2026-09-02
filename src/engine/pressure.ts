@@ -372,7 +372,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
       clock: input.clock,
       counterArmed: null,
       playerThreat: playerThreatOf(input.player),
-      summary: `${seatLabel(input.clock.seatId)} wins — the clock ran out after turn ${input.clock.deadlineTurn}.`,
+      summary: `${seatLabel(input.clock.seatId)} wins. The clock ran out after turn ${input.clock.deadlineTurn}.`,
       notes: ['clock-expired'],
       clockExpired: true,
     };
@@ -440,12 +440,12 @@ export function resolveWindow(input: WindowInput): WindowResult {
     if (caster) {
       const nonlands = rng() < byBracket(PRESSURE.wipe.nonlandChance, bracket);
       const variant = nonlands ? 'nonlands' : 'creatures';
-      const scope = nonlands ? 'every nonland permanent' : 'every creature';
+      const scope = nonlands ? 'Every nonland permanent' : 'Every creature';
       events.push(
         makeEvent(
           'wipe',
           caster.id,
-          `${seatLabel(caster.id)} wraths the table — ${scope} is destroyed. Resolve it, then drag back anything you actually protected.`,
+          `${seatLabel(caster.id)} wraths the table. ${scope} is destroyed. Resolve it, then drag back anything you protected.`,
           { podCreatures, podPower: alive().reduce((n, s) => n + s.silhouette.power, 0) },
           { variant },
         ),
@@ -507,7 +507,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
     const blockLine =
       block > 0
         ? `Block with up to ${block} power or take it.`
-        : 'You have nothing back — block, answer, or take it.';
+        : 'You have nothing back. Answer it or take it.';
     events.push(
       makeEvent(
         'combat',
@@ -535,9 +535,9 @@ export function resolveWindow(input: WindowInput): WindowResult {
         roll < w.discard ? 'discard' : roll < w.discard + w.sacrifice ? 'sacrifice' : 'tax';
       const prompt =
         variant === 'discard'
-          ? `${seatLabel(caster.id)} strips your hand — discard a card of your choice.`
+          ? `${seatLabel(caster.id)} strips your hand. Discard a card of your choice.`
           : variant === 'sacrifice'
-            ? `${seatLabel(caster.id)} makes you sacrifice a permanent — pick one and put it in the graveyard.`
+            ? `${seatLabel(caster.id)} makes you sacrifice a creature. Pick one and put it in the graveyard.`
             : `${seatLabel(caster.id)} taxes the table: your next spell this turn costs 2 more, or it does not happen.`;
       events.push(makeEvent('resource', caster.id, prompt, { amount: 1 }, { variant }));
       bumpThreat(caster.id, 'resource');
@@ -568,7 +568,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
         makeEvent(
           'clock',
           owner.id,
-          `${seatLabel(owner.id)} will win on their turn after your turn ${deadlineTurn} — win first, eliminate ${seatLabel(owner.id)}, or declare held interaction.`,
+          `${seatLabel(owner.id)} will win on their turn after your turn ${deadlineTurn}. Win first, eliminate ${seatLabel(owner.id)}, or declare held interaction.`,
           { deadlineTurn, windows: deadlineTurn - turn },
         ),
       );
@@ -632,7 +632,7 @@ function buildSummary(
   const boards = livingSeats(seats)
     .map((s) => `${s.id} ${s.threat.toFixed(1)}/${s.silhouette.creatures}c ${s.silhouette.power}p`)
     .join(', ');
-  const parts = [`Opponent window before turn ${turn} — ${boards || 'no seats left'}`];
+  const parts = [`Opponent window before turn ${turn}: ${boards || 'no seats left'}`];
   if (events.length > 0) parts.push(events.map((e) => e.type).join(' + '));
   else parts.push('no events');
   if (counterArmed) parts.push(`Seat ${counterArmed.seatId} holding up ${counterArmed.threshold}+`);
@@ -663,9 +663,9 @@ export function counterPrompt(
   isCommander = false,
 ): string {
   const outcome = isCommander
-    ? 'Resolve it to send them back to the command zone — the tax still stands'
+    ? 'Resolve it to send them back to the command zone. The tax still stands'
     : 'Resolve it to bin the spell';
-  return `${seatLabel(seatId)} counters ${cardName} — they held up ${threshold}+ mana all turn. ${outcome}, or respond if you can force it through.`;
+  return `${seatLabel(seatId)} counters ${cardName}. They held up ${threshold}+ mana all turn. ${outcome}, or respond if you can force it through.`;
 }
 
 /**

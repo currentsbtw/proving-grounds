@@ -12,8 +12,6 @@ import { useCallback, useMemo, useState } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
 import { byArrival, canMulligan, commanderTax, useGameStore } from '../../state/gameStore';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
-import CounterTell from '../pressure/CounterTell';
-import PressureLayer from '../pressure/PressureLayer';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
 import { CardMenuProvider } from './CardMenu';
@@ -168,8 +166,6 @@ function TableSurface() {
         className={`pg-table tbl-root${activeId ? ' tbl-dragging' : ''}`}
         aria-label="Table"
       >
-        <PressureLayer />
-
         <Battlefield cards={zones.battlefield} />
 
         <div className="tbl-strip">
@@ -185,14 +181,11 @@ function TableSurface() {
           </div>
 
           <div className="tbl-hand-col">
+            {/* The tell reads once, in the readout's TELLS block; the chip on the
+                seat row is its locator. How to move a card lives in the Keys
+                overlay rather than in a line of copy over the hand. */}
             <div className="tbl-hand-head">
               <span>Hand</span>
-              <span className="tbl-hand-n">{zones.hand.length}</span>
-              <CounterTell />
-              <span className="tbl-mull-spacer" />
-              <span className="muted tbl-hand-tip">
-                double-click to play · drag to any zone · right-click for options
-              </span>
             </div>
 
             {showMulligan && (
@@ -233,13 +226,15 @@ function TableSurface() {
           <div className="tbl-stack-group">
             <ZoneStack
               zone="graveyard"
-              label="Graveyard"
+              label="Grave"
+              name="Graveyard"
               cards={zones.graveyard}
               onOpen={() => setOverlay({ kind: 'zone', zone: 'graveyard' })}
             />
             <ZoneStack
               zone="exile"
               label="Exile"
+              name="Exile"
               cards={zones.exile}
               onOpen={() => setOverlay({ kind: 'zone', zone: 'exile' })}
             />
@@ -355,7 +350,7 @@ function TableSurface() {
               <span className="muted">in {card.zone}</span>
             )
           }
-          footer="Looking does not reorder your library — cards left behind stay in order."
+          footer="Looking does not reorder your library. Cards left behind stay in order."
         />
       )}
 

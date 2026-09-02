@@ -4,15 +4,9 @@
   padding: 0;
   overflow: hidden;
   display: grid;
-  /* pressure layer · battlefield · bottom strip */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* battlefield · bottom strip */
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
-}
-
-/* The pressure dock is docked here rather than floated, so it can never sit on
-   top of a card the player needs to reach. */
-.pg-table.tbl-root > .pgp-layer:not(:empty) {
-  padding: 10px 12px 0;
 }
 
 /* Empty state ------------------------------------------------------------ */
@@ -39,45 +33,48 @@
 .tbl-battlefield {
   position: relative;
   min-height: 0;
-  overflow: auto;
-  padding: 14px 16px 10px;
+  overflow: hidden;
+  padding: 8px 16px 4px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   border-radius: var(--radius) var(--radius) 0 0;
   transition: box-shadow 120ms ease, background-color 120ms ease;
 }
 
+/* Two equal halves: nonlands above, lands below, each exactly half the board's
+   height at every width. Neither zone can grow at the other's expense, so the
+   land row never reads as the larger half of the table. */
 .tbl-bf-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
   flex: 1;
   min-height: 0;
 }
 
+/* Each half wraps inside itself and holds as many rows as its contents need:
+   Battlefield.tsx sizes the cards to the largest width whose rows still fit this
+   box, so the gaps and padding here are what it measures. Past the card floor a
+   crowded half scrolls, and the scrollbar is drawn in the same ink as the rules
+   rather than left to the browser. */
 .tbl-bf-row {
   display: flex;
   flex-wrap: wrap;
-  column-gap: 28px;
-  row-gap: 16px;
+  align-content: flex-start;
+  column-gap: 24px;
+  row-gap: 8px;
   padding: 4px 0;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
 }
 
-/* Nonlands take whatever space is left and stay top-aligned. */
-.tbl-bf-row.is-nonlands {
-  flex: 1 1 auto;
-  align-content: flex-start;
-}
-
-/* The land row is anchored to the bottom of the battlefield and holds its
-   height open, so playing the first land does not move anything else. */
 .tbl-bf-row.is-lands {
-  flex: 0 0 auto;
-  align-content: flex-end;
-  border-top: 1px dashed var(--line);
-  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
 }
 
 .tbl-bf-empty {
@@ -88,12 +85,15 @@
 
 /* Bottom strip ----------------------------------------------------------- */
 
+/* The hand column carries a real floor: with `auto` outer tracks and no minimum
+   of its own it was the only track that could give, so a narrow window squeezed
+   the hand to nothing while the zone stacks kept their full width. */
 .tbl-strip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(260px, 1fr) auto;
   gap: 12px;
   align-items: stretch;
-  padding: 10px 12px 12px;
+  padding: 8px 12px 9px;
   background: var(--ground);
   border-top: 1px solid var(--line);
 }
@@ -106,6 +106,9 @@
 
 /* Zone stacks ------------------------------------------------------------ */
 
+/* Square frames in the printed rule, matching the chips and key squares in the
+   readout. The card faces inside them keep their own corners — those are
+   Scryfall's artwork, not our frame. */
 .tbl-stack {
   position: relative;
   width: 92px;
@@ -114,8 +117,8 @@
   gap: 4px;
   padding: 6px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border: 1px solid var(--rule);
+  border-radius: 0;
   cursor: pointer;
   transition: border-color 120ms ease, box-shadow 120ms ease;
   text-align: left;
@@ -133,18 +136,46 @@
   align-items: flex-start;
 }
 
+/* The head row is the pile's one control. It is printed exactly as it was as a
+   caption — no button chrome — and the 24px pointer box it now needs is taken
+   as padding and handed back as negative margin, so the pile's height is
+   unchanged. */
 .tbl-stack-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 6px;
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  width: 100%;
+  min-height: 24px;
+  padding: 6px 0;
+  margin: -6px 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+  text-align: left;
   color: var(--muted);
+  overflow: hidden;
+}
+
+.tbl-stack-head:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+}
+
+.tbl-stack-head > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tbl-stack-count {
+  flex: none;
   color: var(--ink);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -154,24 +185,13 @@
   position: relative;
   width: 80px;
   height: 112px;
-  border-radius: 5px;
+  border-radius: 0;
   background: var(--raised);
-  border: 1px dashed var(--line);
+  border: 1px dashed var(--rule);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-}
-
-.tbl-stack-slot.is-filled {
-  border-style: solid;
-  border-color: transparent;
-  background: transparent;
-}
-
-.tbl-stack-empty {
-  color: var(--muted);
-  font-size: 11px;
 }
 
 .tbl-commander-cell {
@@ -182,6 +202,10 @@
 }
 
 .tbl-tax {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
   font-size: 11px;
   padding: 3px 6px;
   line-height: 1.2;
@@ -192,14 +216,14 @@
 
 /* Library ---------------------------------------------------------------- */
 
+/* The back of the library is a plain slab carrying the count — a hatched fill
+   was a drawn card back, and this world has no rendered props in it. */
 .tbl-lib-back {
   width: 80px;
   height: 112px;
-  border-radius: 5px;
-  background:
-    repeating-linear-gradient(135deg, rgba(201, 168, 92, 0.09) 0 6px, transparent 6px 12px),
-    var(--raised);
-  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--raised);
+  border: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -208,18 +232,11 @@
 }
 
 .tbl-lib-count {
-  font-family: var(--font-display);
   font-size: 26px;
+  font-weight: 600;
   line-height: 1;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-}
-
-.tbl-lib-sub {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tbl-lib-strip {
@@ -228,13 +245,14 @@
   right: 6px;
   height: 50%;
   pointer-events: none;
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px dashed transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: transparent;
   transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
@@ -251,14 +269,73 @@
 .tbl-dragging .tbl-lib-strip {
   border-color: var(--line);
   color: var(--muted);
-  background: rgba(23, 24, 28, 0.55);
+  background: color-mix(in srgb, var(--ground) 70%, transparent);
 }
 
 .tbl-dragging .tbl-lib-strip.is-over {
   border-color: var(--accent);
   border-style: solid;
   color: var(--accent);
-  background: rgba(201, 168, 92, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Narrow strip ----------------------------------------------------------- */
+
+/* Below the layout's comfortable width the readout narrows first (App.css), and
+   the zone stacks give up their second column before the hand gives up a pixel.
+   This block used to sit above the rules it overrides, where equal specificity
+   and source order meant none of the sizes below ever took effect. */
+@media (max-width: 1100px) {
+  .tbl-strip {
+    gap: 8px;
+    padding: 8px 8px 10px;
+  }
+
+  .tbl-stack-group {
+    gap: 6px;
+  }
+
+  .tbl-stack {
+    width: 78px;
+  }
+
+  .tbl-stack-head {
+    letter-spacing: 0.06em;
+  }
+
+  .tbl-stack-slot,
+  .tbl-lib-back {
+    width: 66px;
+    height: 92px;
+  }
+}
+
+/* A browser at 200% zoom on a 1440px screen reports 720px of width, well under
+   the layout's declared floor. Four stacks and a 260px hand cannot share that
+   line, and the strip was clipping the graveyard and exile off the right edge.
+   Below the floor the surface scrolls instead: nothing is lost, the hand keeps
+   its width, and the board above is untouched. */
+@media (max-width: 940px) {
+  .pg-table.tbl-root {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule) transparent;
+  }
+
+  .tbl-strip {
+    min-width: max-content;
+  }
+
+  .tbl-stack {
+    width: 70px;
+  }
+
+  .tbl-stack-slot,
+  .tbl-lib-back {
+    width: 58px;
+    height: 81px;
+  }
 }
 
 /* Hand ------------------------------------------------------------------- */
@@ -266,7 +343,7 @@
 .tbl-hand-col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -283,11 +360,10 @@
   overflow-x: clip;
   overflow-y: visible;
   overflow-clip-margin: 10px;
-  padding: 12px 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  min-height: 196px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  min-height: 182px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
@@ -311,7 +387,7 @@
 }
 
 .tbl-hand-slot:hover .tbl-card-face {
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 22px var(--shadow-strong);
 }
 
 /* No peeking mid-drag — the drag overlay is the card you are moving. */
@@ -327,6 +403,16 @@
   .tbl-hand-slot:hover .tbl-slot {
     transform: translateY(-8px);
   }
+
+  /* The drop targets settle instantly too. Every one of these is a 110–120ms
+     colour or border fade on a surface the player is dragging over, and the
+     state each one announces reads the same without the fade. */
+  .tbl-battlefield,
+  .tbl-hand,
+  .tbl-stack,
+  .tbl-lib-strip {
+    transition: none;
+  }
 }
 
 .tbl-hand-empty {
@@ -339,27 +425,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
   padding: 0 2px;
-}
-
-.tbl-hand-head .tbl-hand-n {
-  color: var(--ink);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.tbl-hand-tip {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
 }
 
 /* Drop highlight --------------------------------------------------------- */
@@ -370,7 +442,7 @@
 
 .tbl-dragging .tbl-drop.is-over {
   box-shadow: inset 0 0 0 2px var(--accent);
-  background-color: rgba(201, 168, 92, 0.06);
+  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .tbl-dragging .tbl-stack.tbl-drop.is-over {
@@ -396,6 +468,24 @@
   outline: none;
 }
 
+/* Every card is a tab stop (the drag library makes it one), so every card has to
+   show where the keyboard is. `outline: none` above kills the ring a pointer
+   drag would otherwise draw; this puts it back for the keyboard only. */
+.tbl-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  z-index: 3;
+}
+
+/* Tapping spins the card a quarter turn. The tapped state still reads without
+   the spin. This has to sit after the rule it overrides, not with the other
+   reduced-motion rules further up the file. */
+@media (prefers-reduced-motion: reduce) {
+  .tbl-card {
+    transition: none;
+  }
+}
+
 .tbl-card.is-tapped {
   transform: rotate(90deg);
   z-index: 2;
@@ -410,7 +500,7 @@
 }
 
 .tbl-card.is-lifted {
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 14px 28px var(--shadow-strong);
   cursor: grabbing;
 }
 
@@ -465,6 +555,9 @@
   gap: 4px;
 }
 
+/* This frame is what a card is when its Scryfall image never arrives, which is
+   the offline case, so the name has to survive without one: a word longer than
+   the frame breaks rather than running out of the card. */
 .tbl-frame-name {
   font-size: 11px;
   line-height: 1.25;
@@ -474,6 +567,8 @@
   -webkit-line-clamp: 3;
   line-clamp: 3;
   -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
 }
 
 .tbl-frame-cost {
@@ -495,10 +590,11 @@
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }
 
 .tbl-frame.is-token {
-  border: 1px solid rgba(201, 168, 92, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 5px;
   align-items: center;
   justify-content: center;
@@ -506,25 +602,25 @@
 }
 
 .tbl-frame.is-token .tbl-frame-name {
-  font-family: var(--font-display);
   font-size: 12px;
+  font-weight: 600;
 }
 
 .tbl-frame-pt {
-  font-family: var(--font-display);
   font-size: 15px;
+  font-weight: 600;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
+/* A face-down card is the same plain slab as the library it came off. */
 .tbl-frame.is-facedown {
-  background:
-    repeating-linear-gradient(135deg, rgba(201, 168, 92, 0.09) 0 6px, transparent 6px 12px),
-    var(--raised);
+  background: var(--raised);
 }
 
 /* Mana value badge ------------------------------------------------------- */
 
+/* The same small square the readout prints its hotkeys in. */
 .tbl-mv {
   position: absolute;
   top: -6px;
@@ -533,15 +629,14 @@
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--raised);
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   color: var(--ink);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 16px;
   text-align: center;
   pointer-events: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* Counters --------------------------------------------------------------- */
@@ -559,11 +654,11 @@
 }
 
 .tbl-counter {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.35;
   padding: 1px 5px;
   border-radius: 999px;
-  background: rgba(14, 15, 18, 0.86);
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
   border: 1px solid var(--line);
   color: var(--ink);
   white-space: nowrap;
@@ -572,12 +667,12 @@
 
 .tbl-counter.is-plus {
   color: var(--ok);
-  border-color: rgba(143, 196, 158, 0.5);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
 }
 
 .tbl-counter.is-loyalty {
   color: var(--accent);
-  border-color: rgba(201, 168, 92, 0.5);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 /* Mulligan bar ----------------------------------------------------------- */
@@ -589,16 +684,18 @@
   gap: 6px 10px;
   padding: 5px 8px;
   background: var(--raised);
-  border: 1px solid rgba(201, 168, 92, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: var(--radius);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .tbl-mull-label {
   color: var(--muted);
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .tbl-mull-spacer {
@@ -628,7 +725,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 30px var(--shadow-strong);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -636,7 +733,7 @@
 
 .tbl-menu-title {
   padding: 5px 8px 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
   margin-bottom: 3px;
@@ -677,7 +774,7 @@
 
 .tbl-menu-item .tbl-menu-hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -689,8 +786,9 @@
 
 .tbl-menu-head {
   padding: 6px 8px 3px;
-  font-size: 9px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -720,7 +818,7 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(10, 11, 13, 0.72);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -735,7 +833,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 24px 60px var(--shadow-strong);
   overflow: hidden;
 }
 
@@ -779,7 +877,7 @@
 }
 
 .tbl-overlay-cell button {
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 8px;
 }
 
@@ -792,5 +890,5 @@
   padding: 8px 16px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }

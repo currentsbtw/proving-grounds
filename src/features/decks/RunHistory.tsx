@@ -19,6 +19,44 @@ const RESULT_LABEL: Record<RunResult, string> = {
   abandoned: 'ABND',
 };
 
+/** The chip is four characters wide; the tooltip spells the same word out. */
+const RESULT_TITLE: Record<RunResult, string> = {
+  win: 'Win',
+  loss: 'Loss',
+  concede: 'Conceded',
+  abandoned: 'Abandoned, no result recorded',
+};
+
+/** The two crossing strokes of a close control, drawn rather than typed. */
+function CloseMark() {
+  return (
+    <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false">
+      <path
+        d="M1 1 L9 9 M9 1 L1 9"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** One chevron, rotated a quarter turn when the section is open. */
+function Caret({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={'sc-hist-caret' + (open ? ' is-open' : '')}
+      viewBox="0 0 8 10"
+      width="8"
+      height="10"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M2 1 L6 5 L2 9" stroke="currentColor" strokeWidth="1.2" fill="none" />
+    </svg>
+  );
+}
+
 /**
  * Last turn the run reached. Cheap enough to run over every row in the rail —
  * the scoring engine derives the same number, but scoring a whole deck's logs to
@@ -53,7 +91,9 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
   const [expanded, setExpanded] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const runs = useLiveQuery(() => listRuns(deckId), [deckId]);
+  // Storage can be refused outright; History simply stands down rather than
+  // throwing out of the rail. DeckList above says why nothing is stored.
+  const runs = useLiveQuery(() => listRuns(deckId).catch(() => []), [deckId]);
   if (!runs || runs.length === 0) return null;
 
   const selected = runs.find((run) => run.id === selectedRunId);
@@ -69,9 +109,7 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
         aria-expanded={open}
         onClick={() => setExpanded((was) => !was)}
       >
-        <span className="sc-hist-caret" aria-hidden="true">
-          {open ? '▾' : '▸'}
-        </span>
+        <Caret open={open} />
         <span className="sc-hist-deck-name">{deckName}</span>
         <span className="sc-hist-count num">Runs ({runs.length})</span>
       </button>
@@ -92,8 +130,8 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
                     aria-current={isSelected ? 'true' : undefined}
                     onClick={() => selectRun(isSelected ? null : run.id)}
                   >
-                    <span className={`sc-chip ${RESULT_CLASS[result]}`}>
-                      {run.result ? RESULT_LABEL[result] : '—'}
+                    <span className={`sc-chip ${RESULT_CLASS[result]}`} title={RESULT_TITLE[result]}>
+                      {RESULT_LABEL[result]}
                     </span>
                     <span className="sc-hist-turns num">T{runTurns(run)}</span>
                     <span className="sc-hist-bracket num">B{run.bracket}</span>
@@ -137,7 +175,7 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
                       title="Delete this run"
                       onClick={() => setConfirmId(run.id)}
                     >
-                      ×
+                      <CloseMark />
                     </button>
                   )}
                 </div>
@@ -152,7 +190,7 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
 
 /** Left-rail run history: one collapsible section per deck, newest run first. */
 export default function RunHistory() {
-  const decks = useLiveQuery(() => listDecks(), []);
+  const decks = useLiveQuery(() => listDecks().catch(() => []), []);
   if (!decks || decks.length === 0) return null;
 
   return (

@@ -31,7 +31,7 @@ const PRESETS: Preset[] = [
     },
   },
   {
-    label: '1/1 Spirit ✦',
+    label: '1/1 Spirit (flying)',
     spec: {
       name: 'Spirit (flying)',
       power: '1',
@@ -97,20 +97,17 @@ export default function TokenBar() {
 
   return (
     <div className="pg-hud-block">
-      <div className="hud-token-head">
-        <span className="panel-heading">Tokens</span>
-        <label className="hud-token-count" data-hotkeys="off">
-          ×
-          <input
-            type="number"
-            min={1}
-            max={99}
-            value={countText}
-            aria-label="Number of tokens for the next preset"
-            onChange={(e) => setCountText(e.target.value)}
-          />
-        </label>
-      </div>
+      <label className="hud-token-count" data-hotkeys="off">
+        ×
+        <input
+          type="number"
+          min={1}
+          max={99}
+          value={countText}
+          aria-label="Number of tokens for the next preset"
+          onChange={(e) => setCountText(e.target.value)}
+        />
+      </label>
 
       <div className="hud-token-presets">
         {PRESETS.map((preset) => (
@@ -138,7 +135,7 @@ export default function TokenBar() {
           <input
             type="text"
             value={name}
-            placeholder="Token name"
+            placeholder="e.g. Beast"
             aria-label="Custom token name"
             autoFocus
             onChange={(e) => setName(e.target.value)}

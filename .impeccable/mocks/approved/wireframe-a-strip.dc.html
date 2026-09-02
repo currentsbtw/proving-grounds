@@ -1,0 +1,181 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc><helmet><style>
+*{box-sizing:border-box}
+body{margin:0}
+.ab{color:#111;font:13px/1.35 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.mut{color:#888}
+.lbl{font-size:12px;letter-spacing:.06em;color:#888;text-transform:uppercase}
+
+/* title row */
+.title{height:40px;flex:0 0 40px;border-bottom:1px solid #bbb;display:flex;align-items:center;gap:12px;padding:0 14px}
+.title .nm{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.sp{flex:1}
+.chip{border:1px solid #bbb;padding:3px 8px;font-size:12px;white-space:nowrap}
+.chip.on{border-color:#111}
+
+/* seat strip */
+.seats{height:96px;flex:0 0 96px;display:flex;border-bottom:1px solid #bbb}
+.seat{flex:1;border-right:1px solid #bbb;padding:8px 12px;display:flex;flex-direction:column;gap:5px}
+.seat:last-child{border-right:0}
+.seat.out{background:repeating-linear-gradient(45deg,#f4f4f4 0 5px,#e8e8e8 5px 10px)}
+.srow{display:flex;align-items:center;gap:8px}
+.ltr{border:1px solid #111;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.life{font-size:18px;font-weight:700;line-height:1}
+.meter{display:flex;gap:2px}
+.seg{width:13px;height:11px;border:1px solid #bbb}
+.seg.f{background:#111;border-color:#111}
+.tn{font-size:13px;font-weight:700;min-width:14px}
+.tag{border:1px solid #111;padding:1px 5px;font-size:12px;letter-spacing:.04em}
+.tag.q{border-color:#bbb;color:#888}
+
+/* tells */
+.tells{height:26px;flex:0 0 26px;border-bottom:1px solid #bbb;display:flex;align-items:center;gap:10px;padding:0 14px;font-size:12px}
+.tells .t{border-left:3px solid #111;padding-left:6px}
+.tells .t.q{border-left-color:#bbb;color:#888}
+
+/* field */
+.field{flex:1;position:relative;padding:10px 50px 10px 14px;overflow:hidden;border-bottom:1px solid #bbb}
+.fhead{display:flex;align-items:center;gap:10px;height:16px;margin-bottom:8px}
+.cards{display:flex;gap:10px}
+.card{width:130px;height:182px;border:1px solid #bbb;background:#e9e9e9;position:relative;display:flex;align-items:flex-end;padding:6px}
+.card .cn{font-size:12px;line-height:1.2}
+.card .mv{position:absolute;top:5px;right:6px;font-size:12px;color:#888}
+.card .cmd{position:absolute;top:5px;left:6px;font-size:12px;border:1px solid #111;padding:0 4px}
+.lands{margin-top:12px;border:1px solid #bbb;padding:8px 10px;display:inline-flex;flex-direction:column;gap:6px}
+.landrow{display:flex;align-items:center;gap:6px}
+.slot{width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+.land{width:44px;height:62px;border:1px solid #bbb;background:#e9e9e9;font-size:12px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px}
+.land.tp{transform:rotate(90deg);background-image:repeating-linear-gradient(45deg,#ddd 0 4px,#bbb 4px 8px)}
+.tabs{position:absolute;top:0;right:0;bottom:0;width:36px;border-left:1px dashed #888;display:flex;flex-direction:column;align-items:stretch}
+.tab{flex:0 0 auto;border:1px solid #bbb;border-right:0;margin:0 0 6px 0;padding:10px 2px;writing-mode:vertical-rl;text-orientation:mixed;font-size:12px;text-align:center;background:#f4f4f4}
+
+/* event lane */
+.lane{height:56px;flex:0 0 56px;border-bottom:1px solid #bbb;display:flex;align-items:center;gap:10px;padding:0 14px}
+.key{border:1px solid #111;padding:3px 9px;font-size:13px}
+.key b{font-weight:700}
+
+/* own status strip */
+.own{height:44px;flex:0 0 44px;border-bottom:1px solid #bbb;display:flex}
+.cell{border-right:1px solid #bbb;padding:5px 12px;display:flex;flex-direction:column;justify-content:center;gap:1px;white-space:nowrap}
+.cell:last-child{border-right:0}
+.cell .v{font-size:15px;font-weight:700;line-height:1.1}
+.cell.w{flex:1}
+
+/* hand */
+.hand{height:190px;flex:0 0 190px;padding:8px 14px;display:flex;flex-direction:column;gap:6px}
+.hcards{display:flex;gap:10px}
+.hcard{width:108px;height:148px;border:1px solid #bbb;background:#e9e9e9;position:relative;display:flex;align-items:flex-end;padding:6px}
+.hcard .cn{font-size:12px;line-height:1.2}
+.hcard .mv{position:absolute;top:5px;right:6px;font-size:12px;color:#888}
+</style></helmet><div class="ab" style="width:1440px;height:900px;background:#f4f4f4">
+
+  <div class="title">
+    <span class="nm">Proving Grounds</span>
+    <span class="mut" style="font-size:12px">A · Strip</span>
+    <span class="sp"></span>
+    <span class="chip mut">on demand ⌄ run: Krenko goblins · bracket 3 · seed 7QK4</span>
+  </div>
+
+  <div class="seats">
+    <div class="seat">
+      <div class="srow"><span class="ltr">A</span><span class="life">40</span><span class="lbl">life</span><span class="mut" style="font-size:12px">± adjust</span></div>
+      <div class="srow">
+        <span class="lbl">threat</span>
+        <span class="meter"><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></span>
+        <span class="tn">3</span><span style="font-size:12px">▬ steady</span>
+      </div>
+      <div class="srow"><span class="tag q">ALIVE</span><span class="tag">ARMED 4+</span><span class="mut" style="font-size:12px">cmdr dmg 0</span><span class="sp"></span><span class="mut" style="font-size:12px">⌄ silhouette</span></div>
+    </div>
+    <div class="seat">
+      <div class="srow"><span class="ltr">B</span><span class="life">34</span><span class="lbl">life</span><span class="mut" style="font-size:12px">± adjust</span></div>
+      <div class="srow">
+        <span class="lbl">threat</span>
+        <span class="meter"><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></span>
+        <span class="tn">7</span><span style="font-size:12px">▲ rising</span>
+      </div>
+      <div class="srow"><span class="tag q">ALIVE</span><span class="tag">CLOCK</span><span class="mut" style="font-size:12px">cmdr dmg 0</span><span class="sp"></span><span class="mut" style="font-size:12px">⌄ silhouette</span></div>
+    </div>
+    <div class="seat">
+      <div class="srow"><span class="ltr">C</span><span class="life">22</span><span class="lbl">life</span><span class="mut" style="font-size:12px">± adjust</span></div>
+      <div class="srow">
+        <span class="lbl">threat</span>
+        <span class="meter"><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></span>
+        <span class="tn">5</span><span style="font-size:12px">▼ falling</span>
+      </div>
+      <div class="srow"><span class="tag q">ALIVE</span><span style="font-size:12px">cmdr dmg 12</span><span class="sp"></span><span class="mut" style="font-size:12px">⌄ silhouette</span></div>
+    </div>
+  </div>
+
+  <div class="tells">
+    <span class="lbl">tells</span>
+    <span class="t">Seat A armed: counters 4+ mana</span>
+    <span class="t q">post wipe: drag back anything that survived</span>
+  </div>
+
+  <div class="field">
+    <div class="fhead">
+      <span class="lbl">battlefield</span>
+      <span class="mut" style="font-size:12px">6 permanents</span>
+      <span class="sp"></span>
+      <span class="mut" style="font-size:12px">tabs open a 320px drawer over the battlefield · shown closed</span>
+    </div>
+
+    <div class="cards">
+      <div class="card"><span class="cmd">CMD</span><span class="mv">MV 4</span><span class="cn">Krenko, Mob Boss</span></div>
+      <div class="card"><span class="mv">MV 3</span><span class="cn">Goblin Chieftain</span></div>
+      <div class="card"><span class="mv">MV 1</span><span class="cn">Skirk Prospector</span></div>
+    </div>
+
+    <div class="lands">
+      <div class="srow"><span class="lbl">lands</span><span style="font-size:12px">5 Mountains · 2 TAPPED</span><span class="mut" style="font-size:12px">· untap all</span></div>
+      <div class="landrow">
+        <span class="slot"><span class="land">Mtn</span></span>
+        <span class="slot"><span class="land">Mtn</span></span>
+        <span class="slot"><span class="land">Mtn</span></span>
+        <span class="slot"><span class="land tp">Mtn</span></span>
+        <span class="slot"><span class="land tp">Mtn</span></span>
+        <span style="font-size:12px">TAPPED ×2</span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab">Log</div>
+      <div class="tab">Notes</div>
+      <div class="tab">Tokens</div>
+      <div class="tab">Keys</div>
+      <div class="tab">End run</div>
+    </div>
+  </div>
+
+  <div class="lane">
+    <span class="lbl">event</span>
+    <span class="tag">SEAT C</span>
+    <span class="tag">REMOVAL</span>
+    <span style="font-size:14px">Seat C kills your biggest creature</span>
+    <span class="sp"></span>
+    <span class="key"><b>[1]</b> Resolve</span>
+    <span class="key"><b>[2]</b> Answered</span>
+    <span class="mut" style="font-size:12px">1 more queued</span>
+  </div>
+
+  <div class="own">
+    <div class="cell w"><span class="lbl">turn / phase</span><span class="v">T6 · MAIN 1 → next: Seat B window</span></div>
+    <div class="cell"><span class="lbl">mana</span><span class="v">3/5 <span class="mut" style="font-size:12px;font-weight:400">untapped</span></span></div>
+    <div class="cell"><span class="lbl">hand</span><span class="v">4</span></div>
+    <div class="cell"><span class="lbl">tax</span><span class="v">+2</span></div>
+    <div class="cell"><span class="lbl">library</span><span class="v">81</span></div>
+    <div class="cell"><span class="lbl">life</span><span class="v">31 <span style="font-size:12px;font-weight:400">(−9 this turn)</span></span></div>
+    <div class="cell"><span class="lbl">clock</span><span class="v">Seat B · T9 · 3 turns</span></div>
+    <div class="cell"><span class="lbl">hit</span><span class="v">B <span class="mut" style="font-size:12px;font-weight:400">clock holder</span></span></div>
+  </div>
+
+  <div class="hand">
+    <div class="srow"><span class="lbl">hand</span><span style="font-size:12px">4 cards</span></div>
+    <div class="hcards">
+      <div class="hcard"><span class="mv">MV 1</span><span class="cn">Lightning Bolt</span></div>
+      <div class="hcard"><span class="mv">MV 3</span><span class="cn">Goblin Warchief</span></div>
+      <div class="hcard"><span class="mv">MV 4</span><span class="cn">Purphoros, God of the Forge</span></div>
+      <div class="hcard"><span class="mv">land</span><span class="cn">Mountain</span></div>
+    </div>
+  </div>
+
+</div></x-dc></body></html>

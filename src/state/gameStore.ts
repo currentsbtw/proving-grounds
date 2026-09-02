@@ -9,7 +9,6 @@ import {
   emptySilhouette,
   initialThreat,
   makeCounterEvent,
-  playerThreatOf,
   redistribute,
   resolveWindow,
   toSnapshot,
@@ -104,6 +103,15 @@ function freshSeats(rng?: () => number): Seat[] {
   }));
 }
 
+/** Threat per seat, as a plain record — the shape `previousThreat` is kept in. */
+function threatBySeat(seats: Seat[]): Record<SeatId, number> {
+  return {
+    A: seats.find((s) => s.id === 'A')?.threat ?? 0,
+    B: seats.find((s) => s.id === 'B')?.threat ?? 0,
+    C: seats.find((s) => s.id === 'C')?.threat ?? 0,
+  };
+}
+
 /** Type line for a card instance — tokens carry their own, real cards use the cache. */
 function typeLineOf(state: GameState, card: CardInstance): string {
   if (card.isToken) return card.tokenSpec?.typeLine ?? 'Creature — Token';
@@ -179,15 +187,6 @@ function playerPermanentsOf(state: GameState): PermanentSummary[] {
     }));
 }
 
-/**
- * The player's 0–10 threat as it stands *right now*, rather than as of the last
- * window (`state.playerThreat`). Use this for a live meter; use the stored one
- * when showing what the pod actually judged.
- */
-export function currentPlayerThreat(state: GameState): number {
-  return playerThreatOf(playerSummaryOf(state));
-}
-
 /** Machine-readable payload for a pressure event, shared by every log entry. */
 function eventPayload(event: PressureEvent): Record<string, unknown> {
   return {
@@ -207,7 +206,16 @@ export interface GameState {
   phase: Phase;
   turn: number;
   playerLife: number;
+  /** Player life as the current turn began, so the readout can show this turn's swing. */
+  turnStartLife: number;
   seats: Seat[];
+  /**
+   * Each seat's threat as it stood before the most recent opponent window, so a
+   * meter can say which way it is moving. Windows are the only cadence that
+   * matters here: damage the player deals inside a turn moves threat too, and a
+   * trend that flickered on every life button would read as noise.
+   */
+  previousThreat: Record<SeatId, number>;
   cards: Record<string, CardInstance>;
   libraryOrder: string[];
   commanderCasts: Record<string, number>;
@@ -449,7 +457,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (get().clock?.seatId === seatId) {
       const clock = get().clock;
       set({ clock: null });
-      appendLog('threat', `Seat ${seatId} is out — its race clock is canceled.`, {
+      appendLog('threat', `Seat ${seatId} is out. Its race clock is canceled.`, {
         seatId,
         canceled: true,
         reason: 'elimination',
@@ -468,7 +476,7 @@ export const useGameStore = create<GameState>((set, get) => {
       applySeatUpdates(updates);
       appendLog(
         'threat',
-        `Pressure redistributed — ${updates.map((u) => `${u.id} ${u.threat.toFixed(1)}`).join(', ')}`,
+        `Pressure redistributed: ${updates.map((u) => `${u.id} ${u.threat.toFixed(1)}`).join(', ')}`,
         { from: seatId, updates, reason: 'elimination' },
       );
     }
@@ -611,7 +619,7 @@ export const useGameStore = create<GameState>((set, get) => {
       return { cards, libraryOrder, moveCounter: s.moveCounter + 1 };
     });
 
-    const suffix = toZone === 'library' ? ` (${position})` : entersTapped ? ' — enters tapped' : '';
+    const suffix = toZone === 'library' ? ` (${position})` : entersTapped ? ' (enters tapped)' : '';
     appendLog('move', `${name}: ${ZONE_LABELS[fromZone]} → ${ZONE_LABELS[toZone]}${suffix}`, {
       iid,
       name,
@@ -625,7 +633,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (card.isCommander && (toZone === 'graveyard' || toZone === 'exile')) {
       appendLog(
         'commander',
-        `${name} changed zones to ${ZONE_LABELS[toZone]} — commander may return to the command zone`,
+        `${name} changed zones to ${ZONE_LABELS[toZone]}. The commander may return to the command zone`,
         { iid, name, to: toZone },
       );
     }
@@ -689,7 +697,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
     if (!runOpponentWindow(upcoming)) return;
 
-    set({ turn: upcoming, phase: 'untap' });
+    set({ turn: upcoming, phase: 'untap', turnStartLife: get().playerLife });
     appendLog('turn', `Turn ${upcoming} begins`, {
       turn: upcoming,
       previousTurn: upcoming - 1,
@@ -738,7 +746,7 @@ export const useGameStore = create<GameState>((set, get) => {
         clockSeatId: clock?.seatId,
         deadlineTurn: clock?.deadlineTurn,
       });
-      appendLog('run', `Lost the race — Seat ${clock?.seatId} won on the turn after turn ${clock?.deadlineTurn}.`, {
+      appendLog('run', `Lost the race. Seat ${clock?.seatId} won on the turn after turn ${clock?.deadlineTurn}.`, {
         reason: 'clock-expired',
         seatId: clock?.seatId,
         deadlineTurn: clock?.deadlineTurn,
@@ -748,6 +756,9 @@ export const useGameStore = create<GameState>((set, get) => {
       return false;
     }
 
+    // Snapshot before the window's own growth lands, so the meters can show the
+    // direction this window moved each seat in.
+    set({ previousThreat: threatBySeat(state.seats) });
     applySeatUpdates(result.seats);
 
     const firedCounts = { ...state.firedCounts };
@@ -790,7 +801,9 @@ export const useGameStore = create<GameState>((set, get) => {
     phase: 'main1',
     turn: 1,
     playerLife: STARTING_LIFE,
+    turnStartLife: STARTING_LIFE,
     seats: freshSeats(),
+    previousThreat: threatBySeat(freshSeats()),
     cards: {},
     libraryOrder: [],
     commanderCasts: {},
@@ -870,7 +883,9 @@ export const useGameStore = create<GameState>((set, get) => {
         phase: 'main1',
         turn: 1,
         playerLife: STARTING_LIFE,
+        turnStartLife: STARTING_LIFE,
         seats,
+        previousThreat: threatBySeat(seats),
         cards,
         libraryOrder,
         commanderCasts: {},
@@ -891,7 +906,7 @@ export const useGameStore = create<GameState>((set, get) => {
         eventSeq: 0,
       });
 
-      appendLog('run', `Run started — ${deck.name} (seed ${runSeed})`, {
+      appendLog('run', `Run started: ${deck.name} (seed ${runSeed})`, {
         runId: run.id,
         deckId: deck.id,
         deckName: deck.name,
@@ -903,7 +918,7 @@ export const useGameStore = create<GameState>((set, get) => {
       });
       appendLog(
         'threat',
-        `Seats seated — ${seats.map((s) => `${s.id} ${s.threat.toFixed(1)}`).join(', ')}`,
+        `Seats seated: ${seats.map((s) => `${s.id} ${s.threat.toFixed(1)}`).join(', ')}`,
         { seats: seats.map((s) => ({ id: s.id, threat: s.threat, silhouette: s.silhouette })) },
       );
       appendLog('shuffle', `Library shuffled (${libraryOrder.length} cards)`, {
@@ -1032,7 +1047,7 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!get().run || n <= 0) return;
       const milled = get().libraryOrder.slice(0, n);
       if (milled.length === 0) {
-        appendLog('note', 'Nothing to mill — library is empty', { requested: n, available: 0 });
+        appendLog('note', 'Nothing to mill: the library is empty', { requested: n, available: 0 });
         return;
       }
       set((s) => {
@@ -1088,7 +1103,7 @@ export const useGameStore = create<GameState>((set, get) => {
         set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
         appendLog(
           'commander',
-          `Cast ${name} (cast #${priorCasts + 1}, tax +${tax}) — met by a counter`,
+          `Cast ${name} (cast #${priorCasts + 1}, tax +${tax}). Met by a counter`,
           {
             iid,
             name,
@@ -1212,12 +1227,23 @@ export const useGameStore = create<GameState>((set, get) => {
       // Hurting a seat makes it less scary and shrinks the board it presents.
       const shrunk = applyDamageToSeat(seat.threat, seat.silhouette, damage, before);
 
+      // The trend arrow reports what the *pod* did between windows, so damage the
+      // player just dealt moves the baseline with it: hitting a seat must not
+      // read back as "falling" when nothing about the seat's own play changed.
+      const threatShift = shrunk.threat - seat.threat;
+
       set((s) => ({
         seats: s.seats.map((x) =>
           x.id === target
             ? { ...x, life: after, threat: shrunk.threat, silhouette: shrunk.silhouette }
             : x,
         ),
+        previousThreat: threatShift
+          ? {
+              ...s.previousThreat,
+              [target]: (s.previousThreat[target] ?? seat.threat) + threatShift,
+            }
+          : s.previousThreat,
         damageDealtByTurn: damage
           ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + damage }
           : s.damageDealtByTurn,
@@ -1251,6 +1277,10 @@ export const useGameStore = create<GameState>((set, get) => {
         lifeBefore,
       );
 
+      // Same as `adjustLife`: your own damage moves the trend baseline with the
+      // threat it shrinks, so it stays trend-neutral.
+      const threatShift = shrunk.threat - seat.threat;
+
       set((s) => ({
         seats: s.seats.map((x) =>
           x.id === seatId
@@ -1263,6 +1293,12 @@ export const useGameStore = create<GameState>((set, get) => {
               }
             : x,
         ),
+        previousThreat: threatShift
+          ? {
+              ...s.previousThreat,
+              [seatId]: (s.previousThreat[seatId] ?? seat.threat) + threatShift,
+            }
+          : s.previousThreat,
         damageDealtByTurn:
           amount > 0
             ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + amount }
@@ -1343,7 +1379,9 @@ export const useGameStore = create<GameState>((set, get) => {
         phase: 'main1',
         turn: 1,
         playerLife: STARTING_LIFE,
+        turnStartLife: STARTING_LIFE,
         seats: freshSeats(),
+        previousThreat: threatBySeat(freshSeats()),
         cards: {},
         libraryOrder: [],
         commanderCasts: {},
@@ -1393,17 +1431,19 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       if (!target) {
-        appendLog('note', 'Nothing to undo — no life change left in the log', {
+        appendLog('note', 'Nothing to undo: no life change left in the log', {
           undo: true,
           noop: true,
         });
         return;
       }
 
+      const entry = target;
+
       // Threat and silhouette were snapshotted on the entry being undone, so
       // rolling back life rolls back the pressure it caused too.
-      const restoredThreat = target.payload.threatBefore as number | undefined;
-      const restoredSilhouette = target.payload.silhouetteBefore as Silhouette | undefined;
+      const restoredThreat = entry.payload.threatBefore as number | undefined;
+      const restoredSilhouette = entry.payload.silhouetteBefore as Silhouette | undefined;
 
       function restorePressure(seat: Seat): Seat {
         return {
@@ -1413,12 +1453,36 @@ export const useGameStore = create<GameState>((set, get) => {
         };
       }
 
-      if (target.kind === 'life') {
-        const who = target.payload.target as LifeTarget;
-        const life = target.payload.before as number;
+      /**
+       * The mirror of the baseline shift `adjustLife` applied on the way in: the
+       * undo puts the threat back, so the trend baseline goes back with it.
+       */
+      function restoreBaseline(
+        s: GameState,
+        seatId: SeatId,
+      ): Record<SeatId, number> {
+        const seat = s.seats.find((x) => x.id === seatId);
+        if (!seat || restoredThreat === undefined) return s.previousThreat;
+        const shift = restoredThreat - seat.threat;
+        if (!shift) return s.previousThreat;
+        return {
+          ...s.previousThreat,
+          [seatId]: (s.previousThreat[seatId] ?? seat.threat) + shift,
+        };
+      }
+
+      if (entry.kind === 'life') {
+        const who = entry.payload.target as LifeTarget;
+        const life = entry.payload.before as number;
 
         if (who === 'player') {
-          set({ playerLife: life });
+          set((s) => ({
+            playerLife: life,
+            // Undoing a change made on an earlier turn must not rewrite this
+            // turn's swing, so the turn's opening total moves with it.
+            turnStartLife:
+              entry.turn < s.turn ? s.turnStartLife + (life - s.playerLife) : s.turnStartLife,
+          }));
         } else {
           set((s) => ({
             seats: s.seats.map((x) =>
@@ -1430,6 +1494,7 @@ export const useGameStore = create<GameState>((set, get) => {
                   })
                 : x,
             ),
+            previousThreat: restoreBaseline(s, who),
           }));
         }
 
@@ -1458,6 +1523,7 @@ export const useGameStore = create<GameState>((set, get) => {
               })
             : x,
         ),
+        previousThreat: restoreBaseline(s, seatId),
       }));
 
       appendLog('life', `Undid: ${target.message}`, {
@@ -1489,7 +1555,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       const answered: PressureEvent = { ...event, state: 'negated' };
       const trimmed = note?.trim();
-      appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` — "${trimmed}"` : ''}`, {
+      appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` · "${trimmed}"` : ''}`, {
         ...eventPayload(answered),
         responded: true,
         negated: true,
@@ -1550,7 +1616,7 @@ export const useGameStore = create<GameState>((set, get) => {
               if (card.zone !== 'command') performMove(iid, 'command');
               appendLog(
                 'commander',
-                `${name} countered — returned to command zone (next cast tax ${nextTax})`,
+                `${name} countered. Returned to the command zone (next cast tax ${nextTax})`,
                 {
                   iid,
                   name,
@@ -1561,11 +1627,11 @@ export const useGameStore = create<GameState>((set, get) => {
                   nextTax,
                 },
               );
-              detail = ` — ${name} returned to the command zone`;
+              detail = ` (${name} returned to the command zone)`;
             } else if (card.zone !== 'graveyard') {
               outcome.returnedTo = 'graveyard';
               performMove(iid, 'graveyard');
-              detail = ` — ${name} countered`;
+              detail = ` (${name} countered)`;
             }
           }
           break;
@@ -1608,7 +1674,7 @@ export const useGameStore = create<GameState>((set, get) => {
             if (!actual) outcome.unexpectedZone = card.zone;
 
             performMove(iid, 'graveyard');
-            detail = ` — ${mode === 'discard' ? 'discarded' : 'sacrificed'} ${name}`;
+            detail = ` (${mode === 'discard' ? 'discarded' : 'sacrificed'} ${name})`;
           } else {
             const mode = event.variant ?? 'tax';
             outcome.mode = mode;
@@ -1617,7 +1683,7 @@ export const useGameStore = create<GameState>((set, get) => {
               // Say so on the entry, otherwise the log reads as an unexplained
               // no-op and the scorer cannot tell a whiff from a mis-click.
               outcome.noTarget = true;
-              detail = mode === 'discard' ? ' — nothing to discard' : ' — nothing to sacrifice';
+              detail = mode === 'discard' ? ' (nothing to discard)' : ' (nothing to sacrifice)';
             } else {
               // The 'tax' variant has no bookkeeping — acknowledging it is enough.
               outcome.acknowledged = true;
@@ -1638,7 +1704,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       const resolved: PressureEvent = { ...event, state: 'resolved' };
       const trimmed = payload?.note?.trim();
-      appendLog('event', `Resolved ${event.type}: ${event.prompt}${detail}${trimmed ? ` — "${trimmed}"` : ''}`, {
+      appendLog('event', `Resolved ${event.type}: ${event.prompt}${detail}${trimmed ? ` · "${trimmed}"` : ''}`, {
         ...eventPayload(resolved),
         resolved: true,
         outcome,
@@ -1656,7 +1722,7 @@ export const useGameStore = create<GameState>((set, get) => {
       set({ clock: null });
       appendLog(
         'respond',
-        `Declared held interaction — Seat ${clock.seatId}'s clock is answered.`,
+        `Declared held interaction. Seat ${clock.seatId}'s clock is answered.`,
         {
           seatId: clock.seatId,
           deadlineTurn: clock.deadlineTurn,

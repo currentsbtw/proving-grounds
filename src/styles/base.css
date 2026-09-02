@@ -12,13 +12,19 @@ body,
   height: 100%;
 }
 
+/* Every figure in the app is a value in a printed slot: lining and tabular, so a
+   number never changes width as it ticks. */
+html {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
 body {
   margin: 0;
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.35;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,10 +34,12 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-display);
-  font-weight: 400;
+  /* The display face survives in the wordmark only; every other heading is the
+     grotesk, so headings and figures share one set of numerals. */
+  font-family: var(--font-body);
+  font-weight: 600;
   margin: 0;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 p,
@@ -74,11 +82,13 @@ button:disabled {
   cursor: default;
 }
 
+/* The printed rule, not the hairline: a field's boundary is a control edge and
+   has to clear 3:1 the way the buttons beside it already do. */
 input,
 select,
 textarea {
   background: var(--ground);
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 5px 8px;
 }
@@ -91,8 +101,7 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-.num,
-.tabular {
+.num {
   font-variant-numeric: tabular-nums;
 }
 
@@ -106,10 +115,13 @@ button:focus-visible {
   border-radius: var(--radius);
 }
 
+/* The printed label: small caps over the value it names, everywhere. */
 .panel-heading {
-  font-family: var(--font-display);
-  font-size: 13px;
-  letter-spacing: 0.12em;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -120,7 +132,7 @@ button:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--raised);
+  background: var(--line);
   border-radius: 5px;
 }
 

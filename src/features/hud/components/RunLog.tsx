@@ -7,6 +7,15 @@ import type { LogEntry, LogKind } from '../../../domain/types';
 
 const EMPTY: LogEntry[] = [];
 
+/**
+ * How many entries the panel draws. The log itself is never trimmed: it is the
+ * run record and the scorer reads all of it. This is only what the drawer paints
+ * on every store tick, and a long run pays for it on every action taken. At
+ * three thousand entries a single phase step cost over 120ms with the drawer
+ * open, which is the drawer taxing the play it is supposed to record.
+ */
+const VISIBLE_ENTRIES = 400;
+
 /** Phase/turn chatter — rendered smaller and dimmer, and tightened when consecutive. */
 function isFlow(kind: LogKind): boolean {
   return kind === 'phase' || kind === 'turn';
@@ -49,6 +58,9 @@ export default function RunLog() {
   const stickRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
   const [note, setNote] = useState('');
+
+  const hidden = Math.max(0, log.length - VISIBLE_ENTRIES);
+  const shown = hidden > 0 ? log.slice(hidden) : log;
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -95,22 +107,31 @@ export default function RunLog() {
 
   return (
     <div className="pg-hud-block pg-hud-log">
-      <span className="panel-heading">Run log</span>
-
+      {/* The log is the product, and it scrolls. Without a tab stop of its own a
+          keyboard-only pilot can read whatever slice happens to be in view and
+          nothing else, so the region takes focus and says what it is. */}
       <div
         className="hud-log-scroll"
         ref={scrollRef}
         onScroll={handleScroll}
         role="log"
         aria-live="polite"
+        aria-label="Run log"
+        tabIndex={0}
       >
+        {hidden > 0 && (
+          <p className="hud-log-trimmed">
+            {hidden} earlier {hidden === 1 ? 'entry' : 'entries'} kept in the run, not drawn here.
+          </p>
+        )}
+
         {log.length === 0 ? (
-          <p className="hud-log-empty">No entries yet.</p>
+          <p className="hud-log-empty">No entries yet. Every action you take lands here.</p>
         ) : (
-          log.map((entry, i) => {
+          shown.map((entry, i) => {
             if (entry.kind === 'window') return <WindowSeparator key={entry.seq} entry={entry} />;
             const flow = isFlow(entry.kind);
-            const collapsed = flow && i > 0 && isFlow(log[i - 1].kind);
+            const collapsed = flow && i > 0 && isFlow(shown[i - 1].kind);
             return (
               <div
                 key={entry.seq}
@@ -145,7 +166,7 @@ export default function RunLog() {
           onChange={(e) => setNote(e.target.value)}
         />
         <button type="submit" disabled={note.trim() === ''}>
-          Add
+          Add note
         </button>
       </form>
     </div>

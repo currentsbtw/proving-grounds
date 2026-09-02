@@ -29,7 +29,8 @@ export function MulliganBar({
       <div className="tbl-mull" role="group" aria-label="Bottom cards after mulligan">
         <span className="tbl-mull-label">Bottom {mulliganCount}</span>
         <span>
-          Click {mulliganCount} card{mulliganCount === 1 ? '' : 's'} in hand to put on the bottom —{' '}
+          Click {mulliganCount} card{mulliganCount === 1 ? '' : 's'} in hand to put on the bottom{' '}
+          ·{' '}
           <span className="num">
             {selectedCount}/{mulliganCount}
           </span>{' '}
@@ -37,7 +38,7 @@ export function MulliganBar({
         </span>
         <span className="tbl-mull-spacer" />
         <button type="button" onClick={onCancelBottoming}>
-          Cancel
+          Back
         </button>
         <button
           type="button"
@@ -45,7 +46,7 @@ export function MulliganBar({
           disabled={selectedCount !== mulliganCount}
           onClick={onConfirmBottoming}
         >
-          Confirm
+          Put {mulliganCount} on the bottom
         </button>
       </div>
     );
@@ -61,11 +62,11 @@ export function MulliganBar({
       )}
       <span className="tbl-mull-spacer" />
       <button type="button" onClick={onMulligan}>
-        Mulligan (to {nextSize})
+        Mulligan to {nextSize}
       </button>
       {mulliganCount > 0 ? (
         <button type="button" className="is-primary" onClick={onStartBottoming}>
-          Keep — put {mulliganCount} on the bottom
+          Keep and bottom {mulliganCount}
         </button>
       ) : (
         <button type="button" className="is-primary" onClick={onKeep}>

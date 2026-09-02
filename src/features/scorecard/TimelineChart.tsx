@@ -1,5 +1,6 @@
 import { SCORING } from '../../data/scorecard';
 import type { EventLedgerRow, Scorecard } from '../../engine/scorecard';
+import { EVENT_MARK, EVENT_MARK_KEY } from './eventMarks';
 
 /**
  * The run in one picture: what you deployed each turn, what the board was worth
@@ -19,6 +20,9 @@ const PLOT_H = H - PAD.t - PAD.b;
 const BASE = PAD.t + PLOT_H;
 /** Pixels of the thin lands bar per land played — lands are 0–2, so a shared axis would hide them. */
 const LAND_UNIT = 7;
+
+/** Distance between two markers sharing a turn. Wide enough for a letter. */
+const MARK_STEP = 13;
 
 export interface TimelineChartProps {
   card: Scorecard;
@@ -123,8 +127,8 @@ export default function TimelineChart({ card }: TimelineChartProps) {
                 />
                 <title>
                   {wipe.recoveredTurn === null
-                    ? `Wrath on turn ${wipe.turn} — never rebuilt to 70% of ${wipe.boardValueBefore} MV`
-                    : `Wrath on turn ${wipe.turn} — rebuilt by turn ${wipe.recoveredTurn} (${wipe.turnsToRecover} turns)`}
+                    ? `Wrath on turn ${wipe.turn}. Never rebuilt to 70% of ${wipe.boardValueBefore} MV`
+                    : `Wrath on turn ${wipe.turn}. Rebuilt by turn ${wipe.recoveredTurn} (${wipe.turnsToRecover} turns)`}
                 </title>
               </g>
             );
@@ -143,8 +147,8 @@ export default function TimelineChart({ card }: TimelineChartProps) {
                   y={BASE - barH}
                   width={barW}
                   height={barH}
-                  fill="var(--accent)"
-                  opacity={0.85}
+                  fill="var(--ink)"
+                  opacity={0.7}
                 />
               )}
               {landH > 0 && (
@@ -181,23 +185,34 @@ export default function TimelineChart({ card }: TimelineChartProps) {
           />
         ))}
 
-        {/* Event markers in the band above the plot. */}
+        {/* Event markers in the band above the plot: one letter per event, in
+            its class's colour, struck through when the event was answered. */}
         {rows.map((row, i) => {
           const marks = row.eventIds
             .map((id) => byId.get(id))
             .filter((e): e is EventLedgerRow => e !== undefined);
           const count = marks.length;
-          return marks.map((event, k) => (
-            <circle
-              key={event.eventId}
-              className={`sc-evt-dot type-${event.type}${event.terminal === 'responded' ? ' is-answered' : ''}`}
-              cx={mid(i) + (k - (count - 1) / 2) * 8}
-              cy={PAD.t - 16}
-              r={3.2}
-            >
-              <title>{`T${event.turn} · Seat ${event.seatId} · ${event.type}${event.variant ? ` (${event.variant})` : ''} — ${event.terminal}`}</title>
-            </circle>
-          ));
+          return marks.map((event, k) => {
+            const x = mid(i) + (k - (count - 1) / 2) * MARK_STEP;
+            const y = PAD.t - 14;
+            return (
+              <g key={event.eventId} className={`sc-evt-mark type-${event.type}`}>
+                <text x={x} y={y} textAnchor="middle" className="sc-evt-mark">
+                  {EVENT_MARK[event.type]}
+                </text>
+                {event.terminal === 'responded' && (
+                  <line
+                    className="sc-evt-strike"
+                    x1={x - 5}
+                    x2={x + 5}
+                    y1={y - 3.5}
+                    y2={y - 3.5}
+                  />
+                )}
+                <title>{`T${event.turn} · Seat ${event.seatId} · ${event.type}${event.variant ? ` (${event.variant})` : ''} · ${event.terminal}`}</title>
+              </g>
+            );
+          });
         })}
 
         {/* Turn labels, and a per-column hit area carrying the turn's numbers. */}
@@ -211,7 +226,7 @@ export default function TimelineChart({ card }: TimelineChartProps) {
               fill="transparent"
             >
               <title>
-                {`Turn ${row.turn} — deployed ${row.mvDeployed} MV, ${row.landsPlayed} land${row.landsPlayed === 1 ? '' : 's'}, drew ${row.cardsDrawn}; board ${row.boardValueEnd} MV, life ${row.playerLifeEnd}`}
+                {`Turn ${row.turn}: deployed ${row.mvDeployed} MV, ${row.landsPlayed} land${row.landsPlayed === 1 ? '' : 's'}, drew ${row.cardsDrawn}; board ${row.boardValueEnd} MV, life ${row.playerLifeEnd}`}
               </title>
             </rect>
             {(i % labelEvery === 0 || i === n - 1) && (
@@ -224,11 +239,26 @@ export default function TimelineChart({ card }: TimelineChartProps) {
       </svg>
 
       <figcaption className="sc-chart-legend">
-        <span className="sc-key sc-key-bar">mana value deployed</span>
-        <span className="sc-key sc-key-land">lands</span>
-        <span className="sc-key sc-key-board">board value</span>
-        <span className="sc-key sc-key-life">your life</span>
-        <span className="sc-key sc-key-wipe">wrath &amp; rebuild</span>
+        <span className="sc-legend-row">
+          <span className="sc-key sc-key-bar">mana value deployed</span>
+          <span className="sc-key sc-key-land">lands</span>
+          <span className="sc-key sc-key-board">board value</span>
+          <span className="sc-key sc-key-life">your life</span>
+          <span className="sc-key sc-key-wipe">wrath &amp; rebuild</span>
+        </span>
+        {/* The marker key: the letter is what a reader without the colour has,
+            so it is printed beside the word it stands for. */}
+        <span className="sc-legend-row">
+          {EVENT_MARK_KEY.map(({ type, word }) => (
+            <span key={type} className="sc-mark-key">
+              <span className={`sc-evt-mark type-${type}`}>{EVENT_MARK[type]}</span>
+              {word}
+            </span>
+          ))}
+          <span className="sc-mark-key">
+            <span className="sc-evt-mark sc-mark-struck">A</span>answered
+          </span>
+        </span>
       </figcaption>
     </figure>
   );

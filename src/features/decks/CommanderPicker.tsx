@@ -50,7 +50,7 @@ export function CommanderPicker({ options, selectedIds, onChange }: CommanderPic
       <span className="dk-label">Commanders ({selectedIds.length}/2)</span>
 
       {selectedIds.length === 0 && (
-        <span className="dk-warn">No commander detected — pick one below.</span>
+        <span className="dk-warn">No commander detected. Pick one below.</span>
       )}
 
       {selectedIds.map((id) => (
@@ -62,7 +62,9 @@ export function CommanderPicker({ options, selectedIds, onChange }: CommanderPic
             onClick={() => remove(id)}
             aria-label={`Remove ${byId.get(id)?.name ?? 'commander'}`}
           >
-            ×
+            <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false">
+              <path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" strokeWidth="1.2" fill="none" />
+            </svg>
           </button>
         </span>
       ))}

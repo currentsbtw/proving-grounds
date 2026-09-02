@@ -1,4 +1,6 @@
 import type { DeckProfile, EventLedgerRow, Scorecard, TurnRow } from '../../engine/scorecard';
+import type { EventType } from '../../domain/types';
+import { EVENT_MARK, EVENT_MARK_KEY } from './eventMarks';
 
 /** Pixel size of the shareable card. 2:1 so it posts cleanly to Discord/Twitter. */
 export const SHARE_IMAGE_WIDTH = 1200;
@@ -23,13 +25,16 @@ export interface ShareImageOptions {
  */
 
 // ---------------------------------------------------------------------------
-// Palette — mirrors src/styles/tokens.css
+// Palette — read from src/styles/tokens.css at draw time
 // ---------------------------------------------------------------------------
-// The canvas cannot read CSS custom properties (there is no element to resolve
-// them against in a worker), so the tokens are duplicated here. If tokens.css
-// moves, this moves with it.
+// A canvas cannot resolve custom properties itself, but the document can: the
+// values are read off the root element when the card is drawn, so the receipt
+// carries the palette the player is actually looking at and a token edit cannot
+// leave a fork of it behind here. The literals below are the dark theme's
+// values, used only where there is no document — the headless verification
+// harness draws with them.
 
-const C = {
+const FALLBACK = {
   ground: '#17181c',
   surface: '#1f2127',
   raised: '#262932',
@@ -37,26 +42,102 @@ const C = {
   ink: '#e8e6e1',
   muted: '#a0a3aa',
   accent: '#c9a85c',
-  danger: '#e58a76',
+  danger: '#f0899f',
   ok: '#8fc49e',
   manaW: '#e5d9a5',
   manaU: '#8fc1e8',
   manaB: '#bba9c9',
   manaR: '#e58a76',
   manaG: '#8fc49e',
-} as const;
-
-/** Event class → accent, matching the dock stripe in `pressure.css`. */
-const EVENT_COLOR: Record<string, string> = {
-  wipe: C.manaW,
-  removal: C.manaB,
-  resource: C.manaB,
-  counter: C.manaU,
-  combat: C.manaR,
-  clock: C.manaG,
 };
 
-const BODY_FONT = `system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`;
+type Palette = typeof FALLBACK;
+
+/** Which custom property each palette entry comes from. */
+const TOKEN_OF: Record<keyof Palette, string> = {
+  ground: '--ground',
+  surface: '--surface',
+  raised: '--raised',
+  line: '--line',
+  ink: '--ink',
+  muted: '--muted',
+  accent: '--accent',
+  danger: '--danger',
+  ok: '--ok',
+  manaW: '--mana-w',
+  manaU: '--mana-u',
+  manaB: '--mana-b',
+  manaR: '--mana-r',
+  manaG: '--mana-g',
+};
+
+function readPalette(): Palette {
+  if (typeof document === 'undefined' || !document.documentElement) return { ...FALLBACK };
+  try {
+    const style = getComputedStyle(document.documentElement);
+    const out = { ...FALLBACK };
+    for (const key of Object.keys(TOKEN_OF) as (keyof Palette)[]) {
+      const value = style.getPropertyValue(TOKEN_OF[key]).trim();
+      if (value) out[key] = value;
+    }
+    return out;
+  } catch {
+    return { ...FALLBACK };
+  }
+}
+
+/** Event class → accent, matching the dock stripe in `pressure.css`. */
+function eventColor(C: Palette, type: string): string {
+  switch (type) {
+    case 'wipe':
+      return C.manaW;
+    case 'removal':
+    case 'resource':
+      return C.manaB;
+    case 'counter':
+      return C.manaU;
+    case 'combat':
+      return C.manaR;
+    case 'clock':
+      return C.manaG;
+    default:
+      return C.muted;
+  }
+}
+
+/**
+ * The app's own two faces, self-hosted and imported in `src/main.tsx`. The
+ * receipt is the one artefact that leaves the app, so it is set in the app's
+ * type: the grotesk for every word and every figure, and the display face for
+ * the wordmark alone.
+ *
+ * Canvas 2D has no switch for OpenType `tnum`, so the figures here are Plex's
+ * default lining numerals rather than the tabular ones the DOM asks for. That
+ * costs nothing on a static receipt — each figure is drawn once, left-aligned
+ * in its own slot, and never has to line up under a figure drawn later.
+ */
+const BODY_FONT = `'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif`;
+
+/**
+ * A canvas asked for a font the document has not loaded silently draws the
+ * fallback, and the fallback for a 34px deck name is whatever the platform
+ * happens to have. Ask for the four faces the card uses and wait for them.
+ */
+async function ensureFonts(): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts) return;
+  const faces = [
+    '400 34px "IBM Plex Sans"',
+    '500 12px "IBM Plex Sans"',
+    '600 30px "IBM Plex Sans"',
+    '400 26px Marcellus',
+  ];
+  try {
+    await Promise.all(faces.map((face) => document.fonts.load(face)));
+    await document.fonts.ready;
+  } catch {
+    /* The card still draws; it just draws in the fallback stack. */
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -81,15 +162,19 @@ const TILE_GAP = 12;
 const TILE_COUNT = 6;
 const TILE_W = (CONTENT_W - TILE_GAP * (TILE_COUNT - 1)) / TILE_COUNT;
 
-/** Event dots live above the bars, in their own band. */
+/** Event marks live above the bars, in their own band. */
 const DOT_BAND_BOTTOM = 320;
-const DOT_SPACING = 10;
+const DOT_SPACING = 12;
 const MAX_DOTS = 3;
 
+/* The plot gives up fourteen pixels so the marker key has a row of its own
+   between the turn numbers and the strip. A key the reader has to already know
+   is not a key. */
 const PLOT_TOP = 330;
-const AXIS_Y = 500;
+const AXIS_Y = 486;
 const PLOT_H = AXIS_Y - PLOT_TOP;
-const TURN_LABEL_Y = 516;
+const TURN_LABEL_Y = 502;
+const KEY_Y = 522;
 
 const STRIP_Y = 536;
 const STRIP_H = 22;
@@ -139,10 +224,10 @@ function acquireTarget(width: number, height: number): RenderTarget {
 }
 
 /**
- * Marcellus is loaded from Google Fonts by `index.html`, which means it may not
- * have arrived — and a canvas asked for a font it does not have silently draws
- * the browser default, which is not a serif. Ask first, and name Georgia when
- * the answer is no, so the card is always *some* deliberate serif.
+ * The wordmark's face, and nowhere else's. `ensureFonts` has already asked for
+ * it; if the answer was no — a cold cache, a blocked file — Georgia stands in,
+ * so the wordmark is always *some* deliberate serif rather than whatever the
+ * platform's default happens to be.
  */
 function displayFont(): string {
   try {
@@ -159,8 +244,16 @@ function displayFont(): string {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-/** `#rrggbb` at a fraction of opacity, for chip fills and gridlines. */
-function alpha(hex: string, a: number): string {
+/**
+ * A token colour at a fraction of opacity, for chip fills and gridlines. The
+ * values now come out of the stylesheet rather than out of a literal here, so
+ * anything that is not a plain hex is handed back opaque rather than parsed
+ * into nonsense.
+ */
+function alpha(color: string, a: number): string {
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(color);
+  const hex = short ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}` : color;
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return color;
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
@@ -199,7 +292,9 @@ function fit(ctx: Ctx2D, text: string, maxWidth: number, tracking = 0): string {
 interface TextStyle {
   size: number;
   color: string;
+  /** The display face; used for the wordmark only. */
   display?: boolean;
+  weight?: number;
   tracking?: number;
   align?: CanvasTextAlign;
   maxWidth?: number;
@@ -208,7 +303,8 @@ interface TextStyle {
 /** One text run. Returns the width drawn, so callers can flow chips after it. */
 function text(ctx: Ctx2D, value: string, x: number, y: number, style: TextStyle): number {
   const tracking = style.tracking ?? 0;
-  ctx.font = `${style.size}px ${style.display ? displayFont() : BODY_FONT}`;
+  const weight = style.weight ?? 400;
+  ctx.font = `${weight} ${style.size}px ${style.display ? displayFont() : BODY_FONT}`;
   ctx.fillStyle = style.color;
   ctx.textAlign = style.align ?? 'left';
   ctx.textBaseline = 'alphabetic';
@@ -282,7 +378,7 @@ interface Verdict {
   color: string;
 }
 
-function verdictOf(card: Scorecard): Verdict {
+function verdictOf(card: Scorecard, C: Palette): Verdict {
   switch (card.result) {
     case 'win':
       return { word: 'WIN', color: C.ok };
@@ -348,8 +444,8 @@ function tilesFor(card: Scorecard): Tile[] {
     },
     {
       label: 'ANSWER RATE',
-      value: rate === null ? '—' : `${Math.round(rate * 100)}%`,
-      sub: `${answers.responded}/${terminal} terminal`,
+      value: rate === null ? 'n/a' : `${Math.round(rate * 100)}%`,
+      sub: `${answers.responded}/${terminal} ended`,
     },
     {
       label: 'DAMAGE DEALT',
@@ -377,11 +473,11 @@ function formatDate(stamp: number | null): string {
 // Sections
 // ---------------------------------------------------------------------------
 
-function drawHeader(ctx: Ctx2D, card: Scorecard): void {
-  const verdict = verdictOf(card);
+function drawHeader(ctx: Ctx2D, card: Scorecard, C: Palette): void {
+  const verdict = verdictOf(card, C);
 
   // The chip is measured first: the deck name gets whatever is left over.
-  ctx.font = `26px ${displayFont()}`;
+  ctx.font = `600 26px ${BODY_FONT}`;
   const chipTracking = 3;
   const wordWidth = measure(ctx, verdict.word, chipTracking);
   const chipW = wordWidth + 44;
@@ -397,15 +493,16 @@ function drawHeader(ctx: Ctx2D, card: Scorecard): void {
   text(ctx, verdict.word, chipX + chipW / 2, chipY + 32, {
     size: 26,
     color: verdict.color,
-    display: true,
+    weight: 600,
     tracking: chipTracking,
     align: 'center',
   });
 
   const nameWidth = chipX - 24 - L;
 
+  // The one run on the card allowed the display face.
   text(ctx, 'PROVING GROUNDS', L, 66, {
-    size: 12,
+    size: 13,
     color: C.accent,
     display: true,
     tracking: 4.5,
@@ -413,13 +510,13 @@ function drawHeader(ctx: Ctx2D, card: Scorecard): void {
   text(ctx, card.deckName || 'Untitled deck', L, 106, {
     size: 34,
     color: C.ink,
-    display: true,
+    weight: 500,
     maxWidth: nameWidth,
   });
 
   const meta = [
     `Bracket ${finite(card.bracket)}`,
-    `Seed ${card.seed || '—'}`,
+    `Seed ${card.seed || 'none'}`,
     `T${finite(card.turns)}`,
     formatDate(card.endedAt ?? card.startedAt),
   ];
@@ -434,7 +531,7 @@ function drawHeader(ctx: Ctx2D, card: Scorecard): void {
   line(ctx, L, 152, R, 152, C.line);
 }
 
-function drawTiles(ctx: Ctx2D, card: Scorecard): void {
+function drawTiles(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const tiles = tilesFor(card);
   tiles.forEach((tile, i) => {
     const x = L + i * (TILE_W + TILE_GAP);
@@ -442,8 +539,9 @@ function drawTiles(ctx: Ctx2D, card: Scorecard): void {
 
     const inner = TILE_W - 24;
     text(ctx, tile.label, x + 12, TILE_Y + 24, {
-      size: 9.5,
+      size: 11,
       color: C.muted,
+      weight: 500,
       tracking: 1.4,
       maxWidth: inner,
     });
@@ -452,7 +550,7 @@ function drawTiles(ctx: Ctx2D, card: Scorecard): void {
     text(ctx, tile.value, x + 12, TILE_Y + 62, {
       size: tile.value.length > 4 ? 22 : 30,
       color: C.ink,
-      display: true,
+      weight: 600,
       maxWidth: inner,
     });
     text(ctx, tile.sub, x + 12, TILE_Y + 84, {
@@ -463,7 +561,7 @@ function drawTiles(ctx: Ctx2D, card: Scorecard): void {
   });
 }
 
-function drawTimeline(ctx: Ctx2D, card: Scorecard): void {
+function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const rows: TurnRow[] = card.timeline ?? [];
 
   line(ctx, L, AXIS_Y, R, AXIS_Y, C.line);
@@ -506,8 +604,10 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard): void {
     const value = Math.max(0, finite(rows[i].mvDeployed));
     const scaled = (value / maxMv) * PLOT_H;
     const height = Math.max(scaled, 2);
+    // Ink, not the accent — the same call the app's own chart makes. One accent,
+    // held for what needs attention, and a bar chart is a reading.
     box(ctx, centerOf(i) - barW / 2, AXIS_Y - height, barW, height, {
-      fill: alpha(C.accent, scaled > 0 ? 0.85 : 0.25),
+      fill: alpha(C.ink, scaled > 0 ? 0.7 : 0.2),
       radius: Math.min(3, barW / 2),
     });
   }
@@ -526,21 +626,42 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard): void {
     dot(ctx, centerOf(0), AXIS_Y - (finite(rows[0].boardValueEnd) / maxBoard) * PLOT_H, 3, C.ok);
   }
 
-  // Event dots, newest nearest the bars.
+  // Event marks, newest nearest the bars. A letter rather than a dot: this
+  // image is posted to Discord, where a reader who cannot separate the mana
+  // colours would otherwise have five identical circles. The key below the
+  // plot says what each letter is.
   rows.forEach((row, i) => {
     const ids = row.eventIds ?? [];
     for (let d = 0; d < Math.min(ids.length, MAX_DOTS); d++) {
-      const type = typeById.get(ids[d]) ?? 'combat';
-      dot(ctx, centerOf(i), DOT_BAND_BOTTOM - d * DOT_SPACING, 3.5, EVENT_COLOR[type] ?? C.muted);
+      const type = (typeById.get(ids[d]) ?? 'combat') as EventType;
+      text(ctx, EVENT_MARK[type] ?? '?', centerOf(i), DOT_BAND_BOTTOM - d * DOT_SPACING + 4, {
+        size: 12,
+        weight: 600,
+        color: eventColor(C, type),
+        align: 'center',
+      });
     }
     if (ids.length > MAX_DOTS) {
-      text(ctx, `+${ids.length - MAX_DOTS}`, centerOf(i), DOT_BAND_BOTTOM - MAX_DOTS * DOT_SPACING - 2, {
-        size: 8.5,
+      text(ctx, `+${ids.length - MAX_DOTS}`, centerOf(i), DOT_BAND_BOTTOM - MAX_DOTS * DOT_SPACING + 4, {
+        size: 10,
         color: C.muted,
         align: 'center',
       });
     }
   });
+
+  // The key, printed once under the axis so the letters are never a code the
+  // reader has to already know.
+  let keyX = L;
+  for (const { type, word } of EVENT_MARK_KEY) {
+    const markW = text(ctx, EVENT_MARK[type], keyX, KEY_Y, {
+      size: 12,
+      weight: 600,
+      color: eventColor(C, type),
+    });
+    const wordW = text(ctx, word, keyX + markW + 4, KEY_Y, { size: 11, color: C.muted });
+    keyX += markW + wordW + 18;
+  }
 
   // Turn numbers, thinned out so a 30-turn game does not become a smear.
   const step = Math.max(1, Math.ceil(rows.length / 24));
@@ -555,14 +676,19 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard): void {
   });
 }
 
-function drawStrip(ctx: Ctx2D, options?: ShareImageOptions): void {
-  const footer = 'unofficial fan content';
-  ctx.font = `10px ${BODY_FONT}`;
-  const footerWidth = measure(ctx, footer, 1.2);
+function drawStrip(ctx: Ctx2D, C: Palette, options?: ShareImageOptions): void {
+  // The full Fan Content line, not a shorthand: the same sentence the app's own
+  // footer carries. It is set small and untracked because it has to fit beside
+  // the deck's tags on one strip.
+  const footer =
+    'Unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. ' +
+    'Card data and imagery via Scryfall. Not approved or endorsed by Wizards.';
+  ctx.font = `400 9px ${BODY_FONT}`;
+  const footerWidth = measure(ctx, footer, 0.2);
   text(ctx, footer, R, STRIP_Y + 15, {
-    size: 10,
+    size: 9,
     color: alpha(C.muted, 0.7),
-    tracking: 1.2,
+    tracking: 0.2,
     align: 'right',
   });
 
@@ -570,7 +696,7 @@ function drawStrip(ctx: Ctx2D, options?: ShareImageOptions): void {
   const limit = R - footerWidth - 24;
   let x = L;
   for (const tag of tags) {
-    ctx.font = `11px ${BODY_FONT}`;
+    ctx.font = `400 11px ${BODY_FONT}`;
     const width = measure(ctx, tag, 0.6) + 20;
     if (x + width > limit) break;
     box(ctx, x, STRIP_Y, width, STRIP_H, {
@@ -595,6 +721,11 @@ export async function renderScorecardPng(
   card: Scorecard,
   options?: ShareImageOptions,
 ): Promise<Blob> {
+  // The faces first: a canvas asked for a font that has not loaded draws the
+  // fallback and says nothing about it.
+  await ensureFonts();
+  const C = readPalette();
+
   const target = acquireTarget(SHARE_IMAGE_WIDTH * DEVICE_SCALE, SHARE_IMAGE_HEIGHT * DEVICE_SCALE);
   const ctx = target.ctx;
 
@@ -610,10 +741,10 @@ export async function renderScorecardPng(
     radius: CARD_RADIUS,
   });
 
-  drawHeader(ctx, card);
-  drawTiles(ctx, card);
-  drawTimeline(ctx, card);
-  drawStrip(ctx, options);
+  drawHeader(ctx, card, C);
+  drawTiles(ctx, card, C);
+  drawTimeline(ctx, card, C);
+  drawStrip(ctx, C, options);
 
   return target.toBlob();
 }

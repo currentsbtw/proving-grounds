@@ -1,0 +1,232 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc><helmet><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Marcellus&display=swap"><style>
+*{box-sizing:border-box}
+body{margin:0}
+
+/* ---- tokens (dark) ---- */
+.ab{
+  --ground:#17181c;
+  --surface:#1f2127;
+  --line:#33353c;
+  --rule:#6a6d77;
+  --ink:#e8e6e1;
+  --muted:#a0a3aa;
+  --accent:#c9a85c;
+}
+
+.ab{
+  color:var(--ink);
+  font-family:'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif;
+  font-size:13px;line-height:1.35;font-weight:400;
+  font-variant-numeric:tabular-nums lining-nums;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;overflow:hidden;position:relative;
+}
+
+/* ---- printed labels + figures ---- */
+.lbl{font-size:11px;line-height:1.2;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:500;white-space:nowrap}
+.lbl.acc{color:var(--accent)}
+.micro{font-size:12px;color:var(--muted);white-space:nowrap}
+.fig{font-size:19px;line-height:1.05;font-weight:600;letter-spacing:-.005em}
+.fig-lg{font-size:24px;line-height:1;font-weight:600;letter-spacing:-.01em}
+.sp{flex:1}
+.row{display:flex;align-items:center;gap:8px}
+
+/* bordered text chips — legible in greyscale, no fill */
+.chip{border:1px solid var(--rule);color:var(--muted);padding:2px 6px;font-size:11px;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.key{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule);padding:4px 9px 4px 5px;font-size:13px;color:var(--ink)}
+.key i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--rule);font-style:normal;font-size:12px;font-weight:600;color:var(--muted)}
+.key.on{border-color:var(--accent)}
+.key.on i{border-color:var(--accent);color:var(--accent)}
+
+/* ---- title row ---- */
+.title{height:40px;flex:0 0 40px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 16px}
+.wordmark{font-family:'Marcellus',Georgia,serif;font-size:18px;line-height:1;letter-spacing:.03em}
+.title .runid{font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* ---- body split ---- */
+.body{flex:1;display:flex;overflow:hidden}
+.left{width:1066px;flex:0 0 1066px;border-right:1px solid var(--line);display:flex;flex-direction:column}
+.right{flex:1;display:flex;flex-direction:column;min-width:0}
+
+/* ---- battlefield ---- */
+.field{flex:1;padding:12px 16px 14px;overflow:hidden;border-bottom:1px solid var(--line);display:grid;grid-template-rows:auto 1fr 1fr;min-height:0}
+.fhead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.cards{display:flex;gap:12px}
+.card{width:130px;height:182px;border:1px solid var(--rule);background:var(--surface);position:relative;display:flex;align-items:flex-end;padding:8px}
+.card .cn{font-size:12px;line-height:1.25}
+.card .mv{position:absolute;top:7px;right:8px;font-size:12px;color:var(--muted)}
+.card .cmd{position:absolute;top:6px;left:7px;font-size:10px;letter-spacing:.14em;border:1px solid var(--rule);color:var(--muted);padding:1px 4px}
+
+.lands{padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;min-height:0}
+.landrow{display:flex;align-items:center;gap:4px}
+.slot{width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+.land{width:44px;height:62px;border:1px solid var(--rule);background:var(--surface);font-size:11px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px}
+.land.tp{transform:rotate(90deg);border-color:var(--line);color:var(--muted)}
+
+/* ---- hand ---- */
+.hand{height:190px;flex:0 0 190px;padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+.hcards{display:flex;gap:12px}
+.hcard{width:108px;height:148px;border:1px solid var(--rule);background:var(--surface);position:relative;display:flex;align-items:flex-end;padding:7px}
+.hcard .cn{font-size:12px;line-height:1.25}
+.hcard .mv{position:absolute;top:6px;right:7px;font-size:12px;color:var(--muted)}
+
+/* ---- right column: ruled blocks, never boxes ---- */
+.blk{border-bottom:1px solid var(--line);padding:9px 14px 10px}
+.bhead{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+
+/* seats — three ruled rows */
+.seat{padding:6px 0 7px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.seat:first-of-type{border-top:0;padding-top:2px}
+.seat.hit{}
+.ltr{font-size:13px;font-weight:600;letter-spacing:.12em;width:13px;color:var(--muted)}
+.meter{display:flex;gap:3px}
+.seg{width:12px;height:9px;border:1px solid var(--rule)}
+.seg.f{background:var(--ink);border-color:var(--ink)}
+.thr{font-size:14px;font-weight:600;min-width:13px;text-align:right}
+.trend{font-size:12px;color:var(--muted)}
+
+/* you — printed label over figure */
+.pairs{display:flex;flex-wrap:wrap}
+.pair{width:50%;padding:6px 0 7px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:3px}
+.pair.full{width:100%}
+.pair .sub{font-size:12px;color:var(--muted)}
+.pair .delta{font-size:13px;font-weight:400;color:var(--muted)}
+
+/* tells */
+.tell{font-size:12px;line-height:1.4;padding:4px 0 4px 10px;border-left:1px solid var(--rule)}
+.tell.q{color:var(--muted);border-left-color:var(--line)}
+
+/* active event — accent rule, the only place it repeats */
+.evt{display:flex;flex-direction:column;gap:8px}
+.evt .prompt{font-size:14px;line-height:1.35}
+
+/* tab row */
+.tabrow{height:34px;flex:0 0 34px;display:flex;align-items:stretch;border-top:1px solid var(--line)}
+.tabrow .tb{flex:1;border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tabrow .tb:last-child{border-right:0}
+</style></helmet><div class="ab" style="width:1440px;height:900px;background:#17181c">
+
+  <div class="title">
+    <span class="wordmark">Proving Grounds</span>
+    <span class="lbl">B · Readout</span>
+    <span class="sp"></span>
+    <span class="chip">on demand ▾</span>
+    <span class="runid">run: Krenko goblins · bracket 3 · seed 7QK4</span>
+  </div>
+
+  <div class="body">
+
+    <div class="left">
+      <div class="field">
+        <div class="fhead">
+          <span class="lbl">battlefield</span>
+          <span class="micro">6 permanents</span>
+        </div>
+        <div class="cards">
+          <div class="card"><span class="cmd">CMD</span><span class="mv">MV 4</span><span class="cn">Krenko, Mob Boss</span></div>
+          <div class="card"><span class="mv">MV 3</span><span class="cn">Goblin Chieftain</span></div>
+          <div class="card"><span class="mv">MV 1</span><span class="cn">Skirk Prospector</span></div>
+        </div>
+        <div class="lands">
+          <div class="row"><span class="lbl">lands</span><span style="font-size:12px">5 Mountains · 2 TAPPED</span><span class="micro">· untap all</span></div>
+          <div class="landrow">
+            <span class="slot"><span class="land">Mtn</span></span>
+            <span class="slot"><span class="land">Mtn</span></span>
+            <span class="slot"><span class="land">Mtn</span></span>
+            <span class="slot"><span class="land tp">Mtn</span></span>
+            <span class="slot"><span class="land tp">Mtn</span></span>
+            <span class="chip">tapped ×2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hand">
+        <div class="row"><span class="lbl">hand</span><span class="micro">4 cards</span></div>
+        <div class="hcards">
+          <div class="hcard"><span class="mv">MV 1</span><span class="cn">Lightning Bolt</span></div>
+          <div class="hcard"><span class="mv">MV 3</span><span class="cn">Goblin Warchief</span></div>
+          <div class="hcard"><span class="mv">MV 4</span><span class="cn">Purphoros, God of the Forge</span></div>
+          <div class="hcard"><span class="mv">land</span><span class="cn">Mountain</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+
+      <div class="blk">
+        <div class="bhead"><span class="lbl">seats</span><span class="sp"></span><span class="chip on">hit: B</span><span class="micro">clock holder</span></div>
+
+        <div class="seat">
+          <div class="row"><span class="ltr">A</span><span class="fig-lg">40</span><span class="lbl">life</span><span class="sp"></span><span class="chip">alive</span><span class="chip">armed 4+</span></div>
+          <div class="row">
+            <span class="lbl">threat</span>
+            <span class="meter"><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></span>
+            <span class="thr">3</span><span class="trend">▬ steady</span>
+          </div>
+          <div class="row"><span class="micro">cmdr dmg 0</span><span class="sp"></span><span class="micro">▾ silhouette · ± life</span></div>
+        </div>
+
+        <div class="seat hit">
+          <div class="row"><span class="ltr">B</span><span class="fig-lg">34</span><span class="lbl">life</span><span class="sp"></span><span class="chip">alive</span><span class="chip on">clock</span></div>
+          <div class="row">
+            <span class="lbl">threat</span>
+            <span class="meter"><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></span>
+            <span class="thr">7</span><span class="trend">▲ rising</span>
+          </div>
+          <div class="row"><span class="micro">cmdr dmg 0</span><span class="sp"></span><span class="micro">▾ silhouette · ± life</span></div>
+        </div>
+
+        <div class="seat">
+          <div class="row"><span class="ltr">C</span><span class="fig-lg">22</span><span class="lbl">life</span><span class="sp"></span><span class="chip">alive</span></div>
+          <div class="row">
+            <span class="lbl">threat</span>
+            <span class="meter"><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg f"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></span>
+            <span class="thr">5</span><span class="trend">▼ falling</span>
+          </div>
+          <div class="row"><span style="font-size:12px">cmdr dmg 12</span><span class="sp"></span><span class="micro">▾ silhouette · ± life</span></div>
+        </div>
+      </div>
+
+      <div class="blk">
+        <div class="bhead"><span class="lbl">you</span></div>
+        <div class="pairs">
+          <div class="pair full" style="border-top:0"><span class="lbl">turn / phase</span><span class="fig">T6 · MAIN 1</span><span class="sub">next: Seat B window</span></div>
+          <div class="pair"><span class="lbl">mana</span><span class="fig">3/5</span><span class="sub">untapped lands</span></div>
+          <div class="pair"><span class="lbl">life</span><span class="fig">31 <span class="delta">−9</span></span><span class="sub">this turn</span></div>
+          <div class="pair"><span class="lbl">hand</span><span class="fig">4</span></div>
+          <div class="pair"><span class="lbl">tax</span><span class="fig">+2</span></div>
+          <div class="pair"><span class="lbl">library</span><span class="fig">81</span></div>
+          <div class="pair"><span class="lbl">clock</span><span class="fig">B · T9 · 3</span><span class="sub">turns left</span></div>
+        </div>
+      </div>
+
+      <div class="blk">
+        <div class="bhead"><span class="lbl">tells</span></div>
+        <div class="tell">Seat A armed: counters 4+ mana</div>
+        <div class="tell q">post wipe: drag back anything that survived</div>
+      </div>
+
+      <div class="sp"></div>
+
+      <div class="blk" style="border-bottom:0">
+        <div class="bhead"><span class="lbl acc">active event</span><span class="sp"></span><span class="micro">1 more queued</span></div>
+        <div class="evt">
+          <div class="row"><span class="chip on">seat C</span><span class="chip on">removal</span></div>
+          <div class="prompt">Seat C kills your biggest creature</div>
+          <div class="row"><span class="key on"><i>1</i>Resolve</span><span class="key"><i>2</i>Answered</span></div>
+        </div>
+      </div>
+
+      <div class="tabrow">
+        <div class="tb">Log</div>
+        <div class="tb">Notes</div>
+        <div class="tb">Tokens</div>
+        <div class="tb">Keys</div>
+        <div class="tb">End run</div>
+      </div>
+
+    </div>
+  </div>
+
+</div></x-dc></body></html>

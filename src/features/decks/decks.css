@@ -41,7 +41,7 @@
 .dk-textarea {
   min-height: 220px;
   resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -49,7 +49,9 @@
 .dk-btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #17181c;
+  /* The ground, never a literal: it inverts with the theme, so the ink on the
+     accent stays legible on the light readout as well as the dark one. */
+  color: var(--ground);
   font-weight: 600;
 }
 
@@ -98,11 +100,22 @@
   justify-content: space-between;
 }
 
+/* Deck names, card names and parser echoes are all player-supplied text. They
+   wrap rather than run out of the rail, and `isolate` keeps a name carrying a
+   bidi control character from reordering the label printed next to it. */
+.dk-deck-name,
+.dk-user-text,
+.dk-chip > span:first-child,
+.dk-picker-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
 .dk-deck-name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.2;
-  overflow-wrap: anywhere;
 }
 
 .dk-bracket {
@@ -148,20 +161,41 @@
 
 /* Messages -------------------------------------------------------------- */
 
+/* The state is a printed word above the text, not a coloured bar beside it:
+   the rule thins to the same hairline every other block uses. */
+.dk-error,
+.dk-warn {
+  border-left: 1px solid var(--rule);
+  padding-left: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.dk-error::before,
+.dk-warn::before {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .dk-error {
   color: var(--danger);
-  font-size: 12px;
-  border-left: 2px solid var(--danger);
-  padding-left: 8px;
-  overflow-wrap: anywhere;
+}
+
+.dk-error::before {
+  content: 'Error';
 }
 
 .dk-warn {
   color: var(--muted);
-  font-size: 12px;
-  border-left: 2px solid var(--accent);
-  padding-left: 8px;
-  overflow-wrap: anywhere;
+}
+
+.dk-warn::before {
+  content: 'Warning';
 }
 
 .dk-warn-list {
@@ -178,6 +212,15 @@
 .dk-busy::after {
   content: '';
   animation: dk-dots 1.2s steps(4, end) infinite;
+}
+
+/* The only animation in the app that never stops, so it is the one that most
+   needs the switch. The line still says what is happening without it. */
+@media (prefers-reduced-motion: reduce) {
+  .dk-busy::after {
+    animation: none;
+    content: '…';
+  }
 }
 
 @keyframes dk-dots {
@@ -213,7 +256,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+  box-shadow: 0 6px 18px var(--shadow-strong);
 }
 
 .dk-picker-item {
@@ -236,7 +279,7 @@
 .dk-picker-type {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .dk-chip {
@@ -253,6 +296,12 @@
 
 .dk-chip-x {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin: -3px 0;
   background: transparent;
   border: 0;
   color: var(--muted);
@@ -263,33 +312,4 @@
 .dk-chip-x:hover {
   color: var(--danger);
   border-color: transparent;
-}
-
-/* Active run ------------------------------------------------------------ */
-
-.dk-run-name {
-  font-family: var(--font-display);
-  font-size: 17px;
-  margin-bottom: 8px;
-  overflow-wrap: anywhere;
-}
-
-.dk-run-facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 3px 10px;
-  font-size: 12px;
-  margin-bottom: 12px;
-}
-
-.dk-run-facts dt {
-  color: var(--muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: 11px;
-}
-
-.dk-run-facts dd {
-  margin: 0;
-  overflow-wrap: anywhere;
 }

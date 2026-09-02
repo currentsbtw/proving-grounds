@@ -1,0 +1,872 @@
+/* ── Proving Grounds — the readout column ────────────────────────────────── */
+/*
+   Printed labels above tabular figures, blocks separated by hairline rules
+   rather than boxed, and one accent held back for whatever needs an answer now.
+*/
+
+.pg-readout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--ground);
+}
+
+/* Seats and your own numbers scroll together; tells and the event stay pinned
+   below them, so neither ever scrolls away under the other. */
+.rd-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The rules run across the whole column. At a tall window the
+   two blocks used to end well short of the pinned foot and leave a band of
+   nothing between the numbers and the event waiting below them; the slack now
+   goes to the rules inside each block instead, so every slot keeps its order
+   and its label and the sheet simply fills. `1 0 auto` grows and never shrinks,
+   so a short window still scrolls rather than compressing the rows. */
+.rd-scroll > .rd-block {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* ── The settle ─────────────────────────────────────────────────────────── */
+/*
+   On turn advance the column's values settle in reading order — seats, then
+   your own numbers, then the tells and the event waiting at the foot. The two
+   keyframe sets are identical: `data-settle` alternates between them with the
+   turn, and a changed animation name is what replays the animation. Opacity and
+   transform only, so nothing reflows and the figures never move the scan.
+*/
+@keyframes rd-settle-a {
+  from {
+    opacity: 0.3;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rd-settle-b {
+  from {
+    opacity: 0.3;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pg-readout[data-settle='a'] .rd-settle {
+  animation: rd-settle-a 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pg-readout[data-settle='b'] .rd-settle {
+  animation: rd-settle-b 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Reading order: seats, then your own numbers, then the pinned foot. These have
+   to outrank the shorthand above, which would otherwise reset the delay. */
+.pg-readout[data-settle] .rd-settle.is-step2 {
+  animation-delay: 60ms;
+}
+
+.pg-readout[data-settle] .rd-settle.is-step3 {
+  animation-delay: 120ms;
+}
+
+/* Reduced motion reads the settled state and nothing else — this is the only
+   motion left in the column. */
+@media (prefers-reduced-motion: reduce) {
+  .pg-readout[data-settle] .rd-settle {
+    animation: none;
+  }
+}
+
+.rd-block {
+  padding: 6px 14px 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* The event card below already rules the column off, so the last block in the
+   scroll area spends no height on a second rule. */
+.rd-scroll .rd-block:last-child {
+  border-bottom: none;
+}
+
+.rd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+/* ── The printed idiom: label, figure, chip, key ─────────────────────────── */
+
+.rd-title,
+.rd-label,
+.rd-pair-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.rd-title,
+.rd-label {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Two underlined words in the column's own voice: one opens a panel, the other
+   opens a seat's silhouette. They are printed the same because they are.
+
+   The box is held to the 24px pointer minimum while the word stays exactly the
+   size it was printed at: the extra height is taken as padding and handed
+   straight back as negative margin, so the row rhythm above and below is
+   untouched and only the target grows. */
+.rd-quiet-btn,
+.rd-disclose {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 2px;
+  margin-top: -4px;
+  margin-bottom: -4px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rd-quiet-btn {
+  margin-left: auto;
+}
+
+.rd-disclose {
+  flex: none;
+}
+
+.rd-quiet-btn:hover,
+.rd-disclose:hover {
+  color: var(--ink);
+  border-color: transparent;
+}
+
+/* Every state is a word inside a border, so it survives greyscale. */
+.rd-chip {
+  padding: 2px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* The accent is spent on one chip only: the seat to hit is the answer to "who
+   do I attack", and it has to be the loudest word on the row. CLOCK prints its
+   own name and sits beside the clock's own slot in YOU, so it loses nothing by
+   reading in the same printed rule ARMED and OUT read in. */
+.rd-chip.is-hit {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Seats ──────────────────────────────────────────────────────────────── */
+
+.rd-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 3px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.rd-seat:first-of-type {
+  padding-top: 2px;
+  border-top: 0;
+}
+
+.rd-seat-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The on-demand half of the row is the only line allowed to take a second one. */
+.rd-seat-line.is-foot {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.rd-seat-id {
+  flex: none;
+  width: 13px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.rd-seat-life {
+  flex: none;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/* An eliminated seat keeps its slot: ruled through, dimmed, never moved. */
+.rd-seat.is-out {
+  opacity: 0.6;
+}
+
+.rd-seat-line.is-top {
+  position: relative;
+}
+
+.rd-seat.is-out .rd-seat-line.is-top::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--rule);
+  pointer-events: none;
+}
+
+/* Life adjust stays reachable but recessive: the number is the reading. */
+.rd-steps {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+/* Same trick as the underlined words: the figure keeps its printed size, the
+   box clears 24px, and the negative margin gives the row its height back. A
+   mis-hit here writes a wrong number into the log the scorer reads. */
+.rd-steps button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  min-height: 24px;
+  padding: 1px 4px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+}
+
+.rd-steps button:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.rd-steps button:focus-visible {
+  border-color: var(--rule);
+}
+
+.rd-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.rd-threat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rd-threat-bar {
+  display: flex;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 40px;
+}
+
+/* Filled or outlined — never a colour telling the two apart. */
+.rd-threat-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 9px;
+  border: 1px solid var(--rule);
+}
+
+.rd-threat-seg.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+/* Windows high contrast forces every author colour to one system pair, which
+   left a filled segment painted in the same ink as the ground behind it: ten
+   identical outlines, the meter dead. System colour keywords are the one thing
+   forced colours honours, so the fill is restated in them. */
+@media (forced-colors: active) {
+  .rd-threat-seg {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+
+  .rd-threat-seg.is-on {
+    background: CanvasText;
+    border-color: CanvasText;
+  }
+}
+
+.rd-threat-num {
+  flex: none;
+  min-width: 13px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rd-trend {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rd-cmdr {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rd-sil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 4px 0 2px 21px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rd-sil .num {
+  color: var(--ink);
+}
+
+.rd-sil-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rd-sil-label {
+  color: var(--muted);
+}
+
+.rd-sil-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 5px;
+  margin-top: -3px;
+  margin-bottom: -3px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+}
+
+.rd-sil-actions button:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+/* ── You ────────────────────────────────────────────────────────────────── */
+
+/* Label over figure, two slots to a line, each ruled off from the one above. */
+.rd-pairs {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.rd-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 50%;
+  min-width: 0;
+  padding: 3px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+/* The first pair of slots opens the block, so it carries no rule above it. */
+.rd-pairs > .rd-pair:nth-child(1),
+.rd-pairs > .rd-pair:nth-child(2) {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.rd-pair.is-wide {
+  position: relative;
+  width: 100%;
+}
+
+.rd-pair-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Your own OUT chip. It rides in the label row, where the life steps pinned to
+   the foot of the slot cannot collide with it. */
+.rd-chip.is-dead {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.rd-pair-value {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rd-pair-value.is-none {
+  color: var(--muted);
+}
+
+/* The clock slot is a sentence rather than a figure, so it reads a size down. */
+.rd-pair.is-clock .rd-pair-value {
+  font-size: 16px;
+}
+
+/* The wording already carries the state ("this is the last turn"); the colour
+   and weight only underline it. */
+.rd-pair-value.is-urgent {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.rd-pair-sub {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.rd-swing {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.rd-swing.is-down {
+  color: var(--danger);
+}
+
+/* The life row keeps its adjust buttons on the same line as the figure. */
+.rd-pair.is-wide .rd-steps {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+}
+
+.rd-turn-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.rd-turn-actions button {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+}
+
+.rd-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ── Tells ──────────────────────────────────────────────────────────────── */
+
+.rd-tell {
+  margin: 0;
+  padding: 3px 0 3px 10px;
+  border-left: 1px solid var(--rule);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+/* The standing hint is a reminder rather than a read; it recedes a step. */
+.rd-tell.is-quiet {
+  border-left-color: var(--line);
+  color: var(--muted);
+}
+
+.rd-tell .rd-quiet-btn {
+  margin-left: 6px;
+}
+
+.rd-tell-slot:not(:empty) + .rd-tell-slot:not(:empty) {
+  margin-top: 4px;
+}
+
+/* ── Pinned foot: tells and the active event ────────────────────────────── */
+
+.rd-pinned {
+  flex: none;
+  position: relative;
+}
+
+.rd-pinned > .rd-tells,
+.rd-pinned > .pgp-dock {
+  padding: 8px 14px 9px;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+/* The prompt is the one part of the event with no fixed length, and it names
+   cards, so it is the part that is capped: the seat, class, responses and queue
+   count stay whole, and LIFE, CLOCK and the turn controls above keep their room
+   at every width rather than only in a narrow column. */
+.rd-pinned .pgp-prompt {
+  max-height: 2.8em;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+/* Same for the extras line: a named target scrolls inside its own slot instead
+   of growing the pinned foot until the turn controls above it scroll away. */
+.rd-pinned .pgp-target {
+  max-height: 2.2em;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+/* Both slots stay in the accessibility tree with nothing in them, so a tell
+   arriving is announced. With neither standing the block clips to nothing
+   rather than spending a printed heading on an empty slot. The active event's
+   own slot is held open on exactly the same terms. */
+.rd-pinned > .rd-tells.is-empty,
+.rd-pinned > .pgp-dock.is-empty {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  border-top-width: 0;
+}
+
+/* The picker hangs up and to the left, over the battlefield rather than over
+   the readout it was opened from. */
+.rd-pinned .pgp-picker {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: auto;
+  right: 0;
+  width: min(460px, 88vw);
+}
+
+/* ── Foot tabs and drawer ───────────────────────────────────────────────── */
+
+.rd-tabs {
+  flex: none;
+  display: flex;
+  height: 34px;
+  border-top: 1px solid var(--line);
+}
+
+.rd-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--muted);
+}
+
+.rd-tab:last-child {
+  border-right: 0;
+}
+
+.rd-tab:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.rd-tab.is-open {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+
+/* Forced colours drop box-shadow outright, which took the open tab's underline
+   with it and left the four tabs identical. The rule is redrawn as a border. */
+@media (forced-colors: active) {
+  .rd-tab.is-open {
+    border-bottom: 2px solid Highlight;
+    color: Highlight;
+  }
+}
+
+.rd-drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 34px;
+  height: 62%;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 26px var(--shadow);
+}
+
+.rd-drawer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rd-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+/* The log fills its drawer; everything else keeps its natural height. */
+.rd-drawer-body > .pg-hud-log {
+  flex: 1 1 auto;
+}
+
+/* Narrow column: the chips still own line one of a seat row, so the row gives
+   up the "life" caption and the chips tighten rather than wrapping ad hoc. */
+@media (max-width: 1280px) {
+  .rd-block,
+  .rd-pinned > .rd-tells,
+  .rd-pinned > .pgp-dock {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  /* A narrow column has less height to spare, so the caps tighten. */
+  .rd-pinned .pgp-prompt {
+    max-height: 2.8em;
+  }
+
+  .rd-pinned .pgp-target {
+    max-height: 2.6em;
+  }
+
+  /* The folded seat row hands its third line to the disclosure, so the
+     disclosure has to sit at the end of the meter line instead. */
+  .rd-seat-line.is-meter .rd-disclose {
+    margin-left: 4px;
+  }
+
+  .rd-seat {
+    gap: 3px;
+  }
+
+  .rd-seat-line.is-top .rd-label {
+    display: none;
+  }
+
+  .rd-chip {
+    padding: 2px 4px;
+    letter-spacing: 0.06em;
+  }
+
+  .rd-chips {
+    gap: 3px;
+  }
+
+  .rd-tab {
+    letter-spacing: 0.02em;
+  }
+
+  .rd-seat-life {
+    font-size: 20px;
+  }
+
+  .rd-pair-value {
+    font-size: 17px;
+  }
+}
+
+/* The life steps sit in the disclosure once the row is folded, where they are a
+   labelled pair rather than a right-aligned tail. */
+.rd-sil .rd-steps {
+  margin-left: 0;
+}
+
+/* A short window is the tighter constraint: 768px of height has to hold three
+   seats, your own numbers, the tells and the event without any of them sliding
+   under the pinned foot. Every slot keeps its place; the rules just close up. */
+@media (max-height: 940px) {
+  .rd-block,
+  .rd-pinned > .rd-tells,
+  .rd-pinned > .pgp-dock {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .rd-head {
+    margin-bottom: 3px;
+  }
+
+  .rd-pair {
+    padding: 2px 0 3px;
+  }
+
+  .rd-seat {
+    padding: 2px 0 3px;
+  }
+
+  .rd-turn-actions {
+    margin-top: 4px;
+  }
+
+  .rd-pinned .pgp-dock {
+    gap: 5px;
+  }
+}
+
+/* 768px of height is the floor the layout is held to. Every slot keeps its
+   printed label above its figure — the rules just close up further, and the two
+   turn buttons give up enough type to stay on one line each. */
+@media (max-height: 820px) {
+  .rd-block,
+  .rd-pinned > .rd-tells,
+  .rd-pinned > .pgp-dock {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .rd-head {
+    margin-bottom: 2px;
+  }
+
+  .rd-pair {
+    padding: 1px 0 2px;
+  }
+
+  .rd-pair-value {
+    font-size: 16px;
+  }
+
+  .rd-seat {
+    gap: 2px;
+    padding: 1px 0 2px;
+  }
+
+  .rd-seat-life {
+    font-size: 18px;
+  }
+
+  .rd-threat-seg {
+    height: 8px;
+  }
+
+  .rd-pair-sub {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .rd-chip {
+    padding: 1px 4px;
+  }
+
+  .rd-pinned .pgp-answers .pgp-btn {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+
+  .rd-turn-actions {
+    margin-top: 3px;
+  }
+
+  .rd-turn-actions button {
+    gap: 5px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+
+  .rd-tabs {
+    height: 30px;
+  }
+
+  .rd-pinned .pgp-dock {
+    gap: 4px;
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Readout · dark" },
+    { "file": "Light.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "Readout · light" }
+  ],
+  "annotations": [
+    {
+      "id": "note-dark",
+      "x": 0,
+      "y": -190,
+      "w": 620,
+      "text": "READOUT · DARK\n\nType: IBM Plex Sans (400/500/600) for every label, figure and chip, set with tabular lining numerals so a value never shifts its neighbours when it changes; Marcellus survives only in the wordmark. Accent: #c9a85c on ground #17181c.\n\nWhat carries the kneeboard idea without a prop: pre-printed letter-spaced small-caps labels sit above large tabular figures in fixed slots separated by hairline rules rather than boxes, so the column reads as a printed card being filled in each turn — and the single brass accent appears in exactly two places, the seat to hit and the active event, with threat shown as filled versus outlined segments that survive greyscale."
+    },
+    {
+      "id": "note-light",
+      "x": 1560,
+      "y": -190,
+      "w": 620,
+      "text": "READOUT · LIGHT\n\nType: IBM Plex Sans (400/500/600) with tabular lining numerals, identical to the dark artboard; Marcellus only in the wordmark. Accent: #7d5f16 on warm off-white ground #f5f2ec — the same brass, darkened to hold 5.3:1 against a light ground.\n\nWhat carries the kneeboard idea without a prop: this is a token swap of the dark artboard, not a second design — same markup, same rules, same slots, only ground/ink/line/accent values change, which is the proof that the printed-slot structure and not the palette is doing the work."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
