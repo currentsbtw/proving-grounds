@@ -21,14 +21,21 @@ The current milestone is the instrumented goldfish table:
 
 ## Keyboard map
 
-| Key     | Action           |
-| ------- | ---------------- |
-| `D`     | Draw a card      |
-| `S`     | Shuffle library  |
-| `U`     | Untap all        |
-| `Space` | Next phase       |
-| `T`     | Next turn        |
-| `N`     | Add a run note   |
+| Key     | Action                                   |
+| ------- | ---------------------------------------- |
+| `D`     | Draw a card                              |
+| `S`     | Shuffle library                          |
+| `U`     | Untap all                                |
+| `Space` | Next phase                               |
+| `T`     | Next turn                                |
+| `M`     | Take a mulligan (opening hand only)      |
+| `V`     | Preview the focused card                 |
+| `C`     | Cast the focused card to the stack       |
+| `R`     | Resolve the top of the stack             |
+| `A`     | Push an ability or trigger to the stack  |
+| `N`     | Add a run note                           |
+| `1` `2` | Answer the active event                  |
+| `?`     | Keyboard help (every key is rebindable)  |
 
 Hotkeys are ignored while typing in an input, textarea, select, or contenteditable, and are no-ops when no run is active.
 

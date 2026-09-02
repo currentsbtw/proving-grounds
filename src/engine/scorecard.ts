@@ -1,4 +1,5 @@
 import { SCORING } from '../data/scorecard';
+import { isLandTypeLine } from '../domain/typeLine';
 import { EVENT_TYPES } from './pressure';
 import type {
   EventType,
@@ -173,7 +174,15 @@ export interface ScoreOptions {
 
 const SEAT_IDS: SeatId[] = ['A', 'B', 'C'];
 
-const ZONES: ZoneId[] = ['library', 'hand', 'battlefield', 'graveyard', 'exile', 'command'];
+const ZONES: ZoneId[] = [
+  'library',
+  'hand',
+  'battlefield',
+  'graveyard',
+  'exile',
+  'command',
+  'stack',
+];
 
 // ---------------------------------------------------------------------------
 // Payload readers
@@ -240,8 +249,12 @@ function readEventType(payload: Payload, key: string): EventType | undefined {
     : undefined;
 }
 
+/**
+ * Front face only, the same reading the table made while the run was played —
+ * otherwise a `Sorcery // Land` counts as a land drop here and as a spell there.
+ */
 function isLandType(typeLine: string): boolean {
-  return /\bLand\b/i.test(typeLine);
+  return isLandTypeLine(typeLine);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +399,14 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
     totalTaxPaid: 0,
     counteredCasts: 0,
   };
+
+  /**
+   * Countered casts already scored off a *cast* entry, per commander iid — the
+   * legacy log shape. The matching "returned to the command zone" entry that
+   * follows is the same countered cast said twice, so it is skipped once here.
+   * Empty for every run recorded since the two cast paths were reconciled.
+   */
+  const legacyCounteredHome = new Map<string, number>();
 
   const clock: ClockStats = {
     faced: false,
@@ -541,6 +562,10 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
           const from = zones.get(iid);
           if (from === to) continue;
           if (to === 'battlefield') {
+            // Deployment is measured where the card lands, not where it came
+            // from, so a spell resolving off the stack tray scores exactly as
+            // the same spell played straight out of hand. Lands never reach the
+            // tray, so the land-drop tally is unaffected either way.
             const row = rowFor(entry.turn);
             if (isLand(iid)) row.landsPlayed += 1;
             else row.mvDeployed += boardContribution(iid);
@@ -572,12 +597,30 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
           // stack — the commander comes back more expensive either way.
           commander.casts += 1;
           commander.totalTaxPaid += readNumber(p, 'taxPaid') ?? 0;
-          if (isTrue(p, 'countered')) commander.counteredCasts += 1;
+          if (isTrue(p, 'countered')) {
+            // Legacy shape. A run recorded before the two cast paths were
+            // reconciled marked the *cast* countered the moment a seat spoke
+            // up, and then wrote the trip home as a second countered entry. Both
+            // describe one countered cast, so the second one is owed a skip.
+            commander.counteredCasts += 1;
+            if (iid) legacyCounteredHome.set(iid, (legacyCounteredHome.get(iid) ?? 0) + 1);
+          }
+        } else if (isTrue(p, 'countered')) {
+          // The trip back to the command zone, written when the counter actually
+          // resolved. This is the only entry a current run marks countered, and
+          // it is written identically whether the commander was cast straight
+          // out of the command zone or routed through the stack tray — which is
+          // what makes the two paths score the same.
+          const owed = iid ? (legacyCounteredHome.get(iid) ?? 0) : 0;
+          if (owed > 0 && iid) legacyCounteredHome.set(iid, owed - 1);
+          else commander.counteredCasts += 1;
         }
-        // Only a cast that actually landed moves the card. A countered cast logs
-        // `to: 'stack'`, and the follow-up entries (a move, or a second
-        // 'commander' entry for the trip back to the command zone) carry the
-        // real zone change, so applying anything else here would double-count.
+        // Only a cast that actually landed moves the card. A countered direct
+        // cast logs `to: 'stack'`, and the follow-up entries (a move, or a
+        // second 'commander' entry for the trip back to the command zone) carry
+        // the real zone change, so applying anything else here would
+        // double-count. A cast onto the tray writes no `to` at all: the 'move'
+        // entry beside it is the zone change.
         if (iid && readZone(p, 'to') === 'battlefield') {
           if (commander.firstCastTurn === null) commander.firstCastTurn = entry.turn;
           const row = rowFor(entry.turn);

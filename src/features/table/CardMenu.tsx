@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ZoneId } from '../../domain/types';
-import { cardName, commanderTax, useGameStore } from '../../state/gameStore';
+import { canCastToStack, cardName, commanderTax, useGameStore } from '../../state/gameStore';
+import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { MenuHead, MenuItem, MenuSep, MenuTitle, PopMenu } from './PopMenu';
 
 type OpenCardMenu = (iid: string, x: number, y: number) => void;
@@ -49,7 +50,17 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
   const moveCard = useGameStore((s) => s.moveCard);
   const addCounter = useGameStore((s) => s.addCounter);
   const castCommander = useGameStore((s) => s.castCommander);
+  const castToStack = useGameStore((s) => s.castToStack);
   const toggleTapped = useGameStore((s) => s.toggleTapped);
+
+  const castKey = useHotkeyStore((s) => keyLabel(s.keymap.castToStack));
+
+  /**
+   * The menu offers exactly what the store would do. A land does not use the
+   * stack and a token was never cast, but that judgement is the store's — asked
+   * here rather than repeated, so the row cannot outlive the rule behind it.
+   */
+  const stackable = useGameStore((s) => canCastToStack(s, iid));
 
   /** null = the "Custom counter…" row; a string = the inline name input is open. */
   const [custom, setCustom] = useState<string | null>(null);
@@ -74,13 +85,20 @@ function CardMenuBody({ iid, x, y, onClose }: MenuTarget & { onClose: () => void
       <MenuTitle>{name}</MenuTitle>
 
       {card.isCommander && card.zone === 'command' && (
-        <>
-          <MenuItem accent onSelect={run(() => castCommander(iid))} hint={`+${tax}`}>
-            Cast commander
-          </MenuItem>
-          <MenuSep />
-        </>
+        <MenuItem accent onSelect={run(() => castCommander(iid))} hint={`+${tax}`}>
+          Cast commander
+        </MenuItem>
       )}
+
+      {/* Casting to the stack holds the card in front of the board until it is
+          resolved, so a turn with responses in it stays in order. */}
+      {stackable && (
+        <MenuItem onSelect={run(() => castToStack(iid))} hint={castKey || undefined}>
+          Cast to stack
+        </MenuItem>
+      )}
+
+      {(stackable || (card.isCommander && card.zone === 'command')) && <MenuSep />}
 
       {card.zone === 'battlefield' && (
         <MenuItem onSelect={run(() => toggleTapped(iid))}>

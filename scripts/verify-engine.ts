@@ -10,7 +10,7 @@
  *
  *   npm run verify:engine
  *
- * Nine checks, each labelled:
+ * Twelve checks, each labelled:
  *
  *   (a) a seat with a queued event is eliminated — the event leaves the queue,
  *       the log says it was canceled, and the scorecard never lists it
@@ -30,14 +30,27 @@
  *       and the survivors inherit that larger board rather than a stale one
  *   (i) a counter held by a seat that dies is not left stranding the spell: the
  *       spell resolves, and a commander's cast count and tax read as one cast
+ *   (j) the manual stack tray moves cards the way the player declared: a
+ *       permanent resolves onto the battlefield, an instant into the graveyard,
+ *       a removed spell is binned, a land is refused without comment, and a
+ *       two-faced card is read on its front face alone
+ *   (k) a counter raised over a spell already on the tray lands on top of it —
+ *       answering it leaves the spell on the tray, resolving it bins the spell,
+ *       and a commander caught this way goes home with its tax accrued
+ *   (l) a card a counter is standing on is out of the player's hands: it cannot
+ *       be cast again (no tax accrues) and cannot be tidied off the tray; a dead
+ *       seat takes only its counter; a mulligan sweeps the tray back; and every
+ *       exit leaves the newest 'stack' entry reporting the tray's real depth
  *
- * (a) to (c), (h) and (i) need a run where the pod actually did the thing being
- * tested, so each one searches seeds until it finds one and prints which it
- * used. Failures are collected rather than thrown, so one execution reports
+ * (a) to (c), (h), (i), (k) and (l) need a run where the pod actually did the thing
+ * being tested, so each one searches seeds until it finds one and prints which
+ * it used. Failures are collected rather than thrown, so one execution reports
  * everything.
  */
 import {
+  canMulligan,
   cardsInZone,
+  isInstantOrSorceryCard,
   isLandCard,
   manaValueOf,
   useGameStore,
@@ -49,12 +62,14 @@ import type {
   CardData,
   CardInstance,
   Deck,
+  LogEntry,
   PressureEvent,
   RunRecord,
   RunResult,
   Seat,
   SeatId,
   Silhouette,
+  StackItem,
 } from '../src/domain/types.ts';
 
 const BRACKET = 4;
@@ -115,6 +130,48 @@ const DECK: Deck = {
   updatedAt: 0,
 };
 
+/**
+ * The stack checks need a spell that goes to the graveyard when it resolves, and
+ * the deck above is all permanents. Adding one to `DECK` would reshuffle every
+ * other check's seed search, so the instants live in a deck of their own that
+ * only (j) uses.
+ */
+const INSTANT = card('spl-volley', 'Grounds Volley', 2, 'Instant');
+
+/**
+ * The two shapes Scryfall prints as `Front // Back`. Read whole, the first is
+ * simultaneously a creature and an instant (so it resolved into the graveyard)
+ * and the second is simultaneously a sorcery and a land (so the tray refused it
+ * outright). Every classification the table makes is on the front face, and
+ * these two are what say so.
+ */
+const ADVENTURE = card(
+  'spl-errand',
+  'Grounds Errand',
+  3,
+  'Creature — Human Knight // Instant — Adventure',
+);
+const MODAL = card('spl-passage', 'Grounds Passage', 2, 'Sorcery // Land');
+
+const STACK_DECK: Deck = {
+  ...DECK,
+  id: 'verify-engine-stack-deck',
+  name: 'Engine Verification (stack)',
+  cards: [
+    ...DECK.cards,
+    { scryfallId: INSTANT.scryfallId, qty: 8 },
+    { scryfallId: ADVENTURE.scryfallId, qty: 6 },
+    { scryfallId: MODAL.scryfallId, qty: 6 },
+  ],
+};
+
+const STACK_CARD_DATA: Record<string, CardData> = {
+  ...CARD_DATA,
+  [INSTANT.scryfallId]: INSTANT,
+  [ADVENTURE.scryfallId]: ADVENTURE,
+  [MODAL.scryfallId]: MODAL,
+};
+
 // ---------------------------------------------------------------------------
 // Store plumbing
 // ---------------------------------------------------------------------------
@@ -164,6 +221,50 @@ function freshRun(seed: string): void {
   capturedRun = null;
   store().startRun(DECK, CARD_DATA, seed);
   store().resolveMulligan([]);
+}
+
+/** The same opening, on the deck that carries instants. */
+function freshStackRun(seed: string): void {
+  capturedRun = null;
+  store().startRun(STACK_DECK, STACK_CARD_DATA, seed);
+  store().resolveMulligan([]);
+}
+
+/** The same opening again, but with the mulligan still undecided. */
+function freshStackOpening(seed: string): void {
+  capturedRun = null;
+  store().startRun(STACK_DECK, STACK_CARD_DATA, seed);
+}
+
+/** The tray's top item, or undefined. */
+function stackTop(): StackItem | undefined {
+  return store().stack[store().stack.length - 1];
+}
+
+/** Every 'stack' entry the current run has written, in order. */
+function stackEntriesSoFar(): LogEntry[] {
+  return (store().run?.log ?? []).filter((entry) => entry.kind === 'stack');
+}
+
+/** The `depth` payload on the newest 'stack' entry, or null when none was written. */
+function loggedStackDepth(): number | null {
+  const entries = stackEntriesSoFar();
+  const depth = entries[entries.length - 1]?.payload.depth;
+  return typeof depth === 'number' ? depth : null;
+}
+
+/**
+ * Every way an item leaves the tray has to say so, and say it accurately: the
+ * `depth` on the newest 'stack' entry is the tray's own length. An exit that
+ * forgot to log leaves a stale depth behind, which is exactly what this catches.
+ */
+function checkStackDepth(label: string): void {
+  const logged = loggedStackDepth();
+  check(
+    label,
+    logged === store().stack.length,
+    `logged depth ${logged}, live stack ${store().stack.length}`,
+  );
 }
 
 /** Everything currently in front of the player or behind it in the queue. */
@@ -871,6 +972,516 @@ async function checkCanceledCounterResolves(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// (j) the tray hands cards back where the player said they were going
+// ---------------------------------------------------------------------------
+
+/** Whether the log carries a plain move entry for this exact trip. */
+function loggedMove(iid: string, from: string, to: string): boolean {
+  return (store().run?.log ?? []).some(
+    (entry) =>
+      entry.kind === 'move' &&
+      entry.payload.iid === iid &&
+      entry.payload.from === from &&
+      entry.payload.to === to,
+  );
+}
+
+async function checkStackTray(): Promise<void> {
+  const seed = 'engine-stack-tray';
+  freshStackRun(seed);
+  // Deep enough that a permanent, an instant and a land are all certainly in hand.
+  store().drawCards(40);
+
+  // --- a permanent goes to the battlefield ---------------------------------
+  const state = store();
+  const permanent = cardsInZone(state, 'hand').find(
+    (c) => !isLandCard(state, c) && !isInstantOrSorceryCard(state, c),
+  );
+  if (!permanent) {
+    failures.push('(j) no permanent in hand to cast');
+    return;
+  }
+  store().castToStack(permanent.iid);
+  check(
+    '(j) the cast card is on the stack',
+    store().cards[permanent.iid].zone === 'stack',
+    `zone ${store().cards[permanent.iid].zone}`,
+  );
+  check('(j) the tray holds one item', store().stack.length === 1, `${store().stack.length}`);
+  check('(j) the item is the spell', stackTop()?.kind === 'spell' && stackTop()?.iid === permanent.iid);
+  check('(j) leaving hand is a plain move entry', loggedMove(permanent.iid, 'hand', 'stack'));
+
+  store().resolveTop();
+  check(
+    '(j) a resolved permanent lands on the battlefield',
+    store().cards[permanent.iid].zone === 'battlefield',
+    `zone ${store().cards[permanent.iid].zone}`,
+  );
+  check('(j) the tray is empty again', store().stack.length === 0, `${store().stack.length}`);
+  checkStackDepth('(j) the resolve entry reports the depth it left behind');
+  check('(j) resolving is a plain move entry', loggedMove(permanent.iid, 'stack', 'battlefield'));
+
+  // --- an instant goes to the graveyard ------------------------------------
+  const instant = cardsInZone(store(), 'hand').find((c) => isInstantOrSorceryCard(store(), c));
+  if (!instant) {
+    failures.push('(j) no instant in hand to cast');
+    return;
+  }
+  store().castToStack(instant.iid);
+  store().resolveTop();
+  check(
+    '(j) a resolved instant goes to the graveyard',
+    store().cards[instant.iid].zone === 'graveyard',
+    `zone ${store().cards[instant.iid].zone}`,
+  );
+
+  // --- a spell taken off the tray is binned --------------------------------
+  const scrapped = cardsInZone(store(), 'hand').find(
+    (c) => !isLandCard(store(), c) && !isInstantOrSorceryCard(store(), c),
+  );
+  if (!scrapped) {
+    failures.push('(j) no second permanent in hand to scrap');
+    return;
+  }
+  store().castToStack(scrapped.iid);
+  const scrappedItem = stackTop();
+  store().removeStackItem(scrappedItem?.id ?? '');
+  check(
+    '(j) a removed spell is binned',
+    store().cards[scrapped.iid].zone === 'graveyard',
+    `zone ${store().cards[scrapped.iid].zone}`,
+  );
+  check('(j) removing empties the tray', store().stack.length === 0, `${store().stack.length}`);
+  checkStackDepth('(j) the remove entry reports the depth it left behind');
+
+  // --- an ability is just text ---------------------------------------------
+  store().pushAbility('  Saga chapter II  ');
+  check('(j) an ability is trimmed onto the tray', stackTop()?.label === 'Saga chapter II', String(stackTop()?.label));
+  store().pushAbility('   ');
+  check('(j) empty text is ignored', store().stack.length === 1, `${store().stack.length}`);
+  store().resolveTop();
+  check('(j) resolving an ability only pops it', store().stack.length === 0, `${store().stack.length}`);
+
+  // --- a land is refused without comment -----------------------------------
+  const land = cardsInZone(store(), 'hand').find((c) => isLandCard(store(), c));
+  if (!land) {
+    failures.push('(j) no land in hand');
+    return;
+  }
+  const before = store().run?.log.length ?? 0;
+  store().castToStack(land.iid);
+  check('(j) a land never reaches the tray', store().stack.length === 0, `${store().stack.length}`);
+  check('(j) the land stays in hand', store().cards[land.iid].zone === 'hand');
+  check('(j) the refusal says nothing', (store().run?.log.length ?? 0) === before);
+
+  // --- two faces: only the front one is read --------------------------------
+  const adventure = cardsInZone(store(), 'hand').find(
+    (c) => c.scryfallId === ADVENTURE.scryfallId,
+  );
+  const modal = cardsInZone(store(), 'hand').find((c) => c.scryfallId === MODAL.scryfallId);
+  if (!adventure || !modal) {
+    failures.push('(j) no two-faced card in hand to classify');
+    return;
+  }
+  check('(j) an Adventure creature is not an instant', !isInstantOrSorceryCard(store(), adventure));
+  check('(j) a Sorcery // Land is not a land', !isLandCard(store(), modal));
+
+  store().castToStack(adventure.iid);
+  store().resolveTop();
+  check(
+    '(j) an Adventure creature resolves onto the battlefield',
+    store().cards[adventure.iid].zone === 'battlefield',
+    `zone ${store().cards[adventure.iid].zone}`,
+  );
+
+  store().castToStack(modal.iid);
+  check(
+    '(j) a Sorcery // Land reaches the tray',
+    store().stack.length === 1,
+    `${store().stack.length}`,
+  );
+  store().resolveTop();
+  check(
+    '(j) it resolves into the graveyard on its front face',
+    store().cards[modal.iid].zone === 'graveyard',
+    `zone ${store().cards[modal.iid].zone}`,
+  );
+
+  // Five pushes with a resolve each, one push with a remove: twelve entries. The
+  // refused land and the empty ability text write nothing at all.
+  const stackEntries = (store().run?.log ?? []).filter((entry) => entry.kind === 'stack');
+  check('(j) every tray operation is logged', stackEntries.length === 12, `${stackEntries.length}`);
+
+  endRunQuietly('concede');
+  await settle();
+  const record = lastCapturedRun();
+  if (!record) {
+    failures.push('(j) no run captured off the store');
+    return;
+  }
+  const scorecard = scoreRun({ ...record, result: 'concede' });
+  const deployed = scorecard.timeline.reduce((n, r) => n + r.mvDeployed, 0);
+  // The two that landed: the plain permanent, and the Adventure creature the
+  // whole-string reading used to bin. The modal spell resolved to the graveyard.
+  const expectedDeployed =
+    (STACK_CARD_DATA[permanent.scryfallId ?? '']?.manaValue ?? -1) + ADVENTURE.manaValue;
+  check(
+    '(j) the permanents that resolved score as deployed',
+    deployed === expectedDeployed,
+    `${deployed} MV deployed, expected ${expectedDeployed}`,
+  );
+  check(
+    '(j) nothing on the tray counts as a land drop',
+    scorecard.timeline.every((r) => r.landsPlayed === 0),
+  );
+
+  summary.push(
+    `(j) seed ${seed}: permanent → battlefield, instant → graveyard, removed spell → graveyard, land refused, Adventure → battlefield and Sorcery // Land → graveyard on their front faces, ${stackEntries.length} stack entries`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (k) a counter raised over a spell already on the tray
+// ---------------------------------------------------------------------------
+
+async function checkStackedCounter(): Promise<void> {
+  // --- answered: the spell stays on the tray -------------------------------
+  const answered = armSeat('engine-stack-answer', 7);
+  if (!answered) {
+    failures.push('(k) no seed armed a seat within the search');
+    return;
+  }
+  store().drawCards(25);
+  const held = biggestInHand(store());
+  if (!held || manaValueOf(store(), held) < answered.armed.threshold) {
+    failures.push('(k) no spell in hand meets the threshold the seat held');
+    return;
+  }
+
+  store().castToStack(held.iid);
+  const raised = store().activeEvent;
+  check(
+    '(k) the seat answered the spell on the tray',
+    raised?.type === 'counter' && raised.targetIid === held.iid,
+    String(raised?.type),
+  );
+  check('(k) the counter is marked as stacked', raised?.severity.stacked === 1, JSON.stringify(raised?.severity));
+  check('(k) the spell is on the stack, not in hand', store().cards[held.iid].zone === 'stack');
+  check('(k) the counter sits on top of it', store().stack.length === 2 && stackTop()?.kind === 'counter');
+  check(
+    '(k) the counter names the seat',
+    stackTop()?.label ===
+      `Seat ${answered.armed.seatId} counters ${CARD_DATA[held.scryfallId ?? '']?.name}`,
+    String(stackTop()?.label),
+  );
+
+  // The tray refuses to resolve a counter: that one belongs to the event card.
+  store().resolveTop();
+  check('(k) the tray will not resolve the counter itself', store().stack.length === 2, `${store().stack.length}`);
+
+  store().respondToActiveEvent('forced it through');
+  check('(k) answering takes only the counter off', store().stack.length === 1 && stackTop()?.kind === 'spell');
+  checkStackDepth('(k) the answered counter is logged off the tray at the right depth');
+  check(
+    '(k) the answered counter says why it left',
+    stackEntriesSoFar().at(-1)?.payload.reason === 'answered',
+    String(stackEntriesSoFar().at(-1)?.payload.reason),
+  );
+  check(
+    '(k) the answered spell waits on the stack',
+    store().cards[held.iid].zone === 'stack',
+    `zone ${store().cards[held.iid].zone}`,
+  );
+  check('(k) the queue moved on', store().activeEvent?.id !== raised?.id);
+  store().resolveTop();
+  check(
+    '(k) it resolves onto the battlefield afterwards',
+    store().cards[held.iid].zone === 'battlefield',
+    `zone ${store().cards[held.iid].zone}`,
+  );
+  endRunQuietly('concede');
+  await settle();
+
+  // --- resolved: the spell is binned ---------------------------------------
+  const binned = armSeat('engine-stack-bin', 7);
+  if (!binned) {
+    failures.push('(k) no seed armed a seat for the resolved case');
+    return;
+  }
+  store().drawCards(25);
+  const doomed = biggestInHand(store());
+  if (!doomed || manaValueOf(store(), doomed) < binned.armed.threshold) {
+    failures.push('(k) no spell in hand meets the threshold for the resolved case');
+    return;
+  }
+  store().castToStack(doomed.iid);
+  store().resolveActiveEvent();
+  check('(k) resolving the counter clears both items', store().stack.length === 0, `${store().stack.length}`);
+  checkStackDepth('(k) the last of the two drops reports an empty tray');
+  check(
+    '(k) both drops say the counter resolved',
+    stackEntriesSoFar()
+      .slice(-2)
+      .every((entry) => entry.payload.op === 'remove' && entry.payload.reason === 'countered'),
+  );
+  check(
+    '(k) the countered spell is binned',
+    store().cards[doomed.iid].zone === 'graveyard',
+    `zone ${store().cards[doomed.iid].zone}`,
+  );
+  endRunQuietly('concede');
+  await settle();
+
+  // --- the commander: home with the tax accrued ----------------------------
+  const cmdRun = armSeat('engine-stack-cmd', COMMANDER.manaValue);
+  if (!cmdRun) {
+    failures.push('(k) no seed armed a seat at or under the commander MV');
+    return;
+  }
+  const commander = Object.values(store().cards).find((c) => c.isCommander);
+  if (!commander) {
+    failures.push('(k) the run has no commander instance');
+    return;
+  }
+
+  store().castToStack(commander.iid);
+  check(
+    '(k) the commander is on the stack',
+    store().cards[commander.iid].zone === 'stack',
+    `zone ${store().cards[commander.iid].zone}`,
+  );
+  check(
+    '(k) the cast was counted on the way',
+    store().commanderCasts[COMMANDER.scryfallId] === 1,
+    `${store().commanderCasts[COMMANDER.scryfallId]}`,
+  );
+  store().resolveActiveEvent();
+  check(
+    '(k) a countered commander goes back to the command zone',
+    store().cards[commander.iid].zone === 'command',
+    `zone ${store().cards[commander.iid].zone}`,
+  );
+  check('(k) the tray is empty after it', store().stack.length === 0, `${store().stack.length}`);
+
+  // The tax it accrued stays paid, so the second attempt costs more.
+  store().castToStack(commander.iid);
+  check('(k) the second cast is counted', store().commanderCasts[COMMANDER.scryfallId] === 2);
+  store().resolveTop();
+  check(
+    '(k) the second cast resolves onto the battlefield',
+    store().cards[commander.iid].zone === 'battlefield',
+    `zone ${store().cards[commander.iid].zone}`,
+  );
+
+  endRunQuietly('concede');
+  await settle();
+  const record = lastCapturedRun();
+  if (!record) {
+    failures.push('(k) no run captured off the store');
+    return;
+  }
+  const scorecard = scoreRun({ ...record, result: 'concede' });
+  check('(k) the scorecard counts two casts', scorecard.commander.casts === 2, `${scorecard.commander.casts}`);
+  check(
+    '(k) it charges the tax the second cast paid',
+    scorecard.commander.totalTaxPaid === 2,
+    `${scorecard.commander.totalTaxPaid}`,
+  );
+  check(
+    '(k) the countered cast is counted as countered',
+    scorecard.commander.counteredCasts === 1,
+    `${scorecard.commander.counteredCasts}`,
+  );
+  check(
+    '(k) the commander scores as deployed',
+    scorecard.commander.firstCastTurn !== null,
+    String(scorecard.commander.firstCastTurn),
+  );
+
+  summary.push(
+    `(k) seeds ${answered.seed} / ${binned.seed} / ${cmdRun.seed}: answered spell stayed on the tray, resolved one was binned, commander home at tax 2 (${scorecard.commander.casts} casts, ${scorecard.commander.counteredCasts} countered)`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (l) a card the tray has committed is out of the player's hands
+// ---------------------------------------------------------------------------
+
+/**
+ * The three ways the tray can be asked to do something it must refuse, and the
+ * one exit that is not driven by an event.
+ *
+ * A spell a seat has spoken up about is not the player's to cast again or to
+ * tidy away: the question in front of them is about that exact card, and either
+ * move would answer it behind their back. And an opening hand is only an opening
+ * hand while nothing has been declared cast — but a mulligan taken anyway must
+ * still put every card back rather than stranding one on the tray.
+ */
+async function checkStackGuards(): Promise<void> {
+  // --- the seat holding the counter dies -----------------------------------
+  const dying = armSeat('engine-stack-seatout', 7);
+  if (!dying) {
+    failures.push('(l) no seed armed a seat within the search');
+    return;
+  }
+  store().drawCards(25);
+  const stranded = biggestInHand(store());
+  if (!stranded || manaValueOf(store(), stranded) < dying.armed.threshold) {
+    failures.push('(l) no spell in hand meets the threshold the seat held');
+    return;
+  }
+  store().castToStack(stranded.iid);
+  check('(l) the counter is on top of the spell', store().stack.length === 2, `${store().stack.length}`);
+
+  store().adjustLife(dying.armed.seatId, -40);
+  check(
+    '(l) the dead seat takes only its counter off the tray',
+    store().stack.length === 1 && stackTop()?.kind === 'spell',
+    `${store().stack.length} left, top ${stackTop()?.kind}`,
+  );
+  check(
+    '(l) the spell is still owed a resolution',
+    store().cards[stranded.iid].zone === 'stack',
+    `zone ${store().cards[stranded.iid].zone}`,
+  );
+  check(
+    '(l) the drop says the seat went out',
+    stackEntriesSoFar().at(-1)?.payload.op === 'remove' &&
+      stackEntriesSoFar().at(-1)?.payload.reason === 'seat-out',
+    String(stackEntriesSoFar().at(-1)?.payload.reason),
+  );
+  checkStackDepth('(l) the seat-out drop reports the depth it left behind');
+  endRunQuietly('concede');
+  await settle();
+
+  // --- an intercepted card cannot then be cast onto the tray ---------------
+  // The interesting shape: a direct cast met by a counter leaves the card where
+  // it was cast from, so its zone alone still says "castable". Only the live
+  // counter says otherwise, and for the commander the cost of getting that
+  // wrong is a second cast counted and a second lot of tax accrued.
+  const held = armSeat('engine-stack-guard', COMMANDER.manaValue);
+  if (!held) {
+    failures.push('(l) no seed armed a seat at or under the commander MV');
+    return;
+  }
+  const commander = Object.values(store().cards).find((c) => c.isCommander);
+  if (!commander) {
+    failures.push('(l) the run has no commander instance');
+    return;
+  }
+  store().castCommander(commander.iid);
+  check(
+    '(l) the direct cast was intercepted',
+    store().activeEvent?.type === 'counter' && store().activeEvent?.targetIid === commander.iid,
+    String(store().activeEvent?.type),
+  );
+  check(
+    '(l) the intercepted commander waits in the command zone',
+    store().cards[commander.iid].zone === 'command',
+    `zone ${store().cards[commander.iid].zone}`,
+  );
+  const castsAfterFirst = store().commanderCasts[COMMANDER.scryfallId];
+  const beforeCast = store().run?.log.length ?? 0;
+
+  store().castToStack(commander.iid);
+  check(
+    '(l) a card held by a counter cannot be cast onto the tray',
+    store().stack.length === 0,
+    `${store().stack.length} on the tray`,
+  );
+  check(
+    '(l) the refused cast accrues no tax',
+    store().commanderCasts[COMMANDER.scryfallId] === castsAfterFirst,
+    `${store().commanderCasts[COMMANDER.scryfallId]} casts, was ${castsAfterFirst}`,
+  );
+  check(
+    '(l) the refused cast says nothing',
+    (store().run?.log.length ?? 0) === beforeCast,
+    `${(store().run?.log.length ?? 0) - beforeCast} entries written`,
+  );
+  endRunQuietly('concede');
+  await settle();
+
+  // --- a spell a counter is standing on cannot be tidied off the tray ------
+  const guarded = armSeat('engine-stack-remove', 7);
+  if (!guarded) {
+    failures.push('(l) no seed armed a seat for the removal guard');
+    return;
+  }
+  store().drawCards(25);
+  const under = biggestInHand(store());
+  if (!under || manaValueOf(store(), under) < guarded.armed.threshold) {
+    failures.push('(l) no spell in hand meets the threshold for the removal guard');
+    return;
+  }
+  store().castToStack(under.iid);
+  check('(l) the spell is on the tray under a counter', store().stack.length === 2);
+  const spellItem = store().stack.find((x) => x.kind === 'spell');
+  const beforeRemove = store().run?.log.length ?? 0;
+
+  store().removeStackItem(spellItem?.id ?? '');
+  check(
+    '(l) a spell a counter is standing on cannot be tidied away',
+    store().stack.length === 2,
+    `${store().stack.length}`,
+  );
+  check(
+    '(l) it is still on the stack',
+    store().cards[under.iid].zone === 'stack',
+    `zone ${store().cards[under.iid].zone}`,
+  );
+  check(
+    '(l) the refused removal says nothing',
+    (store().run?.log.length ?? 0) === beforeRemove,
+    `${(store().run?.log.length ?? 0) - beforeRemove} entries written`,
+  );
+  endRunQuietly('concede');
+  await settle();
+
+  // --- a mulligan sweeps the tray back into the library --------------------
+  const seed = 'engine-stack-mulligan';
+  freshStackOpening(seed);
+  const opening = store();
+  const spell = cardsInZone(opening, 'hand').find((c) => !isLandCard(opening, c));
+  if (!spell) {
+    failures.push('(l) no spell in the opening hand to declare');
+    return;
+  }
+  store().castToStack(spell.iid);
+  check(
+    '(l) declaring a cast retires the mulligan',
+    !canMulligan(store()),
+    'the opening hand is still offered as undecided',
+  );
+
+  store().takeMulligan();
+  check('(l) the mulligan clears the tray', store().stack.length === 0, `${store().stack.length}`);
+  check(
+    '(l) the declared card is back in the library or the fresh hand',
+    store().cards[spell.iid].zone !== 'stack',
+    `zone ${store().cards[spell.iid].zone}`,
+  );
+  check(
+    '(l) nothing is left in the stack zone',
+    cardsInZone(store(), 'stack').length === 0,
+    `${cardsInZone(store(), 'stack').length} card(s)`,
+  );
+  check(
+    '(l) the sweep says it was a mulligan',
+    stackEntriesSoFar().some(
+      (entry) => entry.payload.op === 'remove' && entry.payload.reason === 'mulligan',
+    ),
+  );
+  checkStackDepth('(l) the mulligan sweep reports an empty tray');
+  endRunQuietly('concede');
+  await settle();
+
+  summary.push(
+    `(l) seeds ${dying.seed} / ${held.seed} / ${guarded.seed} / ${seed}: seat-out left the spell owed, an intercepted commander refused a tray cast at no extra tax, a held spell refused removal, mulligan swept the tray`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // (e) determinism, with the new paths in the script
 // ---------------------------------------------------------------------------
 
@@ -878,7 +1489,9 @@ async function checkCanceledCounterResolves(): Promise<void> {
  * A scripted run that kills a seat mid-game, so the cancel path and the
  * disarm path are both inside what is being compared. Combat is answered rather
  * than taken, so the player never dies and the two executions cannot diverge on
- * a run that ended early.
+ * a run that ended early. The stack tray is in here too: its item ids and stamps
+ * come off the move counter rather than a nanoid or the clock, which is exactly
+ * the property this check exists to hold.
  */
 function scriptedRun(seed: string): RunRecord {
   freshRun(seed);
@@ -888,6 +1501,16 @@ function scriptedRun(seed: string): RunRecord {
     drainEventsWithoutDamage();
     store().drawCards(3);
     playLand();
+    if (turn === 3) {
+      store().pushAbility('Saga chapter II');
+      store().resolveTop();
+    }
+    if (turn === 5) {
+      const cast = biggestInHand(store());
+      if (cast) store().castToStack(cast.iid);
+      drainEventsWithoutDamage();
+      store().resolveTop();
+    }
     playBiggestSpell();
     drainEventsWithoutDamage();
     if (turn === 4) store().adjustLife('A', -40);
@@ -953,6 +1576,9 @@ async function main(): Promise<void> {
   await checkDeathSettlesOnNextAction();
   checkPeakBoardTracks();
   await checkCanceledCounterResolves();
+  await checkStackTray();
+  await checkStackedCounter();
+  await checkStackGuards();
   checkDeterminism();
 
   console.log('\nverify:engine');

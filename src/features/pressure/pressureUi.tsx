@@ -134,11 +134,17 @@ export function describeAnswers(
       break;
   }
 
+  // A counter raised off the tray sits on top of the spell it is aimed at, and
+  // both are printed there. "Force it through" reads as putting the spell on the
+  // table; what it actually does is take the counter off and leave the spell
+  // waiting, so the answer is worded the way every other event's is.
+  const stackedCounter = event.type === 'counter' && event.severity.stacked === 1;
+
   return {
     first:
       event.type === 'clock'
         ? 'Declare held interaction'
-        : event.type === 'counter'
+        : event.type === 'counter' && !stackedCounter
           ? 'Force it through'
           : 'I answer it',
     second,

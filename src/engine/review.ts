@@ -1,4 +1,5 @@
 import { REVIEW } from '../data/review';
+import { isLandTypeLine } from '../domain/typeLine';
 import type { Scorecard } from './scorecard';
 import type { LogEntry, RosterEntry, RunRecord, ZoneId } from '../domain/types';
 
@@ -78,7 +79,15 @@ export interface ReviewOptions {
 
 type Payload = Record<string, unknown>;
 
-const ZONES: ZoneId[] = ['library', 'hand', 'battlefield', 'graveyard', 'exile', 'command'];
+const ZONES: ZoneId[] = [
+  'library',
+  'hand',
+  'battlefield',
+  'graveyard',
+  'exile',
+  'command',
+  'stack',
+];
 
 function readString(payload: Payload, key: string): string | undefined {
   const value = payload[key];
@@ -110,8 +119,12 @@ function hasObject(payload: Payload, key: string): boolean {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Front face only, so the replay classifies a card exactly as the table did
+ * while it was being played — a `Sorcery // Land` is a spell in both readings.
+ */
 function isLandType(typeLine: string): boolean {
-  return /\bLand\b/i.test(typeLine);
+  return isLandTypeLine(typeLine);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +346,8 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
 
       case 'commander': {
         const iid = readString(p, 'iid');
-        // A countered cast logs `to: 'stack'`; only a cast that landed moves it.
+        // A countered direct cast logs `to: 'stack'` and a cast onto the stack
+        // tray logs no `to` at all; only a cast that landed moves the card.
         if (iid && readZone(p, 'to') === 'battlefield') {
           if (firstCommanderSeq === null) firstCommanderSeq = entry.seq;
           enter(iid, 'battlefield', entry, readZone(p, 'from'));

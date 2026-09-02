@@ -10,7 +10,13 @@ import {
 import type { CollisionDetection, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useCallback, useMemo, useState } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
-import { byArrival, canMulligan, commanderTax, useGameStore } from '../../state/gameStore';
+import {
+  byArrival,
+  canCastToStack,
+  canMulligan,
+  commanderTax,
+  useGameStore,
+} from '../../state/gameStore';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
@@ -19,6 +25,7 @@ import { CardView } from './CardView';
 import { Hand } from './Hand';
 import { MulliganBar } from './MulliganBar';
 import { askNumber, MenuHead, MenuItem, MenuSep, MenuTitle, PopMenu } from './PopMenu';
+import { StackTray, STACK_DROP_ID } from './StackTray';
 import { CommandZone, LibraryStack, ZoneStack } from './ZoneStack';
 import EventToast from '../pressure/EventToast';
 import './table.css';
@@ -72,6 +79,7 @@ function TableSurface() {
   const showMulligan = useGameStore(canMulligan);
 
   const moveCard = useGameStore((s) => s.moveCard);
+  const castToStack = useGameStore((s) => s.castToStack);
   const drawCards = useGameStore((s) => s.drawCards);
   const shuffleLibrary = useGameStore((s) => s.shuffleLibrary);
   const millCards = useGameStore((s) => s.millCards);
@@ -81,6 +89,9 @@ function TableSurface() {
   const keymap = useHotkeyStore((s) => s.keymap);
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Whether the card in the air is one the stack would take. Read at drag start
+  // so the tray's offer and the drop's outcome are the same rule.
+  const [canCast, setCanCast] = useState(false);
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
   const [libMenu, setLibMenu] = useState<{ x: number; y: number } | null>(null);
   // Which mulligan the bottoming UI belongs to. Deriving `bottoming` from it
@@ -99,6 +110,10 @@ function TableSurface() {
       graveyard: [],
       exile: [],
       command: [],
+      // Cards waiting on the stack are drawn by the tray, not by a zone here:
+      // the bucket exists so a cast card leaves the hand the moment it is
+      // declared.
+      stack: [],
     };
     for (const card of Object.values(cards)) {
       if (card.zone !== 'library') buckets[card.zone].push(card);
@@ -127,13 +142,30 @@ function TableSurface() {
   const closeLibMenu = useCallback(() => setLibMenu(null), []);
 
   function onDragStart(e: DragStartEvent): void {
-    setActiveId(String(e.active.id));
+    const iid = String(e.active.id);
+    setActiveId(iid);
+    // Asked once, of the store that owns the answer, before the tray decides
+    // whether to open at all. Nothing about the card changes mid-drag.
+    setCanCast(canCastToStack(useGameStore.getState(), iid));
   }
 
   function onDragEnd(e: DragEndEvent): void {
     setActiveId(null);
+    setCanCast(false);
     if (!e.over) return;
-    const target = DROP_ZONES[String(e.over.id)];
+    // The stack is not a zone you move a card to, it is a cast: the store owns
+    // the tax, the log line and the seat that may be holding up interaction.
+    // Only a card the store would actually cast is taken here; anything else
+    // falls through to the zone table, which has no entry for the tray, and so
+    // the card goes back where it came from rather than vanishing quietly.
+    const over = String(e.over.id);
+    if (over === STACK_DROP_ID) {
+      if (canCastToStack(useGameStore.getState(), String(e.active.id))) {
+        castToStack(String(e.active.id));
+        return;
+      }
+    }
+    const target = DROP_ZONES[over];
     if (!target) return;
     moveCard(String(e.active.id), target.zone, target.position);
   }
@@ -161,7 +193,10 @@ function TableSurface() {
       collisionDetection={collisionDetection}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onDragCancel={() => setActiveId(null)}
+      onDragCancel={() => {
+        setActiveId(null);
+        setCanCast(false);
+      }}
     >
       <section
         className={`pg-table tbl-root${activeId ? ' tbl-dragging' : ''}`}
@@ -173,6 +208,8 @@ function TableSurface() {
             the top of the board without taking a pixel from it, without
             covering the hand, and outside every drop surface. */}
         <EventToast />
+
+        <StackTray dragging={activeId !== null} canDrop={canCast} />
 
         <div className="tbl-strip">
           <div className="tbl-stack-group">

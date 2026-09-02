@@ -1,0 +1,323 @@
+/* ── Proving Grounds — the stack tray ────────────────────────────────────── */
+
+/* A band ruled off the board above and the hand below, in the same ink as the
+   strip it sits on. It is not a panel: the play surface has rules, not boxes,
+   and this one only exists while something is waiting on it.
+
+   It is also capped. A deep turn scrolls its own list rather than pushing the
+   board out of the window: whatever the stack is holding, the head that names
+   it and the field that adds to it stay where they were printed. */
+.tbl-tray {
+  background: var(--ground);
+  border-top: 1px solid var(--line);
+  padding: 5px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+  max-height: min(220px, 34vh);
+}
+
+/* Head ------------------------------------------------------------------- */
+
+.tbl-tray-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The printed label is `.panel-heading` from the base sheet; it only has to keep
+   its width in the head's flex. */
+.tbl-tray-title {
+  flex: none;
+}
+
+.tbl-tray-count {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Says what the order means, once, where the order is read. */
+.tbl-tray-caption {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The pointer's way to the ability field; the keyboard has its own key for it.
+   The readout's quiet word, which already takes the 24px target as padding and
+   hands it straight back. This one only refuses to break in two. */
+.tbl-tray-quiet {
+  white-space: nowrap;
+}
+
+/* Rows ------------------------------------------------------------------- */
+
+/* Ruled rows, top of the stack first. This is the part that gives when the band
+   runs out of height: the list scrolls, the head and the foot do not move. */
+.tbl-tray-list {
+  flex: 1 1 auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.tbl-tray-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 2px 0;
+  border-top: 1px solid var(--line);
+}
+
+.tbl-tray-row:first-child {
+  border-top: 0;
+}
+
+.tbl-tray-pos {
+  flex: none;
+  min-width: 13px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The readout's chip, held to one printed slot so the labels beside them start
+   in the same place row after row. */
+.tbl-tray-chip {
+  flex: none;
+  min-width: 62px;
+  text-align: center;
+}
+
+/* The counter wears the counterspell mnemonic the way HIT wears the accent, and
+   carries its own printed word with it, so it never reads by colour alone. */
+.rd-chip.is-counter {
+  border-color: var(--mana-u);
+  color: var(--mana-u);
+}
+
+/* Card names and typed trigger text both land here, and either can run past any
+   width the strip has. */
+.tbl-tray-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+/* The same small square the card face prints its mana value in. */
+.tbl-tray-mv {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 0;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One slot for the row's actions, wide enough for the top row's pair, so the
+   mana values in front of it stay in a column and every row's quiet word ends
+   on the same right edge. */
+.tbl-tray-act {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 152px;
+}
+
+/* The one control on the surface, square and outlined like the readout's. */
+.tbl-tray-resolve {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* Accent is spent on whatever needs an answer now. With an event waiting, that
+   is the event card, and this button stands down to the printed rule. */
+.tbl-tray-resolve.is-accent:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.tbl-tray-resolve:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.tbl-tray-resolve:disabled {
+  opacity: 0.45;
+}
+
+.tbl-tray-resolve.is-accent:not(:disabled) .rd-key {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Taking something back off the stack is a correction, not a play: the readout's
+   quiet word, which here sits in a row rather than at the end of one. */
+.tbl-tray-remove {
+  flex: none;
+  margin-left: 0;
+}
+
+/* Where the counter is answered, stated where the dead button is. */
+.tbl-tray-note {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* Foot ------------------------------------------------------------------- */
+
+.tbl-tray-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tbl-tray-foot input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 25px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+
+/* Square and outlined: this is the play surface, and the 6px slab belongs to the
+   panels between runs. */
+.tbl-tray-push {
+  flex: none;
+  min-width: 90px;
+  min-height: 25px;
+  padding: 3px 9px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.tbl-tray-push:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+/* Drop rule -------------------------------------------------------------- */
+
+/* The one thing in the band that takes a card, and the only thing: a card let
+   go over a row, the note or the ability field is a card let go over the tray,
+   not a cast. Only a surface while a card the stack would accept is in the air,
+   and drawn the way the library's drop strips are — a dashed rule that names
+   itself, going solid accent when the card is over it. Deep enough to be aimed
+   at without care. */
+.tbl-tray-drop {
+  display: none;
+}
+
+.tbl-tray-drop.is-live {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 1px dashed var(--line);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.tbl-tray-drop.is-live.is-over {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tbl-tray-drop.is-live {
+    transition: none;
+  }
+}
+
+/* Narrow ----------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .tbl-tray {
+    padding: 5px 8px 6px;
+  }
+
+  .tbl-tray-chip {
+    letter-spacing: 0.06em;
+  }
+}
+
+/* Below the strip's floor the whole surface scrolls sideways. The strip holds
+   its contents' width because four stacks and a hand cannot be squeezed into
+   it; the tray has no such floor, because its one long line is a card name and
+   a card name wraps. So it takes the container's width and the board never
+   grows a scrollbar on the tray's account. */
+@media (max-width: 940px) {
+  .tbl-tray-label {
+    min-width: 0;
+  }
+}
+
+/* Short ------------------------------------------------------------------ */
+
+/* A browser at 200% zoom leaves a few hundred pixels of board. The hand below
+   carries a real floor and the board above has a readability floor of its own,
+   so between the three it is the tray that gives: the list shortens and scrolls
+   sooner rather than the two halves of the battlefield closing up. */
+@media (max-height: 560px) {
+  .tbl-tray {
+    /* Keep the content height (head, one row, foot) rather than letting the
+       grid squeeze the band; the list scrolls inside and the table scrolls
+       when even that does not fit. */
+    min-height: auto;
+    max-height: 96px;
+  }
+}

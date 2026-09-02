@@ -1,4 +1,16 @@
-export type ZoneId = 'library' | 'hand' | 'battlefield' | 'graveyard' | 'exile' | 'command';
+/**
+ * `stack` is bookkeeping, not a rules engine: a card sits there only while the
+ * player has declared it cast and has not yet said what happened to it. Nothing
+ * moves onto or off it except by the player saying so.
+ */
+export type ZoneId =
+  | 'library'
+  | 'hand'
+  | 'battlefield'
+  | 'graveyard'
+  | 'exile'
+  | 'command'
+  | 'stack';
 export type Phase = 'untap' | 'upkeep' | 'draw' | 'main1' | 'combat' | 'main2' | 'end';
 
 /** Cached subset of a Scryfall card object. */
@@ -126,6 +138,27 @@ export interface CounterArmed {
   threshold: number;
 }
 
+export type StackItemKind = 'spell' | 'ability' | 'counter';
+
+/**
+ * One entry in the manual stack tray. The tray holds the order the player
+ * declared and hands it back top first; it never decides what triggers, who has
+ * priority, or whether any of it is legal.
+ */
+export interface StackItem {
+  /** Deterministic per run — `stk-<moveCounter stamp>`, never random. */
+  id: string;
+  kind: StackItemKind;
+  /** Card name for a spell, the typed text for an ability, the seat's claim for a counter. */
+  label: string;
+  /** `spell`: the card, whose zone is 'stack'. `counter`: the spell it is held over. */
+  iid?: string;
+  /** `counter` only: the `PressureEvent.id` the tray item stands for. */
+  eventId?: string;
+  /** `counter` only: the seat holding it. */
+  seatId?: SeatId;
+}
+
 export type LogKind =
   | 'move'
   | 'draw'
@@ -147,6 +180,8 @@ export type LogKind =
   | 'event'
   /** The player claimed an answer on the table and negated an event. */
   | 'respond'
+  /** Something was put on, resolved off, or taken off the manual stack tray. */
+  | 'stack'
   /** A seat's threat meter or silhouette changed outside a window. */
   | 'threat';
 

@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CardData, CardInstance } from '../../domain/types';
+import { isLandTypeLine } from '../../domain/typeLine';
 import { useGameStore } from '../../state/gameStore';
 import { cardHeight, DraggableCardView } from './CardView';
 
@@ -9,11 +10,16 @@ const BF_CARD_MAX = 150;
 /** Readability floor. Past this a full half scrolls instead of shrinking. */
 const BF_CARD_MIN = 96;
 
+/**
+ * Which half of the board a permanent stands in. The shared front-face reading
+ * is the whole test, so a modal double-faced card sorts by the face it was
+ * played as rather than by the land printed on its back.
+ */
 function isLand(card: CardInstance, cardData: Record<string, CardData>): boolean {
   const typeLine = card.isToken
     ? (card.tokenSpec?.typeLine ?? '')
     : (card.scryfallId ? (cardData[card.scryfallId]?.typeLine ?? '') : '');
-  return typeLine.includes('Land');
+  return isLandTypeLine(typeLine);
 }
 
 /**

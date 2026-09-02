@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core';
 import type { DraggableAttributes } from '@dnd-kit/core';
 import { useCallback, useRef } from 'react';
 import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import { isLandTypeLine } from '../../domain/typeLine';
 import type { CardData, CardInstance } from '../../domain/types';
 import { useGameStore } from '../../state/gameStore';
 import { normalizeKey, useHotkeyStore } from '../../state/hotkeyStore';
@@ -33,7 +34,7 @@ function manaValueBadge(
 ): number | null {
   if (card.isToken || card.faceDown || faceDown) return null;
   if (!data) return null;
-  if (data.manaValue === 0 && data.typeLine.includes('Land')) return null;
+  if (data.manaValue === 0 && isLandTypeLine(data.typeLine)) return null;
   return data.manaValue;
 }
 
@@ -225,6 +226,9 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
       // instead of stepping the phase behind it. (The preview key needs no such
       // attribute: the global listener stands down for it everywhere.)
       data-card-activate={onActivate ? '' : undefined}
+      // Which card the keyboard is on, for the global hotkeys that act on the
+      // focused card without the card itself having to own the binding.
+      data-card-iid={card.iid}
       onPointerEnter={preview.onPointerEnter}
       onPointerMove={preview.onPointerMove}
       onPointerLeave={preview.onPointerLeave}

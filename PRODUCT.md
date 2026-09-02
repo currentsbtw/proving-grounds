@@ -41,13 +41,13 @@ Hard non-goals (policy, not backlog):
 - No multiplayer. No deck builder.
 - Not a judge of humans; teaches nothing about table politics.
 
-Confirmed capabilities (built as of Sep 1, 2026): M0 goldfish table (six zones, phase stepping, four life totals, commander tax and damage, tokens, counters, append-only undo, run log), M1 pressure layer (six event types, bracket hazard curves, threat meters, silhouettes, race clock with respawn, counterable commander casts), M2 scorecard (seven metrics, timeline chart, event ledger, deck profile with tags, same-seed replay/compare, shareable PNG).
+Confirmed capabilities (built as of Sep 1, 2026): M0 goldfish table (six zones, phase stepping, four life totals, commander tax and damage, tokens, counters, append-only undo, run log), M1 pressure layer (six event types, bracket hazard curves, threat meters, silhouettes, race clock with respawn, counterable commander casts), M2 scorecard (seven metrics, timeline chart, event ledger, deck profile with tags, same-seed replay/compare, shareable PNG). Stack tray (added Sep 2, 2026): an opt-in manual last-in-first-out tray on the table; the player casts spells to it, pushes named abilities or triggers, and resolves the top item; seat counterspells land on a stacked spell as an item above it. The app records the declared order and hands back one item at a time; it never decides what triggers, who acts next, or legality, and the word "priority" does not appear in copy. Commander's free first mulligan (CR 103.5c) shipped the same day.
 
 Committed next: M3 advisory judge (LLM grounded in the Comprehensive Rules, cites rule numbers, declines over guessing, advisory only; first backend feature). Ships only at >=95% agreement on a RulesGuru-style eval.
 
 Technical: React + TypeScript + Vite static SPA, Zustand, Dexie/IndexedDB, seeded RNG (same seed = identical run). No accounts, no server, no analytics. Tuning knobs live in data files (`src/data/pressure.ts`, `src/data/scorecard.ts`).
 
-Terminology (use as-is in copy): run, seed, bracket (1-5), seat (A/B/C), threat, silhouette, event, window (opponent window), clock (race clock), wrath/wipe, tax (commander tax), MV (mana value), keep/mull, scorecard, profile, replay, compare.
+Terminology (use as-is in copy): run, seed, bracket (1-5), seat (A/B/C), threat, silhouette, event, window (opponent window), clock (race clock), wrath/wipe, tax (commander tax), MV (mana value), keep/mull, stack (the stack tray; items are spells, abilities, counterspells; "resolve" pops the top), scorecard, profile, replay, compare.
 
 Undecided product facts:
 - Threat meter tuning (rise per window, jump per event, decay per damage) awaits outside-tester feedback.
@@ -55,6 +55,7 @@ Undecided product facts:
 - Mobile layout is explicitly "later, only if earned." The desktop shell holds without horizontal scroll down to about 820px wide (audited 2026-09-01); below 1280px the readout column narrows and seat rows fold, below 940px the bottom strip scrolls.
 - Monetization is not planned; the name shares a card name and would need a recheck before any monetization.
 - Importing opponent decklists to "simulate a pod" (requested 2026-09-01) crosses the no-AI-opponents non-goal. The spec-safe version is list-derived seat pressure profiles: a seat imports a list only to set its threat curve, wipe density and interaction count. Not scheduled.
+- The stack tray routes a resolved card by its front-face type (permanent to battlefield, instant or sorcery to graveyard). This is the same class of type-line read as the battlefield's land row, but it is the closest the app comes to resolution automation; if real runs show it guessing wrong (flashback, split cards, spells that make permanents), the fallback is to resolve to a player-chosen zone. A standalone stack lesson mode was considered on Sep 2, 2026 and dropped in favour of the tray inside real runs.
 - Free placement or a snapping grid on the battlefield (requested 2026-09-01). The board is a flow layout; grouping matters more than position. Revisit after more real runs.
 
 ## Brand Commitments

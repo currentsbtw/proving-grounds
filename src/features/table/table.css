@@ -4,8 +4,10 @@
   padding: 0;
   overflow: hidden;
   display: grid;
-  /* battlefield · bottom strip */
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* battlefield · stack tray · bottom strip. The tray row is empty and zero-high
+     until something is waiting on the stack, so the default loop loses nothing
+     to it and the board is what absorbs it when it opens. */
+  grid-template-rows: minmax(0, 1fr) auto auto;
   min-height: 0;
 }
 
@@ -1005,4 +1007,15 @@
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
+}
+
+/* Short windows (200% zoom on a laptop). The board keeps room for two rows of
+   floor-width cards; if the tray and the strip cannot fit under that, the table
+   scrolls vertically rather than closing the battlefield to a few pixels. This
+   block sits after the 940px rules so its overflow-y wins there too. */
+@media (max-height: 560px) {
+  .pg-table.tbl-root {
+    grid-template-rows: minmax(136px, 1fr) auto auto;
+    overflow-y: auto;
+  }
 }

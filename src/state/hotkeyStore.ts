@@ -9,6 +9,9 @@ export type ActionId =
   | 'untap'
   | 'mulligan'
   | 'preview'
+  | 'castToStack'
+  | 'resolveTop'
+  | 'pushAbility'
   | 'focusNote'
   | 'respondOne'
   | 'respondTwo'
@@ -41,6 +44,19 @@ export const HOTKEY_ACTIONS: readonly HotkeyAction[] = [
     note: 'only while a card has keyboard focus',
     defaultKey: 'v',
   },
+  {
+    id: 'castToStack',
+    label: 'Cast the focused card to the stack',
+    note: 'only while a card has keyboard focus',
+    defaultKey: 'c',
+  },
+  {
+    id: 'resolveTop',
+    label: 'Resolve the top of the stack',
+    note: 'only while the stack has an item',
+    defaultKey: 'r',
+  },
+  { id: 'pushAbility', label: 'Add an ability to the stack', defaultKey: 'a' },
   { id: 'focusNote', label: 'Log a note', defaultKey: 'n' },
   {
     id: 'respondOne',

@@ -41,6 +41,7 @@ import {
 import type {
   CardData,
   Deck,
+  LogEntry,
   RosterEntry,
   RunRecord,
   RunResult,
@@ -130,7 +131,15 @@ const DECK_SIZE = DECK_CARDS.reduce((n, c) => n + c.qty, 0);
 
 const store = () => useGameStore.getState();
 const SEAT_IDS: SeatId[] = ['A', 'B', 'C'];
-const ZONES: ZoneId[] = ['library', 'hand', 'battlefield', 'graveyard', 'exile', 'command'];
+const ZONES: ZoneId[] = [
+  'library',
+  'hand',
+  'battlefield',
+  'graveyard',
+  'exile',
+  'command',
+  'stack',
+];
 
 /** Σ MV of the player's nonland, non-token permanents — the scorer's board value. */
 function boardValue(state: GameState): number {
@@ -457,6 +466,247 @@ function playMulliganRun(seed: string, mulligans = 1): { record: RunRecord; hand
 }
 
 // ---------------------------------------------------------------------------
+// The stack tray, scored against the direct cast
+// ---------------------------------------------------------------------------
+
+const PARITY_TURNS = 8;
+
+/**
+ * The same game twice: once played straight onto the battlefield, once routed
+ * through the manual stack tray. The tray is bookkeeping of declared order, so
+ * it must leave no fingerprint on the numbers — the same cards deployed on the
+ * same turns, the same commander casts, the same tax, the same downtime.
+ *
+ * Neither variant consumes rng, and the tray resolves inside the same turn it
+ * was cast in, so both executions present the engine an identical board at every
+ * window and therefore roll identical windows. The one thing that would split
+ * them is a seat holding up interaction — an intercepted spell waits in hand,
+ * where a stacked one waits on the tray — so a seed that arms one is discarded
+ * and the search moves on.
+ */
+function playParityRun(seed: string, viaStack: boolean): RunRecord {
+  capturedRun = null;
+  oracle = freshOracle();
+  const policy = freshPolicy();
+
+  store().startRun(DECK, CARD_DATA, seed);
+  store().resolveMulligan([]);
+
+  function cast(iid: string, commander: boolean): void {
+    if (viaStack) {
+      store().castToStack(iid);
+      store().resolveTop();
+    } else if (commander) {
+      store().castCommander(iid);
+    } else {
+      store().moveCard(iid, 'battlefield');
+    }
+    drainEvents(policy);
+  }
+
+  for (let turn = 1; turn <= PARITY_TURNS; turn++) {
+    if (!store().run) throw new Error(`parity run ended early at turn ${turn}`);
+    drainEvents(policy);
+    answerClock(policy);
+    if (turn > 1) store().drawCards(3);
+    playLand();
+
+    for (let i = 0; i < 2; i++) {
+      const state = store();
+      const spell = cardsInZone(state, 'hand')
+        .filter((c) => !isLandCard(state, c))
+        .sort((a, b) => manaValueOf(state, b) - manaValueOf(state, a))[0];
+      if (!spell) break;
+      cast(spell.iid, false);
+    }
+
+    if (turn >= 4) {
+      // A commander the pod binned goes back to the command zone, exactly as the
+      // main script does it, so tax and re-casts happen in both variants alike.
+      const stranded = [
+        ...cardsInZone(store(), 'graveyard'),
+        ...cardsInZone(store(), 'exile'),
+      ].find((c) => c.isCommander);
+      if (stranded) store().moveCard(stranded.iid, 'command');
+      const commander = cardsInZone(store(), 'command').find((c) => c.isCommander);
+      if (commander) cast(commander.iid, true);
+    }
+
+    drainEvents(policy);
+    answerClock(policy);
+    if (turn < PARITY_TURNS) store().nextTurn();
+  }
+
+  endRunQuietly('concede');
+  const finished = lastCapturedRun();
+  if (!finished) throw new Error('no parity run captured off the store');
+  const end = finished.log[finished.log.length - 1];
+  const endedAt = typeof end?.payload.endedAt === 'number' ? end.payload.endedAt : Date.now();
+  return { ...finished, endedAt, result: 'concede' };
+}
+
+/** Whether a seat held up interaction anywhere in this run. */
+function sawCounter(record: RunRecord): boolean {
+  return record.log.some((entry) => entry.payload.eventType === 'counter');
+}
+
+/** A seed whose parity script neither variant gets countered in, or null. */
+function findParitySeed(): { seed: string; direct: RunRecord; stacked: RunRecord } | null {
+  for (let i = 0; i < 40; i++) {
+    const seed = `${SEED}-parity-${i}`;
+    const direct = playParityRun(seed, false);
+    if (sawCounter(direct)) continue;
+    const stacked = playParityRun(seed, true);
+    if (sawCounter(stacked)) continue;
+    return { seed, direct, stacked };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// The two cast paths under a counter
+// ---------------------------------------------------------------------------
+
+/** What the player did about the counter the seat put up. */
+type Disposition = 'answered' | 'letThrough';
+
+/**
+ * A seed whose pod is holding up interaction at or under the commander's mana
+ * value, played straight to the turn it happens on. Nothing is cast during the
+ * search, so both variants of the fixture below reach this point identically.
+ */
+function armSeatForCommander(): { seed: string; threshold: number } | null {
+  for (let i = 0; i < 40; i++) {
+    const seed = `${SEED}-counter-${i}`;
+    capturedRun = null;
+    oracle = freshOracle();
+    store().startRun(DECK, CARD_DATA, seed);
+    store().resolveMulligan([]);
+    for (let turn = 1; turn <= 12; turn++) {
+      store().nextTurn();
+      if (!store().run) break;
+      if (store().clock) store().declareInteraction();
+      const armed = store().counterArmed;
+      if (armed && armed.threshold <= COMMANDER.manaValue) return { seed, threshold: armed.threshold };
+    }
+  }
+  return null;
+}
+
+/**
+ * The same decision twice: a commander met by a counterspell, cast straight out
+ * of the command zone once and routed through the stack tray once, with the
+ * player answering the counter (or letting it through) identically both times.
+ *
+ * The two paths used to disagree about what that decision was worth. The direct
+ * cast marked itself countered the instant a seat spoke up, so answering the
+ * counter still scored a countered cast; the tray, which cannot know at cast
+ * time, scored none. Only the entry written when the counter actually resolves
+ * is entitled to say so, and this is the fixture that holds both paths to it.
+ *
+ * The run is cut short the moment the counter is settled: nothing after it is
+ * part of the comparison, and stopping there is what keeps the two executions
+ * from diverging on a later window.
+ */
+function playCounterRun(seed: string, viaStack: boolean, disposition: Disposition): RunRecord {
+  capturedRun = null;
+  oracle = freshOracle();
+  store().startRun(DECK, CARD_DATA, seed);
+  store().resolveMulligan([]);
+  for (let turn = 1; turn <= 12; turn++) {
+    store().nextTurn();
+    if (!store().run) throw new Error(`counter run ${seed} ended during the run-up`);
+    if (store().clock) store().declareInteraction();
+    if (store().counterArmed) break;
+  }
+
+  const commander = cardsInZone(store(), 'command').find((c) => c.isCommander);
+  if (!commander) throw new Error('the counter run has no commander in the command zone');
+
+  if (viaStack) store().castToStack(commander.iid);
+  else store().castCommander(commander.iid);
+
+  const raised = store().activeEvent;
+  if (raised?.type !== 'counter') throw new Error('the seat did not answer the commander');
+
+  if (disposition === 'answered') {
+    store().respondToActiveEvent('held protection');
+    // The direct path's spell finishes its interrupted trip on the spot; the
+    // tray's waits its turn, which is the player saying "and now it resolves".
+    if (viaStack) store().resolveTop();
+  } else {
+    store().resolveActiveEvent();
+  }
+
+  endRunQuietly('concede');
+  const finished = lastCapturedRun();
+  if (!finished) throw new Error('no counter run captured off the store');
+  const end = finished.log[finished.log.length - 1];
+  const endedAt = typeof end?.payload.endedAt === 'number' ? end.payload.endedAt : Date.now();
+  return { ...finished, endedAt, result: 'concede' };
+}
+
+/**
+ * A run in the shape the store wrote before the two cast paths were reconciled:
+ * the cast entry claims `countered` alongside its `castNumber`, and the trip
+ * home claims it again. That is one countered cast said twice, and a scorer that
+ * counts the new shape must not read the old one as two.
+ */
+function legacyCounteredRun(): RunRecord {
+  const iid = 'legacy-cmd-instance';
+  const roster: Record<string, RosterEntry> = {
+    [iid]: {
+      scryfallId: COMMANDER.scryfallId,
+      name: COMMANDER.name,
+      manaValue: COMMANDER.manaValue,
+      typeLine: COMMANDER.typeLine,
+      isCommander: true,
+    },
+  };
+  const entry = (
+    seq: number,
+    kind: LogEntry['kind'],
+    message: string,
+    payload: Record<string, unknown>,
+  ): LogEntry => ({ seq, turn: 4, phase: 'main1', kind, message, payload, at: 0 });
+
+  return {
+    id: 'legacy-countered-run',
+    deckId: DECK.id,
+    deckName: DECK.name,
+    seed: 'legacy-countered',
+    bracket: BRACKET,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'concede',
+    roster,
+    log: [
+      entry(1, 'run', 'Run started', { bracket: BRACKET }),
+      entry(2, 'commander', 'Cast (cast #1, tax +0). Met by a counter', {
+        iid,
+        name: COMMANDER.name,
+        scryfallId: COMMANDER.scryfallId,
+        castNumber: 1,
+        taxPaid: 0,
+        from: 'command',
+        to: 'stack',
+        countered: true,
+      }),
+      entry(3, 'commander', 'Countered. Returned to the command zone', {
+        iid,
+        name: COMMANDER.name,
+        scryfallId: COMMANDER.scryfallId,
+        countered: true,
+        from: 'command',
+        to: 'command',
+        nextTax: 2,
+      }),
+      entry(4, 'run', 'Run ended: concede', { result: 'concede' }),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
 
@@ -674,6 +924,78 @@ function main(): void {
     firstDifference(byName, scorecard),
   );
 
+  // --- the stack tray scores as the direct cast ----------------------------
+  let parityLine: string | null = null;
+  const parity = findParitySeed();
+  check('a parity seed was found', parity !== null, 'no uncountered seed in 40 tries');
+  if (parity) {
+    const direct = scoreRun(parity.direct);
+    const stacked = scoreRun(parity.stacked);
+    checkEqual('casting via the stack deploys the same MV per turn', stacked.deployment, direct.deployment);
+    checkEqual('casting via the stack scores the same commander line', stacked.commander, direct.commander);
+    checkEqual(
+      'casting via the stack scores the same turn timeline',
+      stacked.timeline,
+      direct.timeline,
+    );
+    check(
+      'the stacked variant really went through the tray',
+      parity.stacked.log.some((entry) => entry.kind === 'stack' && entry.payload.op === 'push'),
+    );
+    check(
+      'the direct variant never touched the tray',
+      !parity.direct.log.some((entry) => entry.kind === 'stack'),
+    );
+    check(
+      'nothing was left on the stack at the end',
+      replayZones(parity.stacked).stack.length === 0,
+      `${replayZones(parity.stacked).stack.length} left`,
+    );
+    parityLine = `stack parity        seed ${parity.seed}: ${direct.commander.casts} commander casts, tax ${direct.commander.totalTaxPaid}, ${direct.commander.downtimeTurns} turns down — identical via the tray`;
+  }
+
+  // --- and it scores the same under a counter, either way it is settled -----
+  let counterLine: string | null = null;
+  const armed = armSeatForCommander();
+  check('a counter-armed seed was found', armed !== null, 'no armed seed in 40 tries');
+  if (armed) {
+    const dispositions: Disposition[] = ['answered', 'letThrough'];
+    const scored: Record<string, number> = {};
+    for (const disposition of dispositions) {
+      const direct = scoreRun(playCounterRun(armed.seed, false, disposition));
+      const stacked = scoreRun(playCounterRun(armed.seed, true, disposition));
+      checkEqual(
+        `a commander countered and ${disposition} scores the same via the tray`,
+        stacked.commander,
+        direct.commander,
+      );
+      checkEqual(
+        `a commander countered and ${disposition} deploys the same via the tray`,
+        stacked.deployment,
+        direct.deployment,
+      );
+      check(
+        `both paths agree on countered casts when ${disposition}`,
+        stacked.commander.counteredCasts === direct.commander.counteredCasts,
+        `tray ${stacked.commander.counteredCasts}, direct ${direct.commander.counteredCasts}`,
+      );
+      scored[disposition] = direct.commander.counteredCasts;
+    }
+    // Answering the counter is not being countered. Letting it resolve is.
+    checkEqual('answering the counter scores no countered cast', scored.answered, 0);
+    checkEqual('letting the counter resolve scores one', scored.letThrough, 1);
+    counterLine = `counter parity      seed ${armed.seed} (armed at ${armed.threshold}): answered ${scored.answered} countered, let through ${scored.letThrough} — identical on both paths`;
+  }
+
+  // --- a run recorded in the old shape still scores one countered cast ------
+  const legacyCountered = scoreRun(legacyCounteredRun());
+  checkEqual(
+    'a legacy cast+return pair counts one countered cast, not two',
+    legacyCountered.commander.counteredCasts,
+    1,
+  );
+  checkEqual('the legacy run still counts its one cast', legacyCountered.commander.casts, 1);
+
   // --- mulligans -----------------------------------------------------------
   // The first mulligan is free in Commander (CR 103.5c): it keeps seven. The
   // second bottoms one.
@@ -731,6 +1053,8 @@ function main(): void {
     `keep                ${scorecard.keep.keptHandSize} cards, ${scorecard.keep.landsInKeptHand} lands, ${scorecard.keep.mulligans} mulligans`,
   );
   summary.push(`profile tags        ${profile.tags.join(', ') || '(none)'}`);
+  if (parityLine) summary.push(parityLine);
+  if (counterLine) summary.push(counterLine);
 
   console.log('\nverify:scorecard');
   console.log('─'.repeat(72));

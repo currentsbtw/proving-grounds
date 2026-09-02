@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { createRng, randomSeed, shuffleInPlace } from '../domain/rng';
 import { nextPhaseOf } from '../domain/phases';
+import {
+  isCreatureTypeLine,
+  isInstantOrSorceryTypeLine,
+  isLandTypeLine,
+} from '../domain/typeLine';
 import { saveRun } from '../db/db';
 import { PRESSURE } from '../data/pressure';
 import {
@@ -36,6 +41,7 @@ import type {
   Seat,
   SeatId,
   Silhouette,
+  StackItem,
   TokenSpec,
   ZoneId,
 } from '../domain/types';
@@ -94,7 +100,25 @@ const ZONE_LABELS: Record<ZoneId, string> = {
   graveyard: 'graveyard',
   exile: 'exile',
   command: 'command zone',
+  stack: 'stack',
 };
+
+/**
+ * A counter event raised over a spell that is sitting on the stack tray, rather
+ * than over one intercepted on its way from hand to battlefield. The two answer
+ * differently: forcing a stacked spell through leaves it on the tray to be
+ * resolved in the order the player declared, where an intercepted one finishes
+ * its interrupted trip to the battlefield.
+ */
+function isStackedCounter(event: PressureEvent): boolean {
+  return event.type === 'counter' && event.severity.stacked === 1;
+}
+
+/** Tail of a 'stack' log message: how deep the tray is after the operation. */
+function depthText(depth: number): string {
+  if (depth === 0) return 'stack empty';
+  return `${depth} on the stack`;
+}
 
 /**
  * Three fresh seats. With an rng they open at a randomised 1–2 threat, which is
@@ -169,11 +193,22 @@ function typeLineOf(state: GameState, card: CardInstance): string {
 }
 
 export function isLandCard(state: GameState, card: CardInstance): boolean {
-  return /\bLand\b/i.test(typeLineOf(state, card));
+  return isLandTypeLine(typeLineOf(state, card));
 }
 
 export function isCreatureCard(state: GameState, card: CardInstance): boolean {
-  return /\bCreature\b/i.test(typeLineOf(state, card));
+  return isCreatureTypeLine(typeLineOf(state, card));
+}
+
+/**
+ * Whether a spell resolving off the stack tray goes to the graveyard rather
+ * than the battlefield. The type line is the whole test — this is the only
+ * "rule" the tray knows, and it is the one a player performs without thinking.
+ * Read off the front face, so an Adventure creature is a creature and lands on
+ * the battlefield rather than being binned for the Instant on its back.
+ */
+export function isInstantOrSorceryCard(state: GameState, card: CardInstance): boolean {
+  return isInstantOrSorceryTypeLine(typeLineOf(state, card));
 }
 
 /** Mana value from the Scryfall cache. Tokens are 0. */
@@ -300,6 +335,14 @@ export interface GameState {
   eventSeq: number;
 
   /**
+   * The manual stack tray, bottom first — the last element is the top and the
+   * only one `resolveTop` will hand back. Nothing arrives here on its own: the
+   * player casts to it, names an ability on it, or a seat's counterspell lands
+   * on top of a spell already sitting on it. Legality is never checked.
+   */
+  stack: StackItem[];
+
+  /**
    * The player's life has been seen at or below zero and the table has been
    * told. Death is not settled on the action that caused it: the run ends on the
    * next action that is not an undo, so a mis-clicked life button is still
@@ -323,6 +366,24 @@ export interface GameState {
   millCards: (n: number) => void;
   revealTop: (n: number) => CardInstance[];
   castCommander: (iid: string) => void;
+  /**
+   * Put a spell on the stack tray instead of straight onto the battlefield.
+   * Accepts a card in hand, or the commander in the command zone (the cast is
+   * counted and the tax accrues exactly as `castCommander` does it). Lands and
+   * tokens never go on the stack, so they are a silent no-op.
+   */
+  castToStack: (iid: string) => void;
+  /** Name an ability or trigger onto the tray. Empty text is ignored. */
+  pushAbility: (label: string) => void;
+  /**
+   * Resolve the top item. A spell goes to the battlefield, or to the graveyard
+   * if its type line says Instant or Sorcery; an ability is simply popped. A
+   * no-op on an empty tray, or when the top is a counter — that one belongs to
+   * the event in front of the player.
+   */
+  resolveTop: () => void;
+  /** Take an item off the tray without resolving it. Counters cannot be removed here. */
+  removeStackItem: (id: string) => void;
   toggleTapped: (iid: string) => void;
   untapAll: () => void;
   addCounter: (iid: string, kind: string, delta: number) => void;
@@ -387,11 +448,45 @@ export function canMulligan(state: GameState): boolean {
   if (!state.run) return false;
   if (state.turn !== 1 || state.phase !== 'main1') return false;
   if (state.mulliganResolved) return false;
+  // 'stack' counts as already playing: a card the player has declared cast is
+  // just as much a commitment as one already on the table.
   return !Object.values(state.cards).some(
     (c) =>
       !c.isCommander &&
-      (c.zone === 'battlefield' || c.zone === 'graveyard' || c.zone === 'exile'),
+      (c.zone === 'battlefield' ||
+        c.zone === 'graveyard' ||
+        c.zone === 'exile' ||
+        c.zone === 'stack'),
   );
+}
+
+/**
+ * Whether a counter event is currently live over this card — the one in front
+ * of the player, or one still queued behind it. A spell a seat has spoken up
+ * about is out of the player's hands until that question is answered, so it
+ * cannot be cast (again) while the counter stands.
+ */
+function heldByLiveCounter(state: GameState, iid: string): boolean {
+  const live = state.activeEvent ? [state.activeEvent, ...state.pendingEvents] : state.pendingEvents;
+  return live.some((event) => event.type === 'counter' && event.targetIid === iid);
+}
+
+/**
+ * Every condition the stack tray asks of a card before it will take it. Exported
+ * so the menu item, the drag band and the hotkey all offer exactly what
+ * `castToStack` will accept, rather than each re-deriving a near-miss of it.
+ */
+export function canCastToStack(state: GameState, iid: string): boolean {
+  if (!state.run) return false;
+  const card = state.cards[iid];
+  if (!card) return false;
+  if (card.isToken) return false;
+  // Front face: an MDFC spell // land is a spell, and belongs on the tray.
+  if (isLandCard(state, card)) return false;
+  const fromCommand = card.isCommander && card.zone === 'command';
+  if (card.zone !== 'hand' && !fromCommand) return false;
+  if (heldByLiveCounter(state, iid)) return false;
+  return true;
 }
 
 export function commanderTax(state: GameState, scryfallId: string): number {
@@ -483,6 +578,72 @@ export const useGameStore = create<GameState>((set, get) => {
       return { cards, libraryOrder: s.libraryOrder.slice(taken.length), moveCounter: stamp };
     });
     return taken;
+  }
+
+  /**
+   * Put an item on the tray and say so. The id comes off the move counter rather
+   * than a nanoid or the clock, so a seed replays a run's stack operations byte
+   * for byte.
+   */
+  function pushStackItem(fields: Omit<StackItem, 'id'>): StackItem {
+    const stamp = get().moveCounter + 1;
+    const item: StackItem = { ...fields, id: `stk-${stamp}` };
+    set((s) => ({ moveCounter: stamp, stack: [...s.stack, item] }));
+    logStackOp('push', 'Stacked', item);
+    return item;
+  }
+
+  /**
+   * Drop an item off the tray by id, without logging. Returns whether it was
+   * there. Nothing calls this without logging the drop itself: `logStackOp`
+   * reads the depth back off the tray, so the entry has to come after the drop
+   * rather than being folded into it.
+   */
+  function dropStackItem(id: string): boolean {
+    if (!get().stack.some((item) => item.id === id)) return false;
+    set((s) => ({ stack: s.stack.filter((item) => item.id !== id) }));
+    return true;
+  }
+
+  /**
+   * Take the tray item a counter event stands for off the tray. The spell it was
+   * held over is left exactly where it is: on the stack, still owed a
+   * resolution. Shared by every exit a counter has that is not "it resolved".
+   * Returns the item that left, so the caller can say why it left.
+   */
+  function dropCounterItem(eventId: string): StackItem | null {
+    const item = get().stack.find((x) => x.kind === 'counter' && x.eventId === eventId);
+    if (!item) return null;
+    dropStackItem(item.id);
+    return item;
+  }
+
+  /**
+   * Why an item left the tray. Only ever on a 'remove': a push and a resolve say
+   * why by being what they are, but a removal is one of five different things —
+   * the player tidied it away, the counter over it was answered, the counter
+   * resolved and took the spell with it, the seat holding it died, or the whole
+   * opening was mulliganed back.
+   */
+  type StackRemoveReason = 'answered' | 'countered' | 'seat-out' | 'mulligan';
+
+  function logStackOp(
+    op: 'push' | 'resolve' | 'remove',
+    verb: 'Stacked' | 'Resolved' | 'Removed from the stack',
+    item: StackItem,
+    reason?: StackRemoveReason,
+  ): void {
+    appendLog('stack', `${verb}: ${item.label} (${depthText(get().stack.length)})`, {
+      op,
+      itemId: item.id,
+      kind: item.kind,
+      label: item.label,
+      iid: item.iid,
+      eventId: item.eventId,
+      seatId: item.seatId,
+      reason,
+      depth: get().stack.length,
+    });
   }
 
   function shuffleSilently(): void {
@@ -708,7 +869,14 @@ export const useGameStore = create<GameState>((set, get) => {
     else set({ pendingEvents: kept });
 
     for (const event of retiredActive ? [retiredActive, ...retiredPending] : retiredPending) {
-      const forced = event.type === 'counter' ? forceCounterThrough(event) : null;
+      // A counter held over a spell on the stack tray has nowhere to force the
+      // spell to: it is already cast, and the player still owes it a resolution
+      // in the order they declared. Only the counter leaves.
+      let forced: string | null = null;
+      if (isStackedCounter(event)) {
+        const dropped = dropCounterItem(event.id);
+        if (dropped) logStackOp('remove', 'Removed from the stack', dropped, 'seat-out');
+      } else if (event.type === 'counter') forced = forceCounterThrough(event);
       appendLog(
         'event',
         forced
@@ -802,12 +970,12 @@ export const useGameStore = create<GameState>((set, get) => {
    * forces it through. Consumes no rng, so a seed replays identically whether
    * or not the player happened to cast into an armed seat.
    */
-  function raiseCounterEvent(iid: string, armed: CounterArmed): void {
+  function raiseCounterEvent(iid: string, armed: CounterArmed, stacked = false): PressureEvent | null {
     const state = get();
     const card = state.cards[iid];
-    if (!card) return;
+    if (!card) return null;
     const manaValue = manaValueOf(state, card);
-    const event = makeCounterEvent(
+    const built = makeCounterEvent(
       state.windowCount,
       armed.seatId,
       state.turn,
@@ -817,6 +985,13 @@ export const useGameStore = create<GameState>((set, get) => {
       manaValue,
       card.isCommander,
     );
+    // The spell was already on the tray when the seat spoke up, so the counter
+    // lands on top of it rather than holding it out of play. Stamped on the
+    // severity map so every later exit — answered, resolved, or the seat dying
+    // — can tell the two shapes apart.
+    const event: PressureEvent = stacked
+      ? { ...built, severity: { ...built.severity, stacked: 1 } }
+      : built;
 
     // A counter is about the spell you just cast, so it jumps the queue; the
     // event it displaced goes back to the front and returns after.
@@ -838,6 +1013,7 @@ export const useGameStore = create<GameState>((set, get) => {
       appendLog('event', active.prompt, { ...eventPayload(active), intercepted: true });
     }
     bumpSeatThreat(armed.seatId, 'counter');
+    return active;
   }
 
   /**
@@ -1070,6 +1246,7 @@ export const useGameStore = create<GameState>((set, get) => {
     lastFiredWindow: zeroLastFiredWindow(),
     damageDealtByTurn: {},
     eventSeq: 0,
+    stack: [],
     deathNoticed: false,
     ending: false,
 
@@ -1152,6 +1329,7 @@ export const useGameStore = create<GameState>((set, get) => {
         lastFiredWindow: zeroLastFiredWindow(),
         damageDealtByTurn: {},
         eventSeq: 0,
+        stack: [],
         deathNoticed: false,
         ending: false,
       });
@@ -1186,7 +1364,24 @@ export const useGameStore = create<GameState>((set, get) => {
 
     takeMulligan() {
       if (!get().run) return;
-      const hand = cardsInZone(get(), 'hand').map((c) => c.iid);
+      // `canMulligan` already refuses once anything has been declared cast, but
+      // a mulligan taken anyway must not strand a card on the tray with its
+      // instance swept back into the library. Everything on the stack goes home
+      // with the hand, and the tray is emptied.
+      const stranded = [...get().stack];
+      const onStack = cardsInZone(get(), 'stack');
+      const hand = [
+        ...cardsInZone(get(), 'hand').map((c) => c.iid),
+        // A commander is never a library card; it goes home instead, below.
+        ...onStack.filter((c) => !c.isCommander).map((c) => c.iid),
+      ];
+      for (const item of stranded) {
+        dropStackItem(item.id);
+        logStackOp('remove', 'Removed from the stack', item, 'mulligan');
+      }
+      for (const card of onStack) {
+        if (card.isCommander) performMove(card.iid, 'command');
+      }
       set((s) => {
         const cards = { ...s.cards };
         let stamp = s.moveCounter;
@@ -1363,6 +1558,14 @@ export const useGameStore = create<GameState>((set, get) => {
           // The cast still happened, so the tax still accrues: the commander is
           // on the stack when it gets answered, and comes back more expensive.
           set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
+          // No `countered` on this entry. The seat has spoken up, but the
+          // player has not answered yet and may well force it through — a cast
+          // that claimed to be countered at the moment it was met would score a
+          // countered cast for a decision that never happened, which is exactly
+          // where this path used to disagree with the tray. The entry written
+          // when the counter actually resolves is the one that says so, for both
+          // paths alike. `to: 'stack'` stays: it is what tells the replayers the
+          // card has not landed anywhere yet.
           appendLog(
             'commander',
             `Cast ${name} (cast #${priorCasts + 1}, tax +${tax}). Met by a counter`,
@@ -1375,7 +1578,6 @@ export const useGameStore = create<GameState>((set, get) => {
               nextTax: 2 * (priorCasts + 1),
               from: card.zone,
               to: 'stack',
-              countered: true,
             },
           );
           raiseCounterEvent(iid, armed);
@@ -1402,6 +1604,120 @@ export const useGameStore = create<GameState>((set, get) => {
           from: card.zone,
           to: 'battlefield',
         });
+      });
+    },
+
+    castToStack(iid) {
+      action(() => {
+        const state = get();
+        // Nothing that cannot be cast belongs on the tray, and a player who
+        // dragged a land onto it meant the battlefield. A card a seat has
+        // already spoken up about is not the player's to cast either. Say
+        // nothing, do nothing.
+        if (!canCastToStack(state, iid)) return;
+        const card = state.cards[iid];
+        const fromCommand = card.isCommander && card.zone === 'command';
+
+        const name = cardName(state, iid);
+
+        if (fromCommand) {
+          const key = card.scryfallId;
+          if (!key) return;
+          const tax = commanderTax(state, key);
+          const priorCasts = state.commanderCasts[key] ?? 0;
+          set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
+          // No `to` on this entry. `to: 'stack'` is the marker the scorers read
+          // as "this cast was countered on the stack" (scorecard.ts, review.ts),
+          // and this cast has not been answered yet — it may never be. The trip
+          // itself is the 'move' entry `performMove` writes next.
+          appendLog('commander', `Cast ${name} (cast #${priorCasts + 1}, tax +${tax})`, {
+            iid,
+            name,
+            scryfallId: key,
+            castNumber: priorCasts + 1,
+            taxPaid: tax,
+            nextTax: 2 * (priorCasts + 1),
+            from: card.zone,
+            via: 'stack',
+          });
+        }
+
+        // `performMove`, not `moveCard`: the hand → battlefield counter seam
+        // must not fire on the way to the tray. The tray raises its own below,
+        // after the card is on it.
+        performMove(iid, 'stack');
+        pushStackItem({ kind: 'spell', label: name, iid });
+
+        // Same threshold test the direct cast paths make. The seat speaks up
+        // once the spell is on the tray, so its answer stacks on top of it.
+        const armed = get().counterArmed;
+        if (armed && manaValueOf(get(), card) >= armed.threshold) {
+          const event = raiseCounterEvent(iid, armed, true);
+          if (event) {
+            pushStackItem({
+              kind: 'counter',
+              label: `Seat ${armed.seatId} counters ${name}`,
+              iid,
+              eventId: event.id,
+              seatId: armed.seatId,
+            });
+          }
+        }
+      });
+    },
+
+    pushAbility(label) {
+      action(() => {
+        const text = label.trim();
+        if (!get().run || !text) return;
+        pushStackItem({ kind: 'ability', label: text });
+      });
+    },
+
+    resolveTop() {
+      action(() => {
+        const state = get();
+        if (!state.run) return;
+        const top = state.stack[state.stack.length - 1];
+        // A counter on top is the event dialog's to settle, not the tray's.
+        if (!top || top.kind === 'counter') return;
+
+        dropStackItem(top.id);
+        logStackOp('resolve', 'Resolved', top);
+
+        if (top.kind !== 'spell' || !top.iid) return;
+        const card = state.cards[top.iid];
+        if (!card || card.zone !== 'stack') return;
+        performMove(top.iid, isInstantOrSorceryCard(state, card) ? 'graveyard' : 'battlefield');
+      });
+    },
+
+    removeStackItem(id) {
+      action(() => {
+        const state = get();
+        const item = state.stack.find((x) => x.id === id);
+        // A counter comes off the tray by being answered or resolved, never by
+        // being tidied away: the event in front of the player owns it.
+        if (!state.run || !item || item.kind === 'counter') return;
+        // Nor may the spell underneath one be tidied away while the counter is
+        // still standing on it — that would leave the counter pointing at
+        // nothing and the question in front of the player unanswerable.
+        if (
+          item.iid !== undefined &&
+          state.stack.some((x) => x.kind === 'counter' && x.iid === item.iid)
+        ) {
+          return;
+        }
+
+        dropStackItem(item.id);
+        logStackOp('remove', 'Removed from the stack', item);
+
+        if (item.kind !== 'spell' || !item.iid) return;
+        const card = state.cards[item.iid];
+        if (!card || card.zone !== 'stack') return;
+        // A commander taken off the stack goes home, not to the graveyard. The
+        // tax it accrued on the way stays paid.
+        performMove(item.iid, card.isCommander ? 'command' : 'graveyard');
       });
     },
 
@@ -1680,6 +1996,7 @@ export const useGameStore = create<GameState>((set, get) => {
         lastFiredWindow: zeroLastFiredWindow(),
         damageDealtByTurn: {},
         eventSeq: 0,
+        stack: [],
         deathNoticed: false,
         ending: false,
       });
@@ -1844,8 +2161,13 @@ export const useGameStore = create<GameState>((set, get) => {
 
         // A countered spell you force through actually resolves — the card
         // finishes the trip to the battlefield the interception interrupted,
-        // whether it was cast from hand or off the command zone.
-        if (event.type === 'counter') forceCounterThrough(event);
+        // whether it was cast from hand or off the command zone. A spell caught
+        // on the stack tray is already cast: only the counter leaves, and the
+        // spell waits its turn on the tray like everything else on it.
+        if (isStackedCounter(event)) {
+          const dropped = dropCounterItem(event.id);
+          if (dropped) logStackOp('remove', 'Removed from the stack', dropped, 'answered');
+        } else if (event.type === 'counter') forceCounterThrough(event);
 
         const answered: PressureEvent = { ...event, state: 'negated' };
         const trimmed = note?.trim();
@@ -1896,6 +2218,22 @@ export const useGameStore = create<GameState>((set, get) => {
           case 'counter': {
             const iid = payload?.targetIid ?? event.targetIid;
             const card = iid ? state.cards[iid] : undefined;
+            const stacked = isStackedCounter(event);
+            if (stacked) {
+              // The counter resolved, so both it and the spell under it come off
+              // the tray. Where the spell goes is the same question as ever, and
+              // the answer below is the same answer.
+              const spell = iid
+                ? get().stack.find((x) => x.kind === 'spell' && x.iid === iid)
+                : undefined;
+              const dropped = dropCounterItem(event.id);
+              if (dropped) logStackOp('remove', 'Removed from the stack', dropped, 'countered');
+              if (spell) {
+                dropStackItem(spell.id);
+                logStackOp('remove', 'Removed from the stack', spell, 'countered');
+              }
+              outcome.stacked = 1;
+            }
             if (iid && card) {
               const name = cardName(state, iid);
               outcome.counteredIid = iid;
@@ -1917,7 +2255,14 @@ export const useGameStore = create<GameState>((set, get) => {
                     iid,
                     name,
                     scryfallId: card.scryfallId,
+                    // This entry, and only this entry, is where a cast is marked
+                    // countered — for the direct path and the tray path alike.
+                    // A cast entry is written before anyone has answered, so it
+                    // can never know; saying so there scored a countered cast
+                    // for a counter the player went on to answer.
                     countered: true,
+                    /** Which way the spell got here. Reporting only. */
+                    stacked: stacked || undefined,
                     from: card.zone,
                     to: 'command',
                     nextTax,

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { canMulligan, useGameStore } from '../state/gameStore';
+import { canCastToStack, canMulligan, useGameStore } from '../state/gameStore';
 import {
   actionForKey,
   isBindable,
@@ -37,6 +37,18 @@ function isCardActivation(e: KeyboardEvent): boolean {
 }
 
 /**
+ * The card the keyboard is currently sitting on, or null. Read off the DOM
+ * rather than out of the store because focus is the browser's state, not the
+ * game's — and it has to be read *before* `blurActiveControl` runs, which is
+ * why it is not folded into the switch below.
+ */
+function focusedCardIid(): string | null {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLElement)) return null;
+  return el.closest<HTMLElement>('[data-card-iid]')?.dataset.cardIid ?? null;
+}
+
+/**
  * A just-clicked control keeps focus, so the next Space (or Enter) re-fires it.
  * Every handled hotkey drops that focus before dispatching.
  */
@@ -59,6 +71,13 @@ export const FOCUS_NOTE_EVENT = 'pg:focus-note';
 export const EVENT_RESPONSE_EVENT = 'pg:event-response';
 
 export type EventResponseDetail = { slot: 1 | 2 };
+
+/**
+ * Fired by the ability hotkey. The stack tray answers it by focusing its own
+ * input — the text of an ability is the player's to write, so the key opens the
+ * field rather than guessing at a label.
+ */
+export const STACK_ABILITY_EVENT = 'pg:stack-ability';
 
 /**
  * The single global keyboard listener. Registered in the capture phase on
@@ -129,6 +148,9 @@ export function useHotkeys(): void {
       // down rather than stealing focus from whatever holds it.
       if (action === 'preview') return;
 
+      // Read before the blur below takes the focus this depends on away.
+      const focusedIid = action === 'castToStack' ? focusedCardIid() : null;
+
       e.preventDefault();
       e.stopPropagation();
       blurActiveControl();
@@ -151,6 +173,17 @@ export function useHotkeys(): void {
           break;
         case 'mulligan':
           if (canMulligan(state)) state.takeMulligan();
+          break;
+        case 'castToStack':
+          // Same test the menu and the drop band offer on: a land, a token, or
+          // a spell a seat has already spoken up about is a silent no-op.
+          if (focusedIid && canCastToStack(state, focusedIid)) state.castToStack(focusedIid);
+          break;
+        case 'resolveTop':
+          state.resolveTop();
+          break;
+        case 'pushAbility':
+          window.dispatchEvent(new CustomEvent(STACK_ABILITY_EVENT));
           break;
         case 'focusNote':
           window.dispatchEvent(new CustomEvent(FOCUS_NOTE_EVENT));
