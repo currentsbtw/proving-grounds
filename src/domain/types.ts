@@ -1,3 +1,5 @@
+import type { Citation } from '../data/citations';
+
 /**
  * `stack` is bookkeeping, not a rules engine: a card sits there only while the
  * player has declared it cast and has not yet said what happened to it. Nothing
@@ -72,8 +74,15 @@ export interface Silhouette {
   power: number;
   /** Noncreature permanents worth respecting (artifacts + enchantments). */
   artifacts: number;
-  /** Untapped mana the seat is representing — roughly `min(turn, 8)`. */
+  /** Untapped mana the seat is representing — roughly `min(turn, 8)` plus `bonusMana`. */
   openMana: number;
+  /**
+   * Mana the seat banked outside its land drop, and the only part of `openMana`
+   * that growth does not overwrite every window. A Treasure the player declined
+   * to tax their way out of lives here, so it is still a mana two turns later —
+   * which is the whole reason the punish is worth avoiding.
+   */
+  bonusMana: number;
 }
 
 export interface Seat {
@@ -97,6 +106,21 @@ export interface Seat {
 export type EventType = 'wipe' | 'removal' | 'counter' | 'combat' | 'clock' | 'resource';
 
 /**
+ * The real card a seat cast to produce an event, frozen onto the event itself.
+ *
+ * The seats hold no decks, so this is attribution rather than simulation: the
+ * engine picks it out of `src/data/citations.ts` by the event's shape, the
+ * seat's available mana, the bracket and the turn, and no event fires without
+ * one. It is what makes a prompt something that can happen at a real table, and
+ * it is what the player resolves by hand — so `effect` is the card's actual
+ * effect and `zone` is where the cards it touches really go.
+ */
+export type EventCitation = Omit<
+  Citation,
+  'brackets' | 'minTurn' | 'maxTurn' | 'targets' | 'minTargetMv' | 'excludes' | 'counters'
+>;
+
+/**
  * Lifecycle of a pressure event.
  * - `pending`   — queued, not yet in front of the player.
  * - `responded` — the player claimed an answer on the table (honor system).
@@ -116,10 +140,19 @@ export interface PressureEvent {
   prompt: string;
   /** Machine-readable magnitudes for M2's scorecard. Keys vary by type. */
   severity: Record<string, number>;
-  /** Sub-kind: wipe `creatures`/`nonlands`, resource `discard`/`sacrifice`/`tax`. */
+  /**
+   * Sub-kind: a wipe's is its `CitationSweep` (`creatures`/`nonland`/`ace`),
+   * a resource's is `discard`/`sacrifice`/`tax`. Logs written before the sweep
+   * vocabulary was unified say `nonlands`; the scorers normalise that on read.
+   */
   variant?: string;
   /** Removal target, or the spell held by a counter. Resolution may override it. */
   targetIid?: string;
+  /**
+   * The card the seat cast. Present on every type but `combat`, which is the
+   * silhouette turning sideways rather than a spell.
+   */
+  card?: EventCitation;
   state: PressureEventState;
 }
 

@@ -1,4 +1,6 @@
+import type { CitationSweep, CitationZone } from '../../data/citations';
 import type { CardInstance, EventType, PressureEvent, SeatId } from '../../domain/types';
+import { punishPhrase } from '../../engine/pressure';
 import { byArrival, cardName, isCreatureCard, useGameStore } from '../../state/gameStore';
 import type { GameState } from '../../state/gameStore';
 
@@ -43,6 +45,59 @@ export function collectChoices(
     .map((card) => ({ card, name: cardName(state, card.iid) }));
 }
 
+/**
+ * The sweep a wipe row or event is really talking about. `variant` carried the
+ * two-way scope before the citations landed and legacy runs still say
+ * 'nonlands', so every reader of a stored variant comes through here.
+ */
+export function normalizeSweep(variant: string | undefined): CitationSweep {
+  if (variant === 'ace') return 'ace';
+  if (variant === 'nonland' || variant === 'nonlands') return 'nonland';
+  return 'creatures';
+}
+
+/** The sweep as one noun phrase, the way the ledger prints it. */
+export function sweepWord(sweep: CitationSweep): string {
+  if (sweep === 'ace') return 'artifacts, creatures, enchantments';
+  return sweep === 'nonland' ? 'nonlands' : 'creatures';
+}
+
+/** The sweep as the object of a verb: "Exile all creatures", "Bounce all nonlands". */
+export function sweepScope(sweep: CitationSweep): string {
+  return sweep === 'ace' ? sweepWord(sweep) : `all ${sweepWord(sweep)}`;
+}
+
+/**
+ * What the wipe sweeps once the player has had their say. The cited card owns
+ * the scope; the dock's toggle is the player reporting that the board
+ * disagreed, so it can only widen or narrow, and an untouched toggle leaves the
+ * card alone. This is the same arithmetic the store resolves with, worded here
+ * so the button and the resolution can never name different things.
+ */
+export function effectiveSweep(event: PressureEvent, nonlands?: boolean): CitationSweep {
+  const cited = event.card?.sweep ?? normalizeSweep(event.variant);
+  if (nonlands === undefined) return cited;
+  if (!nonlands) return 'creatures';
+  return cited === 'creatures' ? 'nonland' : cited;
+}
+
+/**
+ * What the cited card does to what it touches. A wrath destroys, a Farewell
+ * exiles, a Cyclonic Rift bounces, and an uncited legacy event destroys because
+ * that is all the old runs ever did.
+ */
+const ZONE_VERB: Record<CitationZone, string> = {
+  graveyard: 'Destroy',
+  exile: 'Exile',
+  hand: 'Bounce',
+  library: 'Shuffle away',
+};
+
+/** The verb the citation's zone prints, or the legacy 'Destroy'. */
+export function zoneVerb(zone: CitationZone | undefined): string {
+  return zone ? ZONE_VERB[zone] : 'Destroy';
+}
+
 /** The two numbered answers as they are printed, and whether the second is dead. */
 export interface EventAnswers {
   /** The first response: answer it, force it through, or declare interaction. */
@@ -65,7 +120,10 @@ export interface AnswerEdits {
   targetIid?: string;
   /** The damage figure as the player has it. */
   damage?: number;
-  /** The wipe's "all nonlands" toggle. */
+  /**
+   * The wipe's scope toggle, and only once the player has touched it: undefined
+   * means the cited card's own sweep stands.
+   */
   nonlands?: boolean;
 }
 
@@ -83,34 +141,40 @@ export function describeAnswers(
   edits: AnswerEdits = {},
 ): EventAnswers {
   const variant = event.variant ?? 'tax';
-  const cards = Object.values(state.cards);
 
   // The gate: a discard with a hand to pitch from, or a sacrifice with a
   // creature to give up, cannot resolve until the player has named the card.
-  // Nothing here guesses one.
+  // Nothing here guesses one. The board scan is inside the branch because the
+  // toast runs this inside a store selector: every other event type answers
+  // without touching `state.cards` at all.
   const needsCard =
     event.type === 'resource' &&
-    ((variant === 'discard' && cards.some((card) => card.zone === 'hand')) ||
-      (variant === 'sacrifice' &&
-        cards.some((card) => card.zone === 'battlefield' && isCreatureCard(state, card))));
+    (() => {
+      const cards = Object.values(state.cards);
+      if (variant === 'discard') return cards.some((card) => card.zone === 'hand');
+      if (variant === 'sacrifice')
+        return cards.some((card) => card.zone === 'battlefield' && isCreatureCard(state, card));
+      return false;
+    })();
   const blocked = needsCard && !edits.pickIid;
 
   const pickName = edits.pickIid && state.cards[edits.pickIid] ? cardName(state, edits.pickIid) : null;
 
   let second: string;
   switch (event.type) {
+    // The button says what the cited card does, not what a wrath does: the
+    // verb comes from where the card puts things and the scope from what it
+    // sweeps, so "Exile all creatures" and "Bounce all nonlands" are both
+    // printable and both true.
     case 'wipe':
-      second =
-        (edits.nonlands ?? variant === 'nonlands')
-          ? 'Destroy all nonlands'
-          : 'Destroy all creatures';
+      second = `${zoneVerb(event.card?.zone)} ${sweepScope(effectiveSweep(event, edits.nonlands))}`;
       break;
     case 'removal': {
       const targetIid = edits.targetIid ?? event.targetIid;
       const target = targetIid ? state.cards[targetIid] : undefined;
       second =
         target && target.zone === 'battlefield'
-          ? `Destroy ${cardName(state, target.iid)}`
+          ? `${zoneVerb(event.card?.zone)} ${cardName(state, target.iid)}`
           : 'Nothing to destroy';
       break;
     }
@@ -124,7 +188,12 @@ export function describeAnswers(
       if (variant === 'discard') second = pickName ? `Discard ${pickName}` : 'Discard a card';
       else if (variant === 'sacrifice')
         second = pickName ? `Sacrifice ${pickName}` : 'Sacrifice a creature';
-      else second = 'Pay the tax';
+      // A tax is pay-or-punish, and both sides are printed: the price is on the
+      // first button, and this is what the seat gets when it goes unpaid. "Pay
+      // the tax" said neither, and named a thing no card on the table is called.
+      // The sentence itself is the engine's, so the button, the toast and the
+      // log all say it the same way.
+      else second = punishPhrase(event.card?.punish, event.seatId);
       break;
     case 'clock':
       second = 'The clock stands';
@@ -140,13 +209,19 @@ export function describeAnswers(
   // waiting, so the answer is worded the way every other event's is.
   const stackedCounter = event.type === 'counter' && event.severity.stacked === 1;
 
+  // The price of the tax, when the citation carries one. It is the whole of the
+  // first answer: paying is the answer.
+  const taxPay = event.type === 'resource' && variant === 'tax' ? event.card?.pay : undefined;
+
   return {
     first:
       event.type === 'clock'
         ? 'Declare held interaction'
-        : event.type === 'counter' && !stackedCounter
-          ? 'Force it through'
-          : 'I answer it',
+        : taxPay !== undefined
+          ? `Pay ${taxPay}`
+          : event.type === 'counter' && !stackedCounter
+            ? 'Force it through'
+            : 'I answer it',
     second,
     blocked,
   };

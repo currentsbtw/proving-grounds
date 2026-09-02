@@ -1,7 +1,24 @@
 import { PRESSURE, byBracket, type Hazard } from '../data/pressure';
+import {
+  CITATIONS,
+  type Citation,
+  type CitationSweep,
+  type CounterTarget,
+  type Punish,
+  type RemovalTarget,
+} from '../data/citations';
+import {
+  isArtifactTypeLine,
+  isCreatureTypeLine,
+  isEnchantmentTypeLine,
+  isInstantOrSorceryTypeLine,
+  isLegendaryTypeLine,
+  isPlaneswalkerTypeLine,
+} from '../domain/typeLine';
 import type {
   ClockState,
   CounterArmed,
+  EventCitation,
   EventType,
   PressureEvent,
   Seat,
@@ -45,6 +62,12 @@ export interface PermanentSummary {
   isCommander: boolean;
   isToken: boolean;
   isLand: boolean;
+  /**
+   * The printed type line. Read front-face only, and only to ask what a removal
+   * spell would have to be able to point at: no card can cite Krosan Grip on a
+   * creature.
+   */
+  typeLine: string;
   /** The store's monotonic move stamp — higher means more recently arrived. */
   movedAt: number;
 }
@@ -123,7 +146,7 @@ export const EVENT_TYPES: EventType[] = [
 ];
 
 export function emptySilhouette(): Silhouette {
-  return { creatures: 0, power: 0, artifacts: 0, openMana: 1 };
+  return { creatures: 0, power: 0, artifacts: 0, openMana: 1, bonusMana: 0 };
 }
 
 export function zeroFiredCounts(): FiredCounts {
@@ -246,8 +269,13 @@ function offCooldown(input: WindowInput, type: EventType, hazard: Hazard): boole
 
 /**
  * What the pod's removal points at: the commander if it is on the battlefield,
- * otherwise the biggest real permanent, otherwise whatever arrived last.
+ * otherwise the biggest real permanent, breaking ties on whatever arrived last.
  * Returns undefined when the player controls nothing worth answering.
+ *
+ * Lands and tokens are not worth answering. No card in the table can point at a
+ * land, and a token that gets removed simply stops existing — spending a card on
+ * one is not a story a pod tells, and it would read as the app inventing a
+ * threat out of a Treasure.
  */
 export function chooseRemovalTarget(
   permanents: PermanentSummary[],
@@ -255,21 +283,175 @@ export function chooseRemovalTarget(
   const commander = permanents.find((p) => p.isCommander);
   if (commander) return commander;
 
-  const real = permanents.filter((p) => !p.isLand && !p.isToken);
-  if (real.length > 0) {
-    let best = real[0];
-    for (const p of real) {
-      if (p.manaValue > best.manaValue || (p.manaValue === best.manaValue && p.movedAt > best.movedAt)) {
-        best = p;
-      }
+  let best: PermanentSummary | undefined;
+  for (const p of permanents) {
+    if (p.isLand || p.isToken) continue;
+    if (
+      !best ||
+      p.manaValue > best.manaValue ||
+      (p.manaValue === best.manaValue && p.movedAt > best.movedAt)
+    ) {
+      best = p;
     }
-    return best;
   }
+  return best;
+}
 
-  const nonlands = permanents.filter((p) => !p.isLand);
-  const pool = nonlands.length > 0 ? nonlands : permanents;
-  if (pool.length === 0) return undefined;
-  return pool.reduce((a, b) => (b.movedAt > a.movedAt ? b : a));
+// ---------------------------------------------------------------------------
+// Card citations
+// ---------------------------------------------------------------------------
+
+/**
+ * Every event names a card the seat cast, and no event fires without one.
+ *
+ * The rule the whole section serves is "no card, no event": a prompt the player
+ * cannot picture happening at a real table is worse than no prompt at all, so
+ * eligibility is checked first and the hazard is dropped when nothing fits. A
+ * bracket-2 pod cannot cite Force of Will, and nobody wraths the nonlands on
+ * turn four with four mana up, because no printed card does that.
+ *
+ * Selection costs exactly one rng draw, taken immediately after the hazard's own
+ * sub-rolls (see the `resolveWindow` docblock). Counters are the exception: they
+ * are raised by the store on a cast, outside the window's rng stream, so they
+ * index deterministically instead.
+ */
+
+/**
+ * Mana a seat can actually spend: its land drop, or the fast mana its bracket
+ * runs, plus whatever it banked outside both. `bonusMana` is added rather than
+ * folded into the `max` on purpose — a Treasure that only raised `openMana` to
+ * a number `turn + accel` already beat would buy the seat nothing, which is
+ * exactly the failure the punish is meant not to have.
+ */
+export function seatMana(silhouette: Silhouette, turn: number, bracket: number): number {
+  return (
+    Math.max(silhouette.openMana, turn + byBracket(PRESSURE.seatMana.accel, bracket)) +
+    silhouette.bonusMana
+  );
+}
+
+function inBracket(citation: Citation, bracket: number): boolean {
+  const b = Math.min(5, Math.max(1, Math.round(bracket)));
+  return b >= citation.brackets[0] && b <= citation.brackets[1];
+}
+
+/** Bracket, mana and turn — the filters every kind of citation shares. */
+function baseEligible(list: Citation[], mana: number, bracket: number, turn: number): Citation[] {
+  return list.filter(
+    (c) =>
+      inBracket(c, bracket) &&
+      c.cost <= mana &&
+      turn >= (c.minTurn ?? 0) &&
+      turn <= (c.maxTurn ?? Infinity),
+  );
+}
+
+/** The event's copy: the card facts, without the filters that chose it. */
+function toEventCitation(citation: Citation): EventCitation {
+  const {
+    brackets: _brackets,
+    minTurn: _minTurn,
+    maxTurn: _maxTurn,
+    targets: _targets,
+    minTargetMv: _minTargetMv,
+    excludes: _excludes,
+    counters: _counters,
+    ...card
+  } = citation;
+  return Object.freeze(card);
+}
+
+/** One rng draw, or none at all when the list is empty. */
+function pickCitation(list: Citation[], rng: () => number): EventCitation | undefined {
+  const chosen = pick(list, rng);
+  return chosen ? toEventCitation(chosen) : undefined;
+}
+
+/** What a removal spell would have to be able to target to answer this permanent. */
+function removalTargetsOf(permanent: PermanentSummary): Set<RemovalTarget> {
+  const kinds = new Set<RemovalTarget>();
+  // Nothing in the table answers a land, so a board of nothing but lands is a
+  // board the pod has no removal for.
+  if (permanent.isLand) return kinds;
+  kinds.add('permanent');
+  const line = permanent.typeLine;
+  if (isCreatureTypeLine(line)) kinds.add('creature');
+  if (isArtifactTypeLine(line)) kinds.add('artifact');
+  if (isEnchantmentTypeLine(line)) kinds.add('enchantment');
+  if (isPlaneswalkerTypeLine(line)) kinds.add('planeswalker');
+  return kinds;
+}
+
+/** What a counterspell would have to be able to hit to catch this spell. */
+export function counterShapesOf(typeLine: string): Set<CounterTarget> {
+  const shapes = new Set<CounterTarget>(['any']);
+  shapes.add(isCreatureTypeLine(typeLine) ? 'creature' : 'noncreature');
+  if (isInstantOrSorceryTypeLine(typeLine)) shapes.add('instant-sorcery');
+  if (isEnchantmentTypeLine(typeLine)) shapes.add('enchantment');
+  if (isLegendaryTypeLine(typeLine)) shapes.add('legendary');
+  return shapes;
+}
+
+/**
+ * The wrath the seat is holding, split by scope. There is no dial holding wide
+ * sweeps back any more: the cheapest printed one that reaches past creatures is
+ * Nevinyrral's Disk, which has to survive a turn before it can be cracked, so
+ * the table's own `minTurn` is what keeps a turn-four Farewell off the table.
+ */
+function partitionWipes(
+  mana: number,
+  bracket: number,
+  turn: number,
+): { creatures: Citation[]; wide: Citation[] } {
+  const creatures: Citation[] = [];
+  const wide: Citation[] = [];
+  for (const c of baseEligible(CITATIONS.wipe, mana, bracket, turn)) {
+    if (c.sweep === 'creatures') creatures.push(c);
+    else if (c.sweep === 'nonland' || c.sweep === 'ace') wide.push(c);
+  }
+  return { creatures, wide };
+}
+
+function eligibleRemoval(
+  mana: number,
+  bracket: number,
+  turn: number,
+  target: PermanentSummary,
+): Citation[] {
+  const kinds = removalTargetsOf(target);
+  if (kinds.size === 0) return [];
+  return baseEligible(CITATIONS.removal, mana, bracket, turn).filter(
+    (c) =>
+      (c.targets ?? []).some((t) => kinds.has(t)) &&
+      // Go for the Throat is a nonartifact creature card, and a player would
+      // notice a seat citing it on their Signet-shaped Golem.
+      !(c.excludes ?? []).some((t) => kinds.has(t)) &&
+      target.manaValue >= (c.minTargetMv ?? 0),
+  );
+}
+
+/**
+ * The counterspell an armed seat actually holds, chosen without touching the
+ * rng: the store raises counters on the player's cast, which is not a point in
+ * the window's draw order, so a seed has to replay the same whether or not the
+ * player cast into it. The index is a hash of things already fixed by the seed
+ * and the spell. Returns undefined when the seat has nothing that catches this
+ * spell — the seat then does not counter at all.
+ */
+export function chooseCounterCitation(
+  windowIndex: number,
+  turn: number,
+  bracket: number,
+  mana: number,
+  spell: { name: string; manaValue: number; typeLine: string },
+): EventCitation | undefined {
+  const shapes = counterShapesOf(spell.typeLine);
+  const eligible = baseEligible(CITATIONS.counter, mana, bracket, turn).filter((c) =>
+    (c.counters ?? []).some((t) => shapes.has(t)),
+  );
+  if (eligible.length === 0) return undefined;
+  const index = (windowIndex + spell.manaValue + spell.name.length) % eligible.length;
+  return toEventCitation(eligible[index]);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +469,10 @@ function grownSilhouette(
     creatures: s.creatures + stochasticRound(seat.threat * c.creaturesPerThreat, rng),
     power: s.power + stochasticRound(seat.threat * c.powerPerThreat, rng),
     artifacts: s.artifacts + stochasticRound(seat.threat * c.artifactsPerThreat, rng),
-    openMana: Math.min(turn, c.maxOpenMana),
+    // The land drop is recomputed every window; the banked mana rides along, so
+    // the readout keeps showing what the seat can really represent.
+    openMana: Math.min(turn, c.maxOpenMana) + s.bonusMana,
+    bonusMana: s.bonusMana,
   };
 }
 
@@ -312,6 +497,7 @@ export function applyDamageToSeat(
       power: Math.round(silhouette.power * keep),
       artifacts: silhouette.artifacts,
       openMana: silhouette.openMana,
+      bonusMana: silhouette.bonusMana,
     },
   };
 }
@@ -347,6 +533,7 @@ export function redistribute(seats: SeatSnapshot[], deadSeatId: SeatId): SeatUpd
       power: s.silhouette.power + Math.round(deadBoard.power * share),
       artifacts: s.silhouette.artifacts + Math.round(deadBoard.artifacts * share),
       openMana: s.silhouette.openMana,
+      bonusMana: s.silhouette.bonusMana,
     },
   }));
 }
@@ -363,6 +550,17 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/**
+ * What a seat collects when a pay-or-punish tax goes unpaid, as a sentence
+ * fragment with the seat named. One export so the prompt, the resolution detail
+ * and the dock's button all say the same thing.
+ */
+export function punishPhrase(punish: Punish | undefined, seatId: SeatId): string {
+  return punish === 'treasure'
+    ? `${seatLabel(seatId)} makes a Treasure`
+    : `${seatLabel(seatId)} draws a card`;
+}
+
 // ---------------------------------------------------------------------------
 // The window
 // ---------------------------------------------------------------------------
@@ -375,7 +573,8 @@ function plural(n: number, one: string, many = `${one}s`): string {
  *   2. silhouette growth, three draws per living seat
  *   3. hazard rolls in the order wipe, removal, combat, resource, then the
  *      clock (plus any sub-rolls a firing event needs, drawn immediately after
- *      its own roll)
+ *      its own roll, ending with the one draw that picks its card citation —
+ *      no draw at all when nothing is eligible, because then nothing fires)
  *   4. the counterspell arming roll
  *
  * When the clock's deadline has passed the function short-circuits: it reports
@@ -434,7 +633,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
     seatId: SeatId,
     prompt: string,
     severity: Record<string, number>,
-    extra: { variant?: string; targetIid?: string } = {},
+    extra: { variant?: string; targetIid?: string; card?: EventCitation } = {},
   ): PressureEvent {
     return {
       id: `w${windowIndex}-${type}-${seatId}`,
@@ -464,20 +663,31 @@ export function resolveWindow(input: WindowInput): WindowResult {
     const caster = bestSeat(alive(), (s) => -s.silhouette.power);
     if (caster) {
       const nonlands = rng() < byBracket(PRESSURE.wipe.nonlandChance, bracket);
-      const variant = nonlands ? 'nonlands' : 'creatures';
-      const scope = nonlands ? 'Every nonland permanent' : 'Every creature';
-      events.push(
-        makeEvent(
-          'wipe',
-          caster.id,
-          `${seatLabel(caster.id)} wraths the table. ${scope} is destroyed. Resolve it, then drag back anything you protected.`,
-          { podCreatures, podPower: alive().reduce((n, s) => n + s.silhouette.power, 0) },
-          { variant },
-        ),
-      );
-      bumpThreat(caster.id, 'wipe');
-      wiped = true;
-      notes.push(`wipe:${caster.id}:${variant}`);
+      const mana = seatMana(caster.silhouette, turn, bracket);
+      // The roll asks for a nonland sweep; the table decides whether the seat
+      // owns one. Nobody blows up the world with four mana up, so a pod that
+      // cannot afford it settles for a creature wrath, and a pod that cannot
+      // afford either does not wrath at all.
+      const wipes = partitionWipes(mana, bracket, turn);
+      const list = nonlands && wipes.wide.length > 0 ? wipes.wide : wipes.creatures;
+      const card = pickCitation(list, rng);
+      if (card) {
+        // One vocabulary for scope everywhere: the event's variant is the card's
+        // own `CitationSweep`, ace included, and so is the resolution's scope.
+        const variant: CitationSweep = card.sweep ?? 'creatures';
+        events.push(
+          makeEvent(
+            'wipe',
+            caster.id,
+            `${seatLabel(caster.id)} casts ${card.name}.`,
+            { podCreatures, podPower: alive().reduce((n, s) => n + s.silhouette.power, 0) },
+            { variant, card },
+          ),
+        );
+        bumpThreat(caster.id, 'wipe');
+        wiped = true;
+        notes.push(`wipe:${caster.id}:${variant}:${card.name}`);
+      }
     }
   }
 
@@ -494,20 +704,25 @@ export function resolveWindow(input: WindowInput): WindowResult {
   ) {
     const caster = bestSeat(alive(), (s) => s.threat);
     if (caster) {
-      const why = target.isCommander
-        ? 'their best answer meets your commander'
-        : 'their best answer meets your biggest threat';
-      events.push(
-        makeEvent(
-          'removal',
-          caster.id,
-          `${seatLabel(caster.id)} destroys ${target.name} (${why}).`,
-          { targetMv: target.manaValue, playerThreat, commander: target.isCommander ? 1 : 0 },
-          { targetIid: target.iid },
-        ),
+      const card = pickCitation(
+        eligibleRemoval(seatMana(caster.silhouette, turn, bracket), bracket, turn, target),
+        rng,
       );
-      bumpThreat(caster.id, 'removal');
-      notes.push(`removal:${caster.id}:${target.isCommander ? 'commander' : 'permanent'}`);
+      if (card) {
+        events.push(
+          makeEvent(
+            'removal',
+            caster.id,
+            `${seatLabel(caster.id)} casts ${card.name} on ${target.name}.`,
+            { targetMv: target.manaValue, playerThreat, commander: target.isCommander ? 1 : 0 },
+            { targetIid: target.iid, card },
+          ),
+        );
+        bumpThreat(caster.id, 'removal');
+        notes.push(
+          `removal:${caster.id}:${target.isCommander ? 'commander' : 'permanent'}:${card.name}`,
+        );
+      }
     }
   }
 
@@ -554,19 +769,50 @@ export function resolveWindow(input: WindowInput): WindowResult {
   ) {
     const caster = pick(alive(), rng);
     if (caster) {
-      const roll = rng();
+      const mana = seatMana(caster.silhouette, turn, bracket);
       const w = PRESSURE.resource.weights;
-      const variant =
-        roll < w.discard ? 'discard' : roll < w.discard + w.sacrifice ? 'sacrifice' : 'tax';
-      const prompt =
-        variant === 'discard'
-          ? `${seatLabel(caster.id)} strips your hand. Discard a card of your choice.`
-          : variant === 'sacrifice'
-            ? `${seatLabel(caster.id)} makes you sacrifice a creature. Pick one and put it in the graveyard.`
-            : `${seatLabel(caster.id)} taxes the table: your next spell this turn costs 2 more, or it does not happen.`;
-      events.push(makeEvent('resource', caster.id, prompt, { amount: 1 }, { variant }));
-      bumpThreat(caster.id, 'resource');
-      notes.push(`resource:${caster.id}:${variant}`);
+      // Only variants the seat owns a card for are on the table, and the weights
+      // are renormalised over what is left — a bracket-1 pod runs no stax piece,
+      // so it strips and edicts instead of taxing at four fifths the rate.
+      const pool = [
+        { variant: 'discard', weight: w.discard, list: CITATIONS.discard },
+        { variant: 'sacrifice', weight: w.sacrifice, list: CITATIONS.sacrifice },
+        { variant: 'tax', weight: w.tax, list: CITATIONS.tax },
+      ]
+        .map((entry) => ({ ...entry, list: baseEligible(entry.list, mana, bracket, turn) }))
+        .filter((entry) => entry.list.length > 0);
+
+      if (pool.length > 0) {
+        const total = pool.reduce((n, entry) => n + entry.weight, 0);
+        const roll = rng() * total;
+        let acc = 0;
+        let chosen = pool[pool.length - 1];
+        for (const entry of pool) {
+          acc += entry.weight;
+          if (roll < acc) {
+            chosen = entry;
+            break;
+          }
+        }
+        const variant = chosen.variant;
+        const card = pickCitation(chosen.list, rng);
+        if (card) {
+          const seat = seatLabel(caster.id);
+          const prompt =
+            variant === 'discard'
+              ? `${seat} casts ${card.name}. Discard a card of your choice.`
+              : variant === 'sacrifice'
+                ? `${seat} casts ${card.name}. Sacrifice a creature.`
+                : // Pay-or-punish, not a one-shot surcharge: the price is real,
+                  // and so is what the seat gets when it goes unpaid.
+                  `${seat} has ${card.name} out. Pay ${card.pay ?? 1} ${
+                    card.punish === 'treasure' ? 'when you next draw' : 'for your next spell'
+                  }, or ${punishPhrase(card.punish, caster.id)}.`;
+          events.push(makeEvent('resource', caster.id, prompt, { amount: 1 }, { variant, card }));
+          bumpThreat(caster.id, 'resource');
+          notes.push(`resource:${caster.id}:${variant}:${card.name}`);
+        }
+      }
     }
   }
 
@@ -587,18 +833,28 @@ export function resolveWindow(input: WindowInput): WindowResult {
       offCooldown(input, 'clock', clockHazard) &&
       rng() < hazardChance(clockHazard, turn, bracket)
     ) {
-      const deadlineTurn = turn + byBracket(PRESSURE.clock.deadlineOffset, bracket);
-      clock = { seatId: owner.id, deadlineTurn, spawnedTurn: turn };
-      events.push(
-        makeEvent(
-          'clock',
-          owner.id,
-          `${seatLabel(owner.id)} will win on their turn after your turn ${deadlineTurn}. Win first, eliminate ${seatLabel(owner.id)}, or declare held interaction.`,
-          { deadlineTurn, windows: deadlineTurn - turn },
-        ),
+      // A clock is what the seat is assembling, not a spell it just cast, so the
+      // citation is filtered on the bracket alone: the mana is the thing it is
+      // still finding.
+      const card = pickCitation(
+        CITATIONS.clock.filter((c) => inBracket(c, bracket)),
+        rng,
       );
-      bumpThreat(owner.id, 'clock');
-      notes.push(`clock:${owner.id}:${deadlineTurn}`);
+      if (card) {
+        const deadlineTurn = turn + byBracket(PRESSURE.clock.deadlineOffset, bracket);
+        clock = { seatId: owner.id, deadlineTurn, spawnedTurn: turn };
+        events.push(
+          makeEvent(
+            'clock',
+            owner.id,
+            `${seatLabel(owner.id)} is setting up ${card.name}. They win on their turn after your turn ${deadlineTurn}. Win first, eliminate ${seatLabel(owner.id)}, or declare held interaction.`,
+            { deadlineTurn, windows: deadlineTurn - turn },
+            { card },
+          ),
+        );
+        bumpThreat(owner.id, 'clock');
+        notes.push(`clock:${owner.id}:${deadlineTurn}:${card.name}`);
+      }
     }
   }
 
@@ -654,7 +910,9 @@ function buildSummary(
   const parts = [`Opponent window before turn ${turn}: ${boards || 'no seats left'}`];
   if (events.length > 0) parts.push(events.map((e) => e.type).join(' + '));
   else parts.push('no events');
-  if (counterArmed) parts.push(`Seat ${counterArmed.seatId} holding up ${counterArmed.threshold}+`);
+  if (counterArmed) {
+    parts.push(`Seat ${counterArmed.seatId} counters at ${counterArmed.threshold}+ mana`);
+  }
   if (clock) parts.push(`clock: Seat ${clock.seatId} by turn ${clock.deadlineTurn}`);
   return parts.join(' · ');
 }
@@ -681,17 +939,20 @@ export function counterPrompt(
   seatId: SeatId,
   cardName: string,
   threshold: number,
+  citationName: string,
   isCommander = false,
 ): string {
   const outcome = isCommander
     ? 'Resolve it to send them back to the command zone. The tax still stands'
     : 'Resolve it to bin the spell';
-  return `${seatLabel(seatId)} counters ${cardName}. They held up ${threshold}+ mana all turn. ${outcome}, or respond if you can force it through.`;
+  return `${seatLabel(seatId)} casts ${citationName} on ${cardName}. They counter anything at ${threshold}+ mana. ${outcome}, or respond if you can force it through.`;
 }
 
 /**
  * Build the counter event the store raises when it intercepts a cast — a hand
- * play or a commander coming off the command zone.
+ * play or a commander coming off the command zone. The citation comes from
+ * `chooseCounterCitation`; a seat with nothing that catches this spell never
+ * gets here, so `card` is always present on a counter.
  */
 export function makeCounterEvent(
   windowIndex: number,
@@ -701,6 +962,7 @@ export function makeCounterEvent(
   cardName: string,
   threshold: number,
   manaValue: number,
+  card: EventCitation,
   isCommander = false,
 ): PressureEvent {
   return {
@@ -708,9 +970,10 @@ export function makeCounterEvent(
     type: 'counter',
     seatId,
     turn,
-    prompt: counterPrompt(seatId, cardName, threshold, isCommander),
+    prompt: counterPrompt(seatId, cardName, threshold, card.name, isCommander),
     severity: { turn, threshold, manaValue, commander: isCommander ? 1 : 0 },
     targetIid: iid,
+    card,
     state: 'pending',
   };
 }

@@ -6,7 +6,14 @@ import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { EVENT_RESPONSE_EVENT } from '../../hooks/useHotkeys';
 import type { EventResponseDetail } from '../../hooks/useHotkeys';
 import { CardView } from '../table/CardView';
-import { collectChoices, describeAnswers, EVENT_LABEL, seatLabel } from './pressureUi';
+import {
+  collectChoices,
+  describeAnswers,
+  effectiveSweep,
+  EVENT_LABEL,
+  seatLabel,
+  sweepScope,
+} from './pressureUi';
 import type { Choice } from './pressureUi';
 
 interface PickerProps {
@@ -93,7 +100,10 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   const [damage, setDamage] = useState(() => Math.max(0, Math.round(event.severity.damage ?? 0)));
   const [targetIid, setTargetIid] = useState<string | undefined>(event.targetIid);
   const [pickIid, setPickIid] = useState<string | undefined>(undefined);
-  const [nonlands, setNonlands] = useState(event.variant === 'nonlands');
+  // The scope toggle starts where the cited card stands, and stays undefined
+  // until the player says otherwise: an untouched toggle must not overrule the
+  // card's own sweep on the way to the store.
+  const [nonlands, setNonlands] = useState<boolean | undefined>(undefined);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const closePicker = useCallback(() => setPickerOpen(false), []);
@@ -117,6 +127,12 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   const pickName = useGameStore((s) => (pickIid && s.cards[pickIid] ? cardName(s, pickIid) : null));
 
   const variant = event.variant ?? 'tax';
+  // What the wipe sweeps as it stands, and what ticking the box would widen it
+  // to. Both come from the citation, so a card that already sweeps artifacts,
+  // creatures and enchantments never offers "all nonlands" instead.
+  const sweep = effectiveSweep(event, nonlands);
+  const wideSweep = effectiveSweep(event, true);
+
   const needsDiscard = event.type === 'resource' && variant === 'discard' && hand.length > 0;
   const needsSacrifice = event.type === 'resource' && variant === 'sacrifice' && creatures.length > 0;
 
@@ -156,7 +172,10 @@ function DockBody({ event, onRetired }: DockBodyProps) {
         if (targetIid) payload.targetIid = targetIid;
         break;
       case 'wipe':
-        payload.wipeNonlands = nonlands;
+        // Sent only when the player touched the toggle. Sending it untouched
+        // would narrow every exile-and-artifacts wrath to the two-way scope the
+        // checkbox can express.
+        if (nonlands !== undefined) payload.wipeNonlands = nonlands;
         break;
       case 'resource':
         if (variant === 'discard' && pickIid) payload.discardIid = pickIid;
@@ -254,10 +273,12 @@ function DockBody({ event, onRetired }: DockBodyProps) {
           <label className="pgp-toggle">
             <input
               type="checkbox"
-              checked={nonlands}
+              checked={sweep !== 'creatures'}
               onChange={(e) => setNonlands(e.target.checked)}
             />
-            <span>all nonlands</span>
+            {/* The label reads the card, so the box the player is ticking says
+                what ticking it means. Farewell's box says what Farewell does. */}
+            <span>{sweepScope(wideSweep)}</span>
           </label>
         )}
 
@@ -504,6 +525,27 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
             </div>
 
             <p className="pgp-prompt">{prompt}</p>
+
+            {/* The card the seat is casting, cited: name, printed mana value,
+                and the real effect the player resolves by hand. The prompt says
+                what happened; this says what it was, so the run teaches which
+                cards produce which pressure. The effect is the line that gives
+                way when the foot is short. */}
+            {event?.card && (
+              <div className="pgp-cite">
+                <div className="pgp-cite-head">
+                  <span className="pgp-cite-name" title={event.card.name}>
+                    {event.card.name}
+                  </span>
+                  <span className="pgp-cite-mv" title={`Mana value ${event.card.mv}`}>
+                    {event.card.mv}
+                  </span>
+                </div>
+                <p className="pgp-cite-effect" title={event.card.effect}>
+                  {event.card.effect}
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>

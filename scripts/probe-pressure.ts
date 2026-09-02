@@ -112,6 +112,7 @@ function permanentsAt(turn: number): PermanentSummary[] {
       isCommander: true,
       isToken: false,
       isLand: false,
+      typeLine: 'Legendary Creature — Probe Avatar',
       movedAt: 1000,
     });
   }
@@ -124,6 +125,9 @@ function permanentsAt(turn: number): PermanentSummary[] {
       isCommander: false,
       isToken: false,
       isLand: false,
+      // Alternating, because removal is chosen by what it can point at: a board
+      // of nothing but creatures would never see Krosan Grip.
+      typeLine: i % 2 === 0 ? 'Artifact' : 'Creature — Probe Beast',
       movedAt: 100 + i,
     });
   }
@@ -153,6 +157,16 @@ interface Tally {
   threatAtTurn10Samples: number;
   clockExpiries: number;
   runsWithExpiry: number;
+  /** Resource events by sub-kind, so the renormalised weights are visible. */
+  discardEvents: number;
+  sacrificeEvents: number;
+  taxEvents: number;
+  /**
+   * Events that fired without naming a card. The product rule is "no card, no
+   * event", so this is the one diagnostic that is really an assertion: any
+   * number but zero means an event escaped the citation table.
+   */
+  citationMissing: number;
 }
 
 function freshTally(): Tally {
@@ -175,6 +189,10 @@ function freshTally(): Tally {
     threatAtTurn10Samples: 0,
     clockExpiries: 0,
     runsWithExpiry: 0,
+    discardEvents: 0,
+    sacrificeEvents: 0,
+    taxEvents: 0,
+    citationMissing: 0,
   };
 }
 
@@ -269,6 +287,9 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
     if (counterArmed) tally.counterArmedWindows += 1;
 
     for (const event of result.events) {
+      // Combat is the silhouette turning sideways rather than a spell; every
+      // other event has to name the card it came off.
+      if (event.type !== 'combat' && !event.card) tally.citationMissing += 1;
       switch (event.type) {
         case 'wipe':
           if (firstWipeTurn === null) firstWipeTurn = event.turn;
@@ -283,6 +304,9 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
           break;
         case 'resource':
           tally.resourceEvents += 1;
+          if (event.variant === 'discard') tally.discardEvents += 1;
+          else if (event.variant === 'sacrifice') tally.sacrificeEvents += 1;
+          else if (event.variant === 'tax') tally.taxEvents += 1;
           break;
         case 'clock':
           if (clockSpawnTurn === null) clockSpawnTurn = event.turn;
@@ -450,6 +474,10 @@ const DIAGNOSTICS: Diagnostic[] = [
   { label: 'combat events per run', value: (t) => mean(t.combatEvents, t.runs), digits: 2 },
   { label: 'deadlines hit per run', value: (t) => mean(t.clockExpiries, t.runs), digits: 2 },
   { label: 'runs that hit a deadline (%)', value: (t) => mean(t.runsWithExpiry * 100, t.runs), digits: 1 },
+  { label: 'discard events per run', value: (t) => mean(t.discardEvents, t.runs), digits: 2 },
+  { label: 'sacrifice events per run', value: (t) => mean(t.sacrificeEvents, t.runs), digits: 2 },
+  { label: 'tax events per run', value: (t) => mean(t.taxEvents, t.runs), digits: 2 },
+  { label: 'events missing a citation', value: (t) => t.citationMissing, digits: 0 },
 ];
 
 interface Metric {
@@ -528,10 +556,12 @@ function main(): void {
   console.log('  deadlines           recorded, then played through (see the header)');
 
   let missTotal = 0;
+  let citationMisses = 0;
   for (const bracket of BRACKETS) {
     const tally = freshTally();
     for (let i = 0; i < RUNS; i++) probeRun(bracket, `probe-b${bracket}-r${i}`, tally);
     missTotal += report(bracket, tally).length;
+    citationMisses += tally.citationMissing;
   }
 
   const checks = TARGETS.length * BRACKETS.length;
@@ -542,8 +572,13 @@ function main(): void {
   } else {
     console.log(`FAIL — ${missTotal} of ${checks} metrics outside their band.`);
   }
+  // Not a band: "no card, no event" is a rule, so any breach fails the probe on
+  // its own however well the curves fit.
+  if (citationMisses > 0) {
+    console.log(`FAIL — ${citationMisses} event(s) fired without a card citation.`);
+  }
   console.log('');
-  process.exitCode = missTotal === 0 ? 0 : 1;
+  process.exitCode = missTotal === 0 && citationMisses === 0 ? 0 : 1;
 }
 
 main();

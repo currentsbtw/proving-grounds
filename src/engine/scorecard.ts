@@ -1,5 +1,6 @@
 import { SCORING } from '../data/scorecard';
 import { isLandTypeLine } from '../domain/typeLine';
+import type { CitationSweep } from '../data/citations';
 import { EVENT_TYPES } from './pressure';
 import type {
   EventType,
@@ -50,6 +51,19 @@ export interface TurnRow {
   damageBySeat: Record<SeatId, number>;
   /** Event ids that arrived (queued) before/in this turn. */
   eventIds: string[];
+}
+
+/**
+ * One vocabulary for a wipe's scope. The engine, the event and the resolution
+ * all speak `CitationSweep` now; runs recorded before they agreed wrote the
+ * dock's two-way toggle value `nonlands`, so that is folded into `nonland` on
+ * the way in and nothing downstream has to know there were ever two words.
+ * Shared with `review.ts`, which reads the same payloads.
+ */
+export function normalizeSweep(variant: string | undefined): CitationSweep {
+  if (variant === 'nonlands' || variant === 'nonland') return 'nonland';
+  if (variant === 'ace') return 'ace';
+  return 'creatures';
 }
 
 export interface WipeRecovery {
@@ -128,6 +142,9 @@ export interface EventLedgerRow {
   seatId: SeatId;
   turn: number;
   variant?: string;
+  /** The card the seat cited, when the event named one. */
+  card?: string;
+  cardEffect?: string;
   severity: Record<string, number>;
   terminal: 'responded' | 'resolved' | 'unresolved';
   outcome?: Record<string, unknown>;
@@ -477,6 +494,10 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
       seatId: readSeat(p, 'seatId') ?? 'A',
       turn: readNumber(p, 'eventTurn') ?? entry.turn,
       variant: readString(p, 'variant'),
+      // Every entry an event writes carries the same flattened citation, so the
+      // first sighting has it — queued, intercepted, answered or resolved.
+      card: readString(p, 'card'),
+      cardEffect: readString(p, 'cardEffect'),
       severity: readNumberRecord(p, 'severity'),
       terminal: 'unresolved',
     };
@@ -584,6 +605,12 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
             commander.removals += 1;
           }
           setZone(iid, to);
+          // A token that left the battlefield ceased to exist. The entry still
+          // names where it was headed, because that is what a wipe swept it to,
+          // but the replay must not leave a Treasure sitting in a graveyard the
+          // store has no card in. Board value is unaffected either way — a token
+          // contributes nothing.
+          if (isTrue(p, 'tokenGone')) zones.delete(iid);
         }
         break;
       }
@@ -734,7 +761,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
           wipes.push({
             eventId: row.eventId,
             turn: entry.turn,
-            variant: readString(outcome, 'scope') ?? row.variant ?? 'creatures',
+            variant: normalizeSweep(readString(outcome, 'scope') ?? row.variant),
             boardValueBefore: boardValue + lost,
             boardValueAfter: boardValue,
             recoveredTurn: null,
@@ -764,7 +791,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
           wipes.push({
             eventId: row.eventId,
             turn: entry.turn,
-            variant: row.variant ?? 'creatures',
+            variant: normalizeSweep(row.variant),
             boardValueBefore: boardValue,
             boardValueAfter: boardValue,
             recoveredTurn: entry.turn,

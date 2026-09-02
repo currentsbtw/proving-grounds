@@ -6,16 +6,21 @@ import {
   isCreatureTypeLine,
   isInstantOrSorceryTypeLine,
   isLandTypeLine,
+  isPlaneswalkerTypeLine,
 } from '../domain/typeLine';
+import { normalizeSweep } from '../engine/scorecard';
 import { saveRun } from '../db/db';
 import { PRESSURE } from '../data/pressure';
 import {
   applyDamageToSeat,
+  chooseCounterCitation,
   emptySilhouette,
   initialThreat,
   makeCounterEvent,
+  punishPhrase,
   redistribute,
   resolveWindow,
+  seatMana,
   toSnapshot,
   zeroFiredCounts,
   zeroLastFiredWindow,
@@ -24,12 +29,14 @@ import {
   type PermanentSummary,
   type PlayerSummary,
 } from '../engine/pressure';
+import type { CitationSweep, CitationZone } from '../data/citations';
 import type {
   CardData,
   CardInstance,
   ClockState,
   CounterArmed,
   Deck,
+  EventCitation,
   EventType,
   LogEntry,
   LogKind,
@@ -159,6 +166,7 @@ function trackPeak(seat: Seat): Seat {
         power: Math.max(seat.silhouette.power, recorded.power),
         artifacts: Math.max(seat.silhouette.artifacts, recorded.artifacts),
         openMana: Math.max(seat.silhouette.openMana, recorded.openMana),
+        bonusMana: Math.max(seat.silhouette.bonusMana, recorded.bonusMana),
       }
     : seat.silhouette;
 
@@ -169,7 +177,8 @@ function trackPeak(seat: Seat): Seat {
     peakSilhouette.creatures === recorded.creatures &&
     peakSilhouette.power === recorded.power &&
     peakSilhouette.artifacts === recorded.artifacts &&
-    peakSilhouette.openMana === recorded.openMana
+    peakSilhouette.openMana === recorded.openMana &&
+    peakSilhouette.bonusMana === recorded.bonusMana
   ) {
     return seat;
   }
@@ -198,6 +207,15 @@ export function isLandCard(state: GameState, card: CardInstance): boolean {
 
 export function isCreatureCard(state: GameState, card: CardInstance): boolean {
   return isCreatureTypeLine(typeLineOf(state, card));
+}
+
+/**
+ * Front-face planeswalker. Only the wipes ask: Farewell and Nevinyrral's Disk
+ * sweep artifacts, creatures and enchantments and leave planeswalkers standing,
+ * which is a difference a player would notice on the table.
+ */
+function isPlaneswalkerCard(state: GameState, card: CardInstance): boolean {
+  return isPlaneswalkerTypeLine(typeLineOf(state, card));
 }
 
 /**
@@ -267,6 +285,7 @@ function playerPermanentsOf(state: GameState): PermanentSummary[] {
       isCommander: c.isCommander,
       isToken: c.isToken,
       isLand: isLandCard(state, c),
+      typeLine: typeLineOf(state, c),
       movedAt: c.movedAt,
     }));
 }
@@ -282,6 +301,14 @@ function eventPayload(event: PressureEvent): Record<string, unknown> {
     variant: event.variant,
     targetIid: event.targetIid,
     state: event.state,
+    // The cited card, flattened to plain keys so the scorers read it with
+    // `readString`/`readNumber` — `severity` is a numbers-only map.
+    card: event.card?.name,
+    cardMv: event.card?.mv,
+    cardEffect: event.card?.effect,
+    cardZone: event.card?.zone,
+    pay: event.card?.pay,
+    punish: event.card?.punish,
   };
 }
 
@@ -646,13 +673,17 @@ export const useGameStore = create<GameState>((set, get) => {
     });
   }
 
-  function shuffleSilently(): void {
-    const rng = rngOrFallback();
+  /** Reorder the library with the supplied generator, without logging. */
+  function shuffleWith(rng: () => number): void {
     set((s) => {
       const order = [...s.libraryOrder];
       shuffleInPlace(order, rng);
       return { libraryOrder: order };
     });
+  }
+
+  function shuffleSilently(): void {
+    shuffleWith(rngOrFallback());
   }
 
   function checkSeatElimination(seatId: SeatId): void {
@@ -773,8 +804,9 @@ export const useGameStore = create<GameState>((set, get) => {
     }));
   }
 
-  /** A seat that just did something gets scarier. */
-  function bumpSeatThreat(seatId: SeatId, type: EventType): void {
+  /** Raise a seat's threat by a flat amount, clamped and rounded like the engine. */
+  function bumpSeatThreatBy(seatId: SeatId, amount: number): void {
+    if (amount === 0) return;
     set((s) => ({
       seats: s.seats.map((seat) =>
         seat.id === seatId
@@ -782,8 +814,40 @@ export const useGameStore = create<GameState>((set, get) => {
               ...seat,
               threat: Math.min(
                 PRESSURE.threat.max,
-                Math.round((seat.threat + PRESSURE.threat.eventJump[type]) * 10) / 10,
+                Math.round((seat.threat + amount) * 10) / 10,
               ),
+            })
+          : seat,
+      ),
+    }));
+  }
+
+  /** A seat that just did something gets scarier. */
+  function bumpSeatThreat(seatId: SeatId, type: EventType): void {
+    bumpSeatThreatBy(seatId, PRESSURE.threat.eventJump[type]);
+  }
+
+  /**
+   * Bank mana on a seat. `bonusMana` is what `seatMana` adds on top of the land
+   * drop, so this is the seam that makes an unpaid Treasure tax buy the seat a
+   * bigger spell next window rather than a number nobody reads. `openMana` moves
+   * with it so the readout says so straight away; growth recomputes it from
+   * `bonusMana` from then on. Deliberately not routed through
+   * `applySeatUpdates`, which writes a whole silhouette and would need the
+   * caller to reconstruct one it does not own.
+   */
+  function bumpSeatMana(seatId: SeatId, n: number): void {
+    if (n === 0) return;
+    set((s) => ({
+      seats: s.seats.map((seat) =>
+        seat.id === seatId
+          ? trackPeak({
+              ...seat,
+              silhouette: {
+                ...seat.silhouette,
+                openMana: seat.silhouette.openMana + n,
+                bonusMana: seat.silhouette.bonusMana + n,
+              },
             })
           : seat,
       ),
@@ -899,14 +963,59 @@ export const useGameStore = create<GameState>((set, get) => {
     }
   }
 
-  /** All battlefield instances a wipe of this scope would sweep away. */
-  function wipeVictims(nonlands: boolean): string[] {
+  /**
+   * All battlefield instances a wipe of this scope would sweep away. The scope
+   * is the cited card's own: Wrath of God takes creatures, Planar Cleansing
+   * takes every nonland, and Farewell and Nevinyrral's Disk take artifacts,
+   * creatures and enchantments while planeswalkers watch.
+   */
+  function wipeVictims(sweep: CitationSweep): string[] {
     const state = get();
     return Object.values(state.cards)
       .filter((c) => c.zone === 'battlefield')
-      .filter((c) => (nonlands ? !isLandCard(state, c) : isCreatureCard(state, c)))
+      .filter((c) => {
+        if (sweep === 'creatures') return isCreatureCard(state, c);
+        if (isLandCard(state, c)) return false;
+        return sweep === 'nonland' || !isPlaneswalkerCard(state, c);
+      })
       .sort(byArrival)
       .map((c) => c.iid);
+  }
+
+  /**
+   * Put a card where the cited card actually sends it.
+   *
+   * Two things a player would do at the table without being told. A commander
+   * tucked or bounced goes to the command zone instead, the same replacement
+   * the counter path already performs and with the same non-effect on the tax —
+   * nothing was cast, so nothing is owed. And a library destination is Chaos
+   * Warp's: the bottom, then a shuffle, so the player is not left knowing where
+   * it went.
+   *
+   * That shuffle draws from a generator derived from the run seed and the
+   * event's id rather than from the run's own stream. Whether the player answers
+   * a Chaos Warp or resolves it is a table decision, not a seeded one, and if it
+   * consumed the run rng the two choices would hand the next window different
+   * rolls.
+   */
+  function moveToCitedZone(iid: string, zone: CitationZone, eventId: string): void {
+    const card = get().cards[iid];
+    if (card?.isCommander && (zone === 'library' || zone === 'hand')) {
+      const name = cardName(get(), iid);
+      performMove(iid, 'command');
+      appendLog(
+        'commander',
+        `${name} was ${zone === 'library' ? 'tucked' : 'bounced'}. Returned to the command zone`,
+        { iid, name, scryfallId: card.scryfallId, from: card.zone, to: 'command', reason: zone },
+      );
+      return;
+    }
+    if (zone === 'library') {
+      performMove(iid, 'library', 'bottom');
+      shuffleWith(createRng(`${get().run?.seed ?? ''}:warp:${eventId}`));
+      return;
+    }
+    performMove(iid, zone);
   }
 
   /**
@@ -925,6 +1034,33 @@ export const useGameStore = create<GameState>((set, get) => {
     const opts: MoveOptions = typeof options === 'string' ? { position: options } : (options ?? {});
     const position = opts.position ?? 'top';
     const entersTapped = toZone === 'battlefield' && opts.tapped === true;
+
+    // A token that leaves the battlefield ceases to exist (CR 111.7). It is the
+    // one move with no destination: the instance goes away rather than sitting
+    // in a graveyard nobody can point at, and it never joins `libraryOrder`. The
+    // entry still says where it was headed, so a wipe's victim list reads the
+    // same whether it swept a card or a Treasure.
+    const tokenGone = card.isToken && toZone !== 'battlefield';
+    if (tokenGone) {
+      set((s) => {
+        const cards = { ...s.cards };
+        delete cards[iid];
+        return {
+          cards,
+          libraryOrder: s.libraryOrder.filter((x) => x !== iid),
+          moveCounter: s.moveCounter + 1,
+        };
+      });
+      appendLog('move', `${name}: ${ZONE_LABELS[fromZone]} → ${ZONE_LABELS[toZone]} (ceases to exist)`, {
+        iid,
+        name,
+        from: fromZone,
+        to: toZone,
+        isCommander: card.isCommander,
+        tokenGone: true,
+      });
+      return;
+    }
 
     set((s) => {
       const next: CardInstance = {
@@ -963,14 +1099,44 @@ export const useGameStore = create<GameState>((set, get) => {
   }
 
   /**
-   * An armed seat catches a spell on its way to the battlefield. The card stays
-   * where it was cast from — hand for a normal spell, the command zone for a
-   * commander — until the player says what happened: `resolveActiveEvent` bins
-   * it (or returns a commander to the command zone), `respondToActiveEvent`
-   * forces it through. Consumes no rng, so a seed replays identically whether
-   * or not the player happened to cast into an armed seat.
+   * The counterspell the armed seat is holding for this particular spell, or
+   * undefined when it has nothing that catches it — a seat with only Negate up
+   * does not counter a creature, and a seat holding one mana counters nothing
+   * at all. Consumes no rng, so the answer is the same on every replay of the
+   * seed whether or not the player cast into it.
    */
-  function raiseCounterEvent(iid: string, armed: CounterArmed, stacked = false): PressureEvent | null {
+  function counterCitationFor(iid: string, armed: CounterArmed): EventCitation | undefined {
+    const state = get();
+    const card = state.cards[iid];
+    if (!card || !state.run) return undefined;
+    const seat = state.seats.find((s) => s.id === armed.seatId);
+    const mana = seatMana(
+      seat?.silhouette ?? emptySilhouette(),
+      state.turn,
+      state.run.bracket,
+    );
+    return chooseCounterCitation(state.windowCount, state.turn, state.run.bracket, mana, {
+      name: cardName(state, iid),
+      manaValue: manaValueOf(state, card),
+      typeLine: typeLineOf(state, card),
+    });
+  }
+
+  /**
+   * An armed seat catches a spell on its way to the battlefield with the card
+   * `counterCitationFor` picked. The spell stays where it was cast from — hand
+   * for a normal spell, the command zone for a commander — until the player
+   * says what happened: `resolveActiveEvent` bins it (or returns a commander to
+   * the command zone), `respondToActiveEvent` forces it through. Consumes no
+   * rng, so a seed replays identically whether or not the player happened to
+   * cast into an armed seat.
+   */
+  function raiseCounterEvent(
+    iid: string,
+    armed: CounterArmed,
+    citation: EventCitation,
+    stacked = false,
+  ): PressureEvent | null {
     const state = get();
     const card = state.cards[iid];
     if (!card) return null;
@@ -983,6 +1149,7 @@ export const useGameStore = create<GameState>((set, get) => {
       cardName(state, iid),
       armed.threshold,
       manaValue,
+      citation,
       card.isCommander,
     );
     // The spell was already on the tray when the seat spoke up, so the counter
@@ -1456,8 +1623,14 @@ export const useGameStore = create<GameState>((set, get) => {
           toZone === 'battlefield' &&
           manaValueOf(state, card) >= armed.threshold
         ) {
-          raiseCounterEvent(iid, armed);
-          return;
+          // Armed is not the same as holding an answer to *this* spell. With
+          // nothing eligible the seat says nothing and the spell resolves; the
+          // mana stays up for whatever comes next.
+          const citation = counterCitationFor(iid, armed);
+          if (citation) {
+            raiseCounterEvent(iid, armed, citation);
+            return;
+          }
         }
 
         performMove(iid, toZone, options);
@@ -1554,7 +1727,11 @@ export const useGameStore = create<GameState>((set, get) => {
         // the printed mana value — commander tax is paid on top of the cost, it
         // does not make the spell bigger.
         const armed = state.counterArmed;
-        if (armed && manaValueOf(state, card) >= armed.threshold) {
+        const citation =
+          armed && manaValueOf(state, card) >= armed.threshold
+            ? counterCitationFor(iid, armed)
+            : undefined;
+        if (armed && citation) {
           // The cast still happened, so the tax still accrues: the commander is
           // on the stack when it gets answered, and comes back more expensive.
           set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
@@ -1580,7 +1757,7 @@ export const useGameStore = create<GameState>((set, get) => {
               to: 'stack',
             },
           );
-          raiseCounterEvent(iid, armed);
+          raiseCounterEvent(iid, armed, citation);
           return;
         }
 
@@ -1651,8 +1828,12 @@ export const useGameStore = create<GameState>((set, get) => {
         // Same threshold test the direct cast paths make. The seat speaks up
         // once the spell is on the tray, so its answer stacks on top of it.
         const armed = get().counterArmed;
-        if (armed && manaValueOf(get(), card) >= armed.threshold) {
-          const event = raiseCounterEvent(iid, armed, true);
+        const citation =
+          armed && manaValueOf(get(), card) >= armed.threshold
+            ? counterCitationFor(iid, armed)
+            : undefined;
+        if (armed && citation) {
+          const event = raiseCounterEvent(iid, armed, citation, true);
           if (event) {
             pushStackItem({
               kind: 'counter',
@@ -2171,10 +2352,16 @@ export const useGameStore = create<GameState>((set, get) => {
 
         const answered: PressureEvent = { ...event, state: 'negated' };
         const trimmed = note?.trim();
+        // Answering a tax is paying it. The price is on the entry, so the
+        // scorers can tell a turn the player bought back from a turn the seat
+        // collected on.
+        const paid =
+          event.type === 'resource' && event.variant === 'tax' ? event.card?.pay : undefined;
         appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` · "${trimmed}"` : ''}`, {
           ...eventPayload(answered),
           responded: true,
           negated: true,
+          paid,
           note: trimmed,
         });
         advanceQueue();
@@ -2193,10 +2380,24 @@ export const useGameStore = create<GameState>((set, get) => {
 
         switch (event.type) {
           case 'wipe': {
-            const nonlands = payload?.wipeNonlands ?? event.variant === 'nonlands';
-            const victims = wipeVictims(nonlands);
-            for (const iid of victims) performMove(iid, 'graveyard');
-            outcome.scope = nonlands ? 'nonlands' : 'creatures';
+            // The cited card carries the true scope; the dock's toggle is the
+            // player saying the board disagreed. All it can say is "more than
+            // creatures" or "creatures only", so it widens or narrows, and an
+            // untouched toggle leaves the card's own sweep alone.
+            const cited: CitationSweep = event.card?.sweep ?? normalizeSweep(event.variant);
+            const sweep: CitationSweep =
+              payload?.wipeNonlands === undefined
+                ? cited
+                : payload.wipeNonlands
+                  ? cited === 'creatures'
+                    ? 'nonland'
+                    : cited
+                  : 'creatures';
+            const zone = event.card?.zone ?? 'graveyard';
+            const victims = wipeVictims(sweep);
+            for (const iid of victims) moveToCitedZone(iid, zone, event.id);
+            outcome.scope = sweep;
+            outcome.zone = zone;
             outcome.swept = victims.length;
             outcome.iids = victims;
             break;
@@ -2206,9 +2407,11 @@ export const useGameStore = create<GameState>((set, get) => {
             const iid = payload?.targetIid ?? event.targetIid;
             const card = iid ? state.cards[iid] : undefined;
             if (iid && card && card.zone === 'battlefield') {
+              const zone = event.card?.zone ?? 'graveyard';
               outcome.targetIid = iid;
               outcome.targetName = cardName(state, iid);
-              performMove(iid, 'graveyard');
+              outcome.zone = zone;
+              moveToCitedZone(iid, zone, event.id);
             } else {
               outcome.noTarget = true;
             }
@@ -2329,8 +2532,17 @@ export const useGameStore = create<GameState>((set, get) => {
                 outcome.noTarget = true;
                 detail = mode === 'discard' ? ' (nothing to discard)' : ' (nothing to sacrifice)';
               } else {
-                // The 'tax' variant has no bookkeeping — acknowledging it is enough.
-                outcome.acknowledged = true;
+                // A tax is pay-or-punish, and this is the punish: the player did
+                // not pay, so the seat takes what the card offers. The seat was
+                // already made scarier for casting the thing, in the window that
+                // offered it; what it collects here is the punish's own, which
+                // is a card for a draw and a mana for a Treasure.
+                const punish = event.card?.punish ?? 'draw';
+                outcome.punish = punish;
+                if (event.card?.pay !== undefined) outcome.pay = event.card.pay;
+                bumpSeatThreatBy(event.seatId, PRESSURE.threat.punish[punish]);
+                if (punish === 'treasure') bumpSeatMana(event.seatId, 1);
+                detail = ` (${punishPhrase(punish, event.seatId)})`;
               }
             }
             break;

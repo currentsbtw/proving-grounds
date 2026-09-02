@@ -42,6 +42,16 @@
  *       seat takes only its counter; a mulligan sweeps the tray back; and every
  *       exit leaves the newest 'stack' entry reporting the tray's real depth
  *
+ *   (m) every event but combat names a real card: none fires without one, no
+ *       wrath sweeps past creatures before turn 5, an armed seat with nothing
+ *       castable does not counter at all, and the tax is pay-or-punish — paying
+ *       logs the price and costs the seat nothing, not paying collects the
+ *       punish, which is threat for a draw and spendable mana for a Treasure
+ *   (n) the cited card is read the way it is printed: a tuck shuffles off a
+ *       generator of its own, so answering a Chaos Warp and resolving one leave
+ *       the run's next rolls identical, and a card that excludes a kind is
+ *       never cited on it (Go for the Throat, artifact creature)
+ *
  * (a) to (c), (h), (i), (k) and (l) need a run where the pod actually did the thing
  * being tested, so each one searches seeds until it finds one and prints which
  * it used. Failures are collected rather than thrown, so one execution reports
@@ -57,7 +67,20 @@ import {
   type GameState,
 } from '../src/state/gameStore.ts';
 import { scoreRun } from '../src/engine/scorecard.ts';
+import { reviewRun } from '../src/engine/review.ts';
 import { PRESSURE } from '../src/data/pressure.ts';
+import { createRng } from '../src/domain/rng.ts';
+import {
+  chooseCounterCitation,
+  emptySilhouette,
+  initialThreat,
+  resolveWindow,
+  seatMana,
+  zeroFiredCounts,
+  zeroLastFiredWindow,
+  type PermanentSummary,
+  type SeatSnapshot,
+} from '../src/engine/pressure.ts';
 import type {
   CardData,
   CardInstance,
@@ -1482,6 +1505,557 @@ async function checkStackGuards(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// (m) every event cites a card, and the tax is pay-or-punish
+// ---------------------------------------------------------------------------
+
+/** A pod that grows, for driving `resolveWindow` directly without a store. */
+function sweepSeats(rng: () => number): SeatSnapshot[] {
+  return (['A', 'B', 'C'] as SeatId[]).map((id) => ({
+    id,
+    life: 40,
+    eliminated: false,
+    threat: initialThreat(rng),
+    silhouette: emptySilhouette(),
+  }));
+}
+
+/** A board worth answering: a commander, an artifact and a creature. */
+function sweepPermanents(turn: number): PermanentSummary[] {
+  const out: PermanentSummary[] = [
+    {
+      iid: 'sweep-art',
+      name: 'Grounds Signet',
+      manaValue: 2,
+      isCommander: false,
+      isToken: false,
+      isLand: false,
+      typeLine: 'Artifact',
+      movedAt: 10,
+    },
+    {
+      iid: 'sweep-cr',
+      name: 'Grounds Titan',
+      manaValue: 7,
+      isCommander: false,
+      isToken: false,
+      isLand: false,
+      typeLine: 'Creature — Giant',
+      movedAt: 11,
+    },
+  ];
+  if (turn >= 4) {
+    out.push({
+      iid: 'sweep-cmd',
+      name: 'Proving Ground Warlord',
+      manaValue: 5,
+      isCommander: true,
+      isToken: false,
+      isLand: false,
+      typeLine: 'Legendary Creature — Human Warrior',
+      movedAt: 12,
+    });
+  }
+  return out;
+}
+
+/**
+ * Drive the engine straight, over enough windows that every hazard fires many
+ * times at every bracket. Two rules are asserted over the whole sweep: no event
+ * but combat exists without a card, and no wrath sweeps more than creatures
+ * before turn 5, which is the turn the cheapest printed one (Nevinyrral's Disk)
+ * can happen on.
+ */
+function checkEveryEventCitesACard(): void {
+  const WINDOW_RUNS = 200;
+  const FIRST = 2;
+  const LAST = 12;
+  let windows = 0;
+  let events = 0;
+  const missing: string[] = [];
+  const earlyWideWipes: string[] = [];
+  const seen = new Set<string>();
+
+  for (let bracket = 1; bracket <= 5; bracket++) {
+    for (let i = 0; i < WINDOW_RUNS; i++) {
+      const rng = createRng(`citation-b${bracket}-${i}`);
+      const seats = sweepSeats(rng);
+      const firedCounts = zeroFiredCounts();
+      const lastFiredWindow = zeroLastFiredWindow();
+      let clock = null as ReturnType<typeof resolveWindow>['clock'];
+
+      for (let turn = FIRST; turn <= LAST; turn++) {
+        const windowIndex = turn - FIRST + 1;
+        const result = resolveWindow({
+          turn,
+          windowIndex,
+          bracket,
+          rng,
+          seats,
+          player: {
+            life: 40,
+            boardMV: 3 * (turn - 1),
+            boardPower: 2 * turn,
+            commanderOnBattlefield: turn >= 4,
+            damageDealtRecent: turn >= 5 ? 8 : 0,
+          },
+          permanents: sweepPermanents(turn),
+          clock,
+          counterArmed: null,
+          firedCounts,
+          lastFiredWindow,
+        });
+        if (result.clockExpired) break;
+        windows += 1;
+        for (const update of result.seats) {
+          const seat = seats.find((s) => s.id === update.id);
+          if (seat) {
+            seat.threat = update.threat;
+            seat.silhouette = update.silhouette;
+          }
+        }
+        for (const event of result.events) {
+          firedCounts[event.type] += 1;
+          lastFiredWindow[event.type] = windowIndex;
+          events += 1;
+          seen.add(event.type);
+          if (event.type === 'combat') continue;
+          if (!event.card) missing.push(`b${bracket} t${turn} ${event.type}`);
+          else if (
+            event.type === 'wipe' &&
+            event.card.sweep !== 'creatures' &&
+            event.turn < 5
+          ) {
+            earlyWideWipes.push(`b${bracket} t${event.turn} ${event.card.name}`);
+          }
+        }
+        clock = result.clock;
+      }
+    }
+  }
+
+  check(
+    '(m) every event but combat cites a card',
+    missing.length === 0,
+    `${missing.length} without one, e.g. ${missing.slice(0, 3).join(', ')}`,
+  );
+  check(
+    '(m) no wrath sweeps past creatures before turn 5',
+    earlyWideWipes.length === 0,
+    earlyWideWipes.slice(0, 3).join(', '),
+  );
+  check(
+    '(m) the sweep exercised every hazard',
+    ['wipe', 'removal', 'combat', 'resource', 'clock'].every((t) => seen.has(t)),
+    [...seen].join(', '),
+  );
+  summary.push(
+    `(m) ${windows} windows across 5 brackets produced ${events} events, all cited`,
+  );
+}
+
+/** A seat holding up mana it cannot spend has no counterspell to hold. */
+function checkCounterCitationSkips(): void {
+  const spell = { name: 'Grounds Titan', manaValue: 7, typeLine: 'Creature — Giant' };
+  const broke = chooseCounterCitation(3, 5, 1, 0, spell);
+  const afforded = chooseCounterCitation(3, 5, 1, 5, spell);
+  check('(m) no mana, no counterspell, no interception', broke === undefined);
+  check('(m) with mana up the same seat does counter', afforded !== undefined, `${afforded?.name}`);
+  // The other way a seat has nothing is shape: at bracket 2 the only counter
+  // one mana buys is An Offer You Can't Refuse, which does not look at
+  // creatures. The same seat, same mana, catches a noncreature spell.
+  const noShape = chooseCounterCitation(3, 5, 2, 1, spell);
+  const rightShape = chooseCounterCitation(3, 5, 2, 1, {
+    name: 'Grounds Signet',
+    manaValue: 6,
+    typeLine: 'Artifact',
+  });
+  check('(m) a counter the wrong shape is not cited', noShape === undefined, `${noShape?.name}`);
+  check(
+    '(m) the same mana still catches what it is shaped for',
+    rightShape?.name === "An Offer You Can't Refuse",
+    `${rightShape?.name}`,
+  );
+  summary.push(`(m) counter citations skip when nothing is castable (${afforded?.name} when it is)`);
+}
+
+/**
+ * Find a run whose pod puts a pay-or-punish tax in front of the player, and
+ * hand it back with the run still live. `want` picks which punish is wanted.
+ */
+function findTaxEvent(seed: string, want?: 'draw' | 'treasure'): PressureEvent | null {
+  freshRun(seed);
+  for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+    if (!store().run) return null;
+    for (let guard = 0; guard < 40; guard++) {
+      const event = store().activeEvent;
+      if (!event) break;
+      if (
+        event.type === 'resource' &&
+        event.variant === 'tax' &&
+        (want === undefined || event.card?.punish === want)
+      ) {
+        return event;
+      }
+      if (event.type === 'combat') store().respondToActiveEvent('blocked it');
+      else store().resolveActiveEvent();
+    }
+    if (store().clock) store().declareInteraction();
+    store().nextTurn();
+  }
+  return null;
+}
+
+function seatThreat(seatId: SeatId): number {
+  return store().seats.find((s) => s.id === seatId)?.threat ?? 0;
+}
+
+function seatOpenMana(seatId: SeatId): number {
+  return store().seats.find((s) => s.id === seatId)?.silhouette.openMana ?? 0;
+}
+
+function seatBonusMana(seatId: SeatId): number {
+  return store().seats.find((s) => s.id === seatId)?.silhouette.bonusMana ?? 0;
+}
+
+/** What the seat could actually cast right now, which is the point of a Treasure. */
+function seatSpendable(seatId: SeatId): number {
+  const seat = store().seats.find((s) => s.id === seatId);
+  const run = store().run;
+  if (!seat || !run) return 0;
+  return seatMana(seat.silhouette, store().turn, run.bracket);
+}
+
+function checkTaxIsPayOrPunish(): void {
+  // Paying: the seat gets nothing, and the entry says what it cost.
+  const paidSeed = search('tax-paid', (seed) => (findTaxEvent(seed) ? seed : null));
+  check('(m) a run offered a tax to pay', paidSeed !== null);
+  if (paidSeed) {
+    const event = findTaxEvent(paidSeed);
+    if (event) {
+      const before = seatThreat(event.seatId);
+      store().respondToActiveEvent();
+      const entry = (store().run?.log ?? [])
+        .filter((e) => e.kind === 'respond' && e.payload.eventId === event.id)
+        .pop();
+      check('(m) paying the tax is logged as an answer', entry !== undefined);
+      check(
+        '(m) the paid entry carries the price',
+        entry?.payload.paid === event.card?.pay,
+        `logged ${String(entry?.payload.paid)}, card asks ${String(event.card?.pay)}`,
+      );
+      check(
+        '(m) paying leaves the seat exactly as scary',
+        seatThreat(event.seatId) === before,
+        `${before} → ${seatThreat(event.seatId)}`,
+      );
+      summary.push(`(m) seed ${paidSeed}: paid ${event.card?.name} for ${event.card?.pay}`);
+    }
+  }
+
+  // Not paying: the punish lands. A drawn card makes the seat scarier; a
+  // Treasure does that and leaves a mana open for the next window.
+  const drawSeed = search('tax-draw', (seed) => (findTaxEvent(seed, 'draw') ? seed : null));
+  check('(m) a run offered a draw tax', drawSeed !== null);
+  if (drawSeed) {
+    const event = findTaxEvent(drawSeed, 'draw');
+    if (event) {
+      const before = seatThreat(event.seatId);
+      const openBefore = seatOpenMana(event.seatId);
+      const bonusBefore = seatBonusMana(event.seatId);
+      store().resolveActiveEvent();
+      // The cast already jumped this seat's threat in the window that offered
+      // the tax. What lands here is the punish's own, and only the punish's.
+      const punish = PRESSURE.threat.punish.draw;
+      check(
+        '(m) an unpaid draw tax makes the seat scarier by the punish alone',
+        Math.abs(seatThreat(event.seatId) - Math.min(PRESSURE.threat.max, before + punish)) < 0.05,
+        `${before} → ${seatThreat(event.seatId)}, expected +${punish}`,
+      );
+      check(
+        '(m) a draw tax leaves the seat no extra mana',
+        seatOpenMana(event.seatId) === openBefore && seatBonusMana(event.seatId) === bonusBefore,
+        `${openBefore} → ${seatOpenMana(event.seatId)}, bonus ${bonusBefore} → ${seatBonusMana(event.seatId)}`,
+      );
+      summary.push(`(m) seed ${drawSeed}: ${event.card?.name} went unpaid, Seat ${event.seatId} drew`);
+    }
+  }
+
+  const treasureSeed = search('tax-treasure', (seed) =>
+    findTaxEvent(seed, 'treasure') ? seed : null,
+  );
+  check('(m) a run offered a Treasure tax', treasureSeed !== null);
+  if (treasureSeed) {
+    const event = findTaxEvent(treasureSeed, 'treasure');
+    if (event) {
+      const before = seatThreat(event.seatId);
+      const openBefore = seatOpenMana(event.seatId);
+      const bonusBefore = seatBonusMana(event.seatId);
+      const spendableBefore = seatSpendable(event.seatId);
+      store().resolveActiveEvent();
+      check(
+        '(m) an unpaid Treasure tax pays itself in mana, not in threat',
+        Math.abs(seatThreat(event.seatId) - before) < 0.05,
+        `${before} → ${seatThreat(event.seatId)}`,
+      );
+      check(
+        '(m) the Treasure is a mana the seat now has open',
+        seatOpenMana(event.seatId) === openBefore + 1 &&
+          seatBonusMana(event.seatId) === bonusBefore + 1,
+        `${openBefore} → ${seatOpenMana(event.seatId)}, bonus ${bonusBefore} → ${seatBonusMana(event.seatId)}`,
+      );
+      check(
+        '(m) and a mana it can actually spend on a bigger card',
+        seatSpendable(event.seatId) === spendableBefore + 1,
+        `${spendableBefore} → ${seatSpendable(event.seatId)}`,
+      );
+      summary.push(
+        `(m) seed ${treasureSeed}: ${event.card?.name} went unpaid, Seat ${event.seatId} made a Treasure`,
+      );
+    }
+  }
+  endRunQuietly('abandoned');
+}
+
+// ---------------------------------------------------------------------------
+// (n) a tuck shuffles off its own generator, and excludes are honoured
+// ---------------------------------------------------------------------------
+
+/**
+ * Drive a run until the pod cites a card that puts its target into the library
+ * — Chaos Warp is the only shape in the table that does. Lands and spells are
+ * played every turn, because removal needs something to point at.
+ */
+function findTuckEvent(seed: string, castCommander = false): PressureEvent | null {
+  freshRun(seed);
+  for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+    if (!store().run) return null;
+    for (let guard = 0; guard < 40; guard++) {
+      const event = store().activeEvent;
+      if (!event) break;
+      if (event.type === 'removal' && event.card?.zone === 'library') {
+        // With the commander on the table it is the only thing the pod points
+        // at, so `castCommander` is also what decides which target this finds.
+        const onCommander = store().cards[event.targetIid ?? '']?.isCommander === true;
+        if (onCommander === castCommander) return event;
+      }
+      if (event.type === 'combat') store().respondToActiveEvent('blocked it');
+      else store().resolveActiveEvent();
+    }
+    if (store().clock) store().declareInteraction();
+    store().nextTurn();
+    playLand();
+    if (castCommander) {
+      const commander = cardsInZone(store(), 'command')[0];
+      if (commander) store().moveCard(commander.iid, 'battlefield');
+    }
+    playBiggestSpell();
+  }
+  return null;
+}
+
+/**
+ * A commander cannot be tucked or bounced: its owner sends it to the command
+ * zone instead, exactly as the counter path already does, and nothing about the
+ * tax moves because nothing was cast.
+ */
+function checkTuckedCommanderGoesHome(): void {
+  const found = search('warp-cmd', (s) => (findTuckEvent(s, true) ? s : null));
+  check('(n) a run cited a tuck at the commander', found !== null);
+  if (found === null) return;
+  const event = findTuckEvent(found, true);
+  const iid = event?.targetIid;
+  if (!event || !iid) return;
+
+  const taxBefore = (store().run?.log ?? []).filter((e) => e.kind === 'commander').length;
+  store().resolveActiveEvent();
+  check(
+    '(n) a tucked commander goes to the command zone',
+    store().cards[iid]?.zone === 'command',
+    `${store().cards[iid]?.zone}`,
+  );
+  check('(n) it is not in the library', !store().libraryOrder.includes(iid));
+  const home = (store().run?.log ?? [])
+    .filter((e) => e.kind === 'commander' && e.payload.iid === iid)
+    .pop();
+  check('(n) the trip home is logged as a commander entry', home !== undefined);
+  check(
+    '(n) and charges no tax for it',
+    home?.payload.castNumber === undefined && home?.payload.taxPaid === undefined,
+    `${JSON.stringify(home?.payload)}`,
+  );
+  summary.push(
+    `(n) seed ${found}: ${event.card?.name} on the commander sent it home, ${taxBefore + 1} commander entries`,
+  );
+  endRunQuietly('abandoned');
+}
+
+/**
+ * Whether the player answers a tuck or lets it resolve is a decision at the
+ * table, not one the seed made. The shuffle it needs therefore runs on a
+ * generator derived from the seed and the event's id: if it drew from the run's
+ * own stream, the two choices would hand every window after it different rolls,
+ * and a seed would stop describing a game.
+ */
+function checkTuckShuffleIsOffTheMainStream(): void {
+  const found = search('warp', (s) => (findTuckEvent(s) ? s : null));
+  check('(n) a run cited a card that tucks its target', found !== null);
+  if (found === null) return;
+  const seed: string = found;
+
+  /** Replay to the tuck, take the named exit, then read the run's next rolls. */
+  function nextRolls(exit: 'resolve' | 'answer'): { rolls: string; topBefore: string; topAfter: string } {
+    const event = findTuckEvent(seed);
+    const iid = event?.targetIid;
+    const topBefore = store().libraryOrder.slice(0, 6).join(',');
+    if (exit === 'resolve') store().resolveActiveEvent();
+    else store().respondToActiveEvent('answered it');
+    const topAfter = store().libraryOrder.slice(0, 6).join(',');
+    const rng = store().rng;
+    const rolls = rng ? Array.from({ length: 16 }, () => rng()).join(',') : 'no rng';
+    return { rolls, topBefore, topAfter: `${topAfter}|${iid ? store().cards[iid]?.zone : '?'}` };
+  }
+
+  const resolved = nextRolls('resolve');
+  const answered = nextRolls('answer');
+  check(
+    '(n) the tuck actually shuffled the library',
+    resolved.topBefore !== resolved.topAfter.split('|')[0],
+    'the top of the library did not move',
+  );
+  check(
+    '(n) the tucked card is in the library',
+    resolved.topAfter.endsWith('|library'),
+    resolved.topAfter,
+  );
+  check(
+    '(n) resolving a tuck leaves the next rolls identical to answering it',
+    resolved.rolls === answered.rolls,
+    `${resolved.rolls.slice(0, 60)} vs ${answered.rolls.slice(0, 60)}`,
+  );
+  summary.push(`(n) seed ${seed}: a tuck shuffled without moving the run's own stream`);
+  endRunQuietly('abandoned');
+}
+
+/**
+ * A token that leaves the battlefield ceases to exist, and both replayers have
+ * to survive a move whose card is gone by the next entry.
+ */
+function checkTokensCeaseToExist(): void {
+  freshRun('token-vanish');
+  store().createToken({ name: 'Treasure', typeLine: 'Artifact — Treasure' }, 1);
+  const iid = Object.values(store().cards).find((c) => c.isToken)?.iid;
+  check('(n) a token was created', iid !== undefined);
+  if (!iid) return;
+
+  store().moveCard(iid, 'graveyard');
+  check('(n) a token that leaves the battlefield stops existing', store().cards[iid] === undefined);
+  check('(n) and never joins the library order', !store().libraryOrder.includes(iid));
+  const move = (store().run?.log ?? [])
+    .filter((e) => e.kind === 'move' && e.payload.iid === iid)
+    .pop();
+  check('(n) the move entry says the token is gone', move?.payload.tokenGone === true);
+
+  endRunQuietly('abandoned');
+  const record = lastCapturedRun();
+  check('(n) the vanishing run was captured', record !== null);
+  if (!record) return;
+  // The replayers read a move whose card is gone by the next entry. Neither may
+  // throw, and neither may count the token as board value it can never get back.
+  const scored = scoreRun(record);
+  check('(n) the scorer replays the vanished token', scored.turns >= 1, `${scored.turns} turns`);
+  check(
+    '(n) a token was worth no board value either way',
+    scored.timeline.every((row) => row.boardValueEnd === 0 && row.mvDeployed === 0),
+    scored.timeline.map((row) => `${row.mvDeployed}/${row.boardValueEnd}`).join(' '),
+  );
+  check('(n) the review replays it too', reviewRun(record, scored).findings.length >= 0);
+  summary.push('(n) a token swept off the battlefield ceased to exist, in the store and in the replay');
+}
+
+/** An artifact creature the pod must not answer with Go for the Throat. */
+function artifactCreatureBoard(): PermanentSummary[] {
+  return [
+    {
+      iid: 'golem',
+      name: 'Grounds Golem',
+      manaValue: 4,
+      isCommander: false,
+      isToken: false,
+      isLand: false,
+      typeLine: 'Artifact Creature — Golem',
+      movedAt: 10,
+    },
+  ];
+}
+
+/**
+ * `excludes` is the difference between a citation a player recognises and one
+ * that reads as the app not knowing the card. Go for the Throat is a nonartifact
+ * creature card, so a board of one artifact creature must never see it, at any
+ * bracket, on any turn, however many windows are swept.
+ */
+function checkExcludesAreHonoured(): void {
+  let cited = 0;
+  let removals = 0;
+  const wrong: string[] = [];
+
+  for (let bracket = 1; bracket <= 5; bracket++) {
+    for (let i = 0; i < 120; i++) {
+      const rng = createRng(`excludes-b${bracket}-${i}`);
+      const seats = sweepSeats(rng);
+      const firedCounts = zeroFiredCounts();
+      const lastFiredWindow = zeroLastFiredWindow();
+      for (let turn = 2; turn <= 12; turn++) {
+        const result = resolveWindow({
+          turn,
+          windowIndex: turn - 1,
+          bracket,
+          rng,
+          seats,
+          player: {
+            life: 40,
+            boardMV: 4,
+            boardPower: 4,
+            commanderOnBattlefield: false,
+            damageDealtRecent: 0,
+          },
+          permanents: artifactCreatureBoard(),
+          clock: null,
+          counterArmed: null,
+          firedCounts,
+          lastFiredWindow,
+        });
+        for (const update of result.seats) {
+          const seat = seats.find((s) => s.id === update.id);
+          if (seat) {
+            seat.threat = update.threat;
+            seat.silhouette = update.silhouette;
+          }
+        }
+        for (const event of result.events) {
+          firedCounts[event.type] += 1;
+          lastFiredWindow[event.type] = turn - 1;
+          if (event.type !== 'removal') continue;
+          removals += 1;
+          cited += 1;
+          if (event.card?.name === 'Go for the Throat') {
+            wrong.push(`b${bracket} t${turn}`);
+          }
+        }
+      }
+    }
+  }
+
+  check('(n) the excludes sweep produced removal to judge', removals > 100, `${removals}`);
+  check(
+    '(n) Go for the Throat is never cited on an artifact creature',
+    wrong.length === 0,
+    `${wrong.length} times, e.g. ${wrong.slice(0, 3).join(', ')}`,
+  );
+  summary.push(`(n) ${cited} removals at an artifact creature, none of them Go for the Throat`);
+}
+
+// ---------------------------------------------------------------------------
 // (e) determinism, with the new paths in the script
 // ---------------------------------------------------------------------------
 
@@ -1579,6 +2153,13 @@ async function main(): Promise<void> {
   await checkStackTray();
   await checkStackedCounter();
   await checkStackGuards();
+  checkEveryEventCitesACard();
+  checkCounterCitationSkips();
+  checkTaxIsPayOrPunish();
+  checkTuckShuffleIsOffTheMainStream();
+  checkTuckedCommanderGoesHome();
+  checkTokensCeaseToExist();
+  checkExcludesAreHonoured();
   checkDeterminism();
 
   console.log('\nverify:engine');

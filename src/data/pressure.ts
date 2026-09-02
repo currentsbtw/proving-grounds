@@ -33,6 +33,10 @@ import type { EventType } from '../domain/types';
  *     the most removal, the most counter-armed windows, and a clock from turn 4
  *     because the win is a combo, not an army.
  *
+ * Version 3 changes no curve. It adds `seatMana.accel`, the one number the card
+ * citations need: every event now names a real card the seat could actually
+ * cast, and what a seat can cast depends on how much mana it represents.
+ *
  * Bracket tables are indexed by `bracket - 1`, i.e. `[b1, b2, b3, b4, b5]`.
  * Values were fitted with `npm run probe:pressure 1000`, which carries the
  * target for every metric and fails non-zero when one drifts out of band.
@@ -74,7 +78,18 @@ export function byBracket(table: BracketTable, bracket: number): number {
 
 export const PRESSURE = {
   /** Bumped whenever the numbers below change, so logged runs stay comparable. */
-  version: 2,
+  version: 3,
+
+  seatMana: {
+    /**
+     * Mana a seat represents beyond its land drop: rocks, rituals and fast mana.
+     * Available mana is `max(silhouette.openMana, turn + accel[bracket])`, so a
+     * cEDH seat is two mana ahead of the turn count and a precon seat is not
+     * ahead at all. It is the gate on which cards a seat can cite — a five-mana
+     * wrath is not something a bracket-1 pod does on turn three.
+     */
+    accel: [0, 0, 1, 1, 2] as BracketTable,
+  },
 
   bracket: {
     /** Multiplies damage and other magnitudes. */
@@ -228,6 +243,15 @@ export const PRESSURE = {
       clock: 1.2,
       resource: 0.6,
     } satisfies Record<EventType, number>,
+    /**
+     * Threat a seat gains when a pay-or-punish tax goes unpaid, on top of the
+     * `eventJump.resource` it already took for casting the thing. This is off
+     * the probe: the probe never answers a prompt, so it can only ever see the
+     * jump, and these are driven by a choice the player makes at the table. A
+     * drawn card is a real gain and worth a fraction of a point; a Treasure
+     * pays itself out in `bonusMana` instead, so it adds no threat here.
+     */
+    punish: { draw: 0.3, treasure: 0 },
     /** Damage a seat must take to shed one point of threat. */
     damagePerPoint: 8,
     /** Share of an eliminated seat's threat inherited by the survivors. */

@@ -5,6 +5,7 @@ import { aggregateProfile, compareScorecards } from '../../engine/scorecard';
 import type { EventLedgerRow, Scorecard } from '../../engine/scorecard';
 import type { Deck, RunResult } from '../../domain/types';
 import { useUiStore } from '../../state/uiStore';
+import { normalizeSweep, sweepWord } from '../pressure/pressureUi';
 import ReviewSection from './ReviewSection';
 import TimelineChart from './TimelineChart';
 import { useDeckScorecards, useScorecard } from './useScorecards';
@@ -74,11 +75,13 @@ function eventDetail(row: EventLedgerRow): string {
   const s = row.severity;
   switch (row.type) {
     case 'wipe':
-      return `${row.variant ?? 'creatures'} · pod ${s.podCreatures ?? 0} creatures, ${s.podPower ?? 0} power`;
+      // The stored variant is the sweep, and old runs still say 'nonlands'; the
+      // ledger prints the scope in the same words the dock offered it in.
+      return `${sweepWord(normalizeSweep(row.variant))} · pod ${s.podCreatures ?? 0} creatures, ${s.podPower ?? 0} power`;
     case 'removal':
       return `target MV ${s.targetMv ?? 0}${s.commander ? ' · your commander' : ''}`;
     case 'counter':
-      return `holds up ${s.threshold ?? 0}+ · your spell MV ${s.manaValue ?? 0}${s.commander ? ' · commander' : ''}`;
+      return `counters at ${s.threshold ?? 0}+ · your spell MV ${s.manaValue ?? 0}${s.commander ? ' · commander' : ''}`;
     case 'combat': {
       const attackers = s.attackers ?? 0;
       return `${attackers} attacker${attackers === 1 ? '' : 's'} for ${s.damage ?? 0}`;
@@ -235,11 +238,18 @@ function EventLedger({ card }: { card: Scorecard }) {
         </thead>
         <tbody>
           {rows.map((row) => (
+            /* The card text is printed under the card name rather than hidden
+               in the row's tooltip: a tooltip is unreachable by keyboard and
+               gone on touch, and the effect is the thing a run is meant to
+               teach. It stays inside the event column, so the ledger is still
+               six columns wide at 1024. */
             <tr key={row.eventId}>
               <td className="num">{row.turn}</td>
               <td className="num">{row.seatId}</td>
               <td>
                 <span className={`sc-evt type-${row.type}`}>{row.type}</span>
+                {row.card && <span className="sc-evt-card">{row.card}</span>}
+                {row.cardEffect && <span className="sc-evt-effect">{row.cardEffect}</span>}
               </td>
               <td className="sc-cell-detail">{eventDetail(row)}</td>
               <td className={`sc-term is-${row.terminal}`}>{row.terminal}</td>

@@ -340,6 +340,10 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
             firstCommanderSeq = entry.seq;
           }
           enter(iid, to, entry, from);
+          // A token that left the battlefield ceased to exist. The entry says
+          // where it was headed because that is what swept it, but nothing is
+          // there afterwards — a bounced Treasure is not a card in hand.
+          if (isTrue(p, 'tokenGone')) zones.delete(iid);
         }
         break;
       }

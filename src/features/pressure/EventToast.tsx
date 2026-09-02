@@ -23,6 +23,8 @@ interface Toast {
   first: string;
   /** Label on the second response; a bare clock has only the first. */
   second: string | null;
+  /** The cited card's name, printed beside the class chip. Null when uncited. */
+  card: string | null;
   /** The event being announced, so the gate can be re-read live. Null for a clock. */
   event: PressureEvent | null;
 }
@@ -50,6 +52,7 @@ function describeEvent(event: PressureEvent): Toast {
     prompt: event.prompt,
     first: answers.first,
     second: answers.second,
+    card: event.card?.name ?? null,
     event,
   };
 }
@@ -65,6 +68,7 @@ function describeClock(clock: ClockState): Toast {
     prompt: `${seatLabel(clock.seatId)} wins after your turn ${clock.deadlineTurn}.`,
     first: 'Declare held interaction',
     second: null,
+    card: null,
     event: null,
   };
 }
@@ -104,8 +108,12 @@ export default function EventToast() {
    * all; the dock's own listener is the hard gate and no-ops a slot 2 it cannot
    * honour. Selecting the boolean rather than the whole answer keeps the
    * snapshot stable, and keeps the toast honest as the board moves under it.
+   * Only a resource event has a gate at all, so the type is checked first and
+   * every other event answers without walking the board on each store write.
    */
-  const blocked = useGameStore((s) => (toast?.event ? describeAnswers(toast.event, s).blocked : false));
+  const blocked = useGameStore((s) =>
+    toast?.event?.type === 'resource' ? describeAnswers(toast.event, s).blocked : false,
+  );
 
   useEffect(() => {
     const eventId = activeEvent?.id ?? null;
@@ -223,6 +231,13 @@ export default function EventToast() {
           </span>
           <span className="pgp-seat">{seatLabel(toast.seatId)}</span>
           <span className={`pgp-type type-${toast.type}`}>{EVENT_LABEL[toast.type]}</span>
+          {/* The card the seat cast, named where the eyes already are. One line:
+              the dock carries the mana value and the effect text. */}
+          {toast.card && (
+            <span className="pgp-toast-card" title={toast.card}>
+              {toast.card}
+            </span>
+          )}
         </div>
 
         <p className="pgp-toast-prompt">{toast.prompt}</p>

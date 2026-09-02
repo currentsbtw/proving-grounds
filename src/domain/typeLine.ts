@@ -35,3 +35,23 @@ export function isInstantOrSorceryTypeLine(typeLine: string): boolean {
 export function isCreatureTypeLine(typeLine: string): boolean {
   return /\bCreature\b/i.test(frontFaceTypeLine(typeLine));
 }
+
+export function isArtifactTypeLine(typeLine: string): boolean {
+  return /\bArtifact\b/i.test(frontFaceTypeLine(typeLine));
+}
+
+export function isEnchantmentTypeLine(typeLine: string): boolean {
+  return /\bEnchantment\b/i.test(frontFaceTypeLine(typeLine));
+}
+
+export function isPlaneswalkerTypeLine(typeLine: string): boolean {
+  return /\bPlaneswalker\b/i.test(frontFaceTypeLine(typeLine));
+}
+
+/**
+ * Supertype, not a card type, but the citation table asks for it: a few
+ * counterspells only look at legendary spells.
+ */
+export function isLegendaryTypeLine(typeLine: string): boolean {
+  return /\bLegendary\b/i.test(frontFaceTypeLine(typeLine));
+}

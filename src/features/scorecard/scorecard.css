@@ -617,6 +617,18 @@
   color: var(--ink);
 }
 
+/* The card the seat cast, on its own line under the class chip. Held to a short
+   measure so a 141-character printed name cannot widen the Event column and
+   push the ledger into a horizontal scroll at 1024. */
+.sc-evt-card {
+  display: block;
+  max-width: 18ch;
+  margin-top: 3px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
 /* Event accents, mirroring the dock stripe in `pressure.css`. One declaration
    feeds the ledger chip, the chart's markers and the chart's key. */
 .sc-evt.type-wipe,
@@ -923,4 +935,22 @@
     grid-column: 1 / -1;
     margin-top: 2px;
   }
+}
+
+/* The cited card's real effect, printed under its name. It sits in the ledger
+   rather than in the row's tooltip because a tooltip is unreachable by keyboard
+   and absent on touch, and this line is the thing a run is meant to teach. Two
+   lines: the ledger is a scan, not a rules reference. */
+.sc-evt-effect {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 26ch;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
 }
