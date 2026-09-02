@@ -100,7 +100,47 @@ function freshSeats(rng?: () => number): Seat[] {
     eliminated: false,
     threat: rng ? initialThreat(rng) : PRESSURE.threat.startMin,
     silhouette: emptySilhouette(),
-  }));
+  })).map(trackPeak);
+}
+
+/**
+ * Remember a seat at its scariest. Recording the high-water mark here is what
+ * lets elimination redistribute what the seat *was* rather than the husk left
+ * after the killing blow — see `redistribute`.
+ *
+ * Threat and board are tracked independently, because they do not move
+ * together. A seat pinned at the threat cap, or regrowing after damage knocked
+ * it back, keeps adding creatures and power every window while its threat sits
+ * flat or below an earlier reading. Gating the board on "did threat rise" froze
+ * the recorded board at whatever it happened to be the last time the number
+ * ticked up, so the survivors inherited a board the seat had long outgrown.
+ * Peak threat is the running max of threat; peak board is the componentwise max
+ * of the boards seen, and both are refreshed on every update.
+ */
+function trackPeak(seat: Seat): Seat {
+  const peakThreat = Math.max(seat.threat, seat.peakThreat ?? seat.threat);
+  const recorded = seat.peakSilhouette;
+  const peakSilhouette: Silhouette = recorded
+    ? {
+        creatures: Math.max(seat.silhouette.creatures, recorded.creatures),
+        power: Math.max(seat.silhouette.power, recorded.power),
+        artifacts: Math.max(seat.silhouette.artifacts, recorded.artifacts),
+        openMana: Math.max(seat.silhouette.openMana, recorded.openMana),
+      }
+    : seat.silhouette;
+
+  // Nothing moved: hand back the same object so a seat row does not re-render.
+  if (
+    recorded &&
+    peakThreat === seat.peakThreat &&
+    peakSilhouette.creatures === recorded.creatures &&
+    peakSilhouette.power === recorded.power &&
+    peakSilhouette.artifacts === recorded.artifacts &&
+    peakSilhouette.openMana === recorded.openMana
+  ) {
+    return seat;
+  }
+  return { ...seat, peakThreat, peakSilhouette };
 }
 
 /** Threat per seat, as a plain record — the shape `previousThreat` is kept in. */
@@ -249,6 +289,21 @@ export interface GameState {
   damageDealtByTurn: Record<number, number>;
   /** Monotonic suffix that keeps event ids unique without breaking determinism. */
   eventSeq: number;
+
+  /**
+   * The player's life has been seen at or below zero and the table has been
+   * told. Death is not settled on the action that caused it: the run ends on the
+   * next action that is not an undo, so a mis-clicked life button is still
+   * recoverable. Cleared the moment life is back above zero.
+   */
+  deathNoticed: boolean;
+  /**
+   * A run is being ended right now. Set synchronously at the top of `endRun`,
+   * which then awaits the Dexie write before clearing the store — without this,
+   * any action landing inside that window would settle the run a second time and
+   * append a second "Run ended". Cleared when the state resets.
+   */
+  ending: boolean;
 
   startRun: (deck: Deck, cardData: Record<string, CardData>, seed?: string) => void;
   takeMulligan: () => void;
@@ -465,11 +520,29 @@ export const useGameStore = create<GameState>((set, get) => {
       });
     }
 
+    // Whatever the seat still had in front of the player, or behind it in the
+    // queue, dies with it. The readout already hides a dead seat's chip; this is
+    // the seam underneath, so nothing can be answered on a corpse's behalf.
+    retireSeatEvents(seatId);
+
+    const armed = get().counterArmed;
+    if (armed && armed.seatId === seatId) {
+      set({ counterArmed: null });
+      appendLog('threat', `Seat ${seatId} is out. Nothing is held up any more.`, {
+        seatId,
+        canceled: true,
+        reason: 'seat-eliminated',
+        threshold: armed.threshold,
+      });
+    }
+
     // Pressure does not drop when a seat dies; it concentrates. Event frequency
     // is already seat-independent, so only threat and board move here.
     const updates = redistribute(
-      // The dead seat's own pre-death numbers are what the survivors inherit.
-      get().seats.map((x) => (x.id === seatId ? { ...toSnapshot(x), threat: seat.threat, silhouette: seat.silhouette } : toSnapshot(x))),
+      // The seat as it stood before the killing blow, peaks included: the
+      // survivors inherit the seat at its scariest, never the husk. Burning a
+      // seat down sheds threat point by point, so its last reading can be zero.
+      get().seats.map((x) => (x.id === seatId ? toSnapshot(seat) : toSnapshot(x))),
       seatId,
     );
     if (updates.length > 0) {
@@ -523,7 +596,9 @@ export const useGameStore = create<GameState>((set, get) => {
     set((s) => ({
       seats: s.seats.map((seat) => {
         const update = byId.get(seat.id);
-        return update ? { ...seat, threat: update.threat, silhouette: update.silhouette } : seat;
+        return update
+          ? trackPeak({ ...seat, threat: update.threat, silhouette: update.silhouette })
+          : seat;
       }),
     }));
   }
@@ -533,13 +608,13 @@ export const useGameStore = create<GameState>((set, get) => {
     set((s) => ({
       seats: s.seats.map((seat) =>
         seat.id === seatId
-          ? {
+          ? trackPeak({
               ...seat,
               threat: Math.min(
                 PRESSURE.threat.max,
                 Math.round((seat.threat + PRESSURE.threat.eventJump[type]) * 10) / 10,
               ),
-            }
+            })
           : seat,
       ),
     }));
@@ -572,6 +647,77 @@ export const useGameStore = create<GameState>((set, get) => {
     });
     const next = get().activeEvent;
     if (next) {
+      appendLog('event', `Next: ${next.prompt}`, { ...eventPayload(next), activated: true });
+    }
+  }
+
+  /**
+   * Finish the trip a counter event interrupted. The interception left the card
+   * where it was cast from — hand for a normal spell, the command zone for a
+   * commander whose cast is already counted and whose tax is already logged — so
+   * the spell resolving is exactly one move onto the battlefield. Shared by
+   * `respondToActiveEvent` (the player forced it through) and by
+   * `retireSeatEvents` (the seat holding the counter died, so nobody is left to
+   * counter it), which is what keeps the two paths identical.
+   *
+   * Returns the card's name when it moved, or null when there was nothing to
+   * force — no target, or a card already on the battlefield.
+   */
+  function forceCounterThrough(event: PressureEvent): string | null {
+    const iid = event.targetIid;
+    if (!iid) return null;
+    const held = get().cards[iid];
+    if (!held || held.zone === 'battlefield') return null;
+    const name = cardName(get(), iid);
+    performMove(iid, 'battlefield');
+    return name;
+  }
+
+  /**
+   * Take a dead seat's events off the table: everything of its in the queue,
+   * plus the one it currently has in front of the player. Each is logged as
+   * canceled so the scorer can tell it apart from an event that was offered and
+   * left unanswered — a canceled event was never really offered at all.
+   *
+   * A counter is the exception to "off the table". It is not a threat sitting in
+   * front of the player, it is a spell of the player's own held out of play; if
+   * the counter simply vanished, the spell would be stranded in hand (or in the
+   * command zone with its cast already counted and its tax already paid). So the
+   * counter is canceled *and* the spell it caught resolves. The event still logs
+   * as canceled, because it was never offered as a question the player answered,
+   * and the resolution is a plain move entry, so board value and commander stats
+   * read it as the ordinary cast it turned out to be.
+   */
+  function retireSeatEvents(seatId: SeatId): void {
+    const { activeEvent, pendingEvents } = get();
+    const retiredActive = activeEvent && activeEvent.seatId === seatId ? activeEvent : null;
+    const retiredPending = pendingEvents.filter((e) => e.seatId === seatId);
+    if (!retiredActive && retiredPending.length === 0) return;
+
+    const kept = pendingEvents.filter((e) => e.seatId !== seatId);
+    if (retiredActive) set({ activeEvent: kept.shift() ?? null, pendingEvents: kept });
+    else set({ pendingEvents: kept });
+
+    for (const event of retiredActive ? [retiredActive, ...retiredPending] : retiredPending) {
+      const forced = event.type === 'counter' ? forceCounterThrough(event) : null;
+      appendLog(
+        'event',
+        forced
+          ? `Seat ${seatId} is out. Nobody counters ${forced}. It resolves.`
+          : `Seat ${seatId} is out. Its pending ${event.type} is off the table.`,
+        {
+          ...eventPayload(event),
+          canceled: true,
+          reason: 'seat-eliminated',
+          forcedThrough: forced ? event.targetIid : undefined,
+          forcedName: forced ?? undefined,
+        },
+      );
+    }
+
+    // The queue moved, so say what the player is looking at now.
+    const next = get().activeEvent;
+    if (retiredActive && next) {
       appendLog('event', `Next: ${next.prompt}`, { ...eventPayload(next), activated: true });
     }
   }
@@ -796,6 +942,97 @@ export const useGameStore = create<GameState>((set, get) => {
     return true;
   }
 
+  // -------------------------------------------------------------------------
+  // Run settlement
+  // -------------------------------------------------------------------------
+
+  /**
+   * The two automatic end conditions: the player is dead, or the pod is. Only
+   * ever called from `action` below, at the tail of a public action, never from
+   * inside one. `endRun` appends "Run ended" synchronously and then clears the
+   * store, and `appendLog` drops entries once `run` is null — so ending the run
+   * the moment life crossed zero would swallow the entry the action still owed
+   * the log (the fatal combat would read as unresolved forever).
+   *
+   * The two conditions settle differently, on purpose:
+   *
+   * - Killing the pod wins immediately. There is nothing to take back and
+   *   nothing left to play against.
+   * - Dying is noticed on the fatal action and settled on the next one. Life is
+   *   kept with adjacent buttons, so a -5 at 3 life is a slip rather than a
+   *   result, and settling it on the spot wrote it to the log and put
+   *   `undoLastLifeChange` out of reach. Instead the table says so once, and the
+   *   next action that is not an undo collects. An undo never settles a death,
+   *   only clears the notice by bringing life back above zero.
+   */
+  function settleRun(recovery: boolean): void {
+    const state = get();
+    if (!state.run || state.ending) return;
+
+    if (state.playerLife <= 0) {
+      // Death is noticed first and settled later. The life buttons sit next to
+      // each other, so a -5 at 3 life is a mis-click the player must be able to
+      // take back; ending the run on the spot persists it and puts the undo out
+      // of reach. The pod collects on the next action instead.
+      if (!state.deathNoticed) {
+        set({ deathNoticed: true });
+        appendLog(
+          'note',
+          `Dead on ${state.playerLife}. Undo the life change, or the next action ends the run.`,
+          { reason: 'life', life: state.playerLife, deathNoticed: true },
+        );
+        return;
+      }
+      // An undo is the way out, never the thing that closes the door: two bad
+      // clicks take two undos, and the first must not be counted as "the next
+      // action" and end the run before the second lands.
+      if (recovery) return;
+      appendLog('run', `Dead on ${state.playerLife}. The pod takes it.`, {
+        reason: 'life',
+        life: state.playerLife,
+      });
+      void get().endRun('loss');
+      return;
+    }
+
+    // Back above zero: the notice is spent, and a later death starts over.
+    if (state.deathNoticed) set({ deathNoticed: false });
+
+    if (state.seats.length > 0 && state.seats.every((seat) => seat.eliminated)) {
+      appendLog('run', 'Every seat is out. The table is yours.', { reason: 'pod-eliminated' });
+      void get().endRun('win');
+    }
+  }
+
+  /**
+   * Depth of public actions on the stack. Actions nest — `resolveActiveEvent`
+   * calls `adjustLife` for a combat hit — and only the outermost one settles, so
+   * the run ends after the whole action has finished writing to the log.
+   */
+  let actionDepth = 0;
+  /** Whether the outermost action currently on the stack is an undo. */
+  let recovering = false;
+
+  /**
+   * Run a public action's body, then settle the run if this is the outer one.
+   * `kind` is 'recovery' for an action whose whole job is to take something
+   * back: it can clear a death notice but never cashes one in.
+   */
+  function action<T>(body: () => T, kind: 'action' | 'recovery' = 'action'): T {
+    if (actionDepth === 0) recovering = kind === 'recovery';
+    actionDepth += 1;
+    try {
+      return body();
+    } finally {
+      actionDepth -= 1;
+      if (actionDepth === 0) {
+        const wasRecovery = recovering;
+        recovering = false;
+        settleRun(wasRecovery);
+      }
+    }
+  }
+
   return {
     run: null,
     phase: 'main1',
@@ -824,6 +1061,8 @@ export const useGameStore = create<GameState>((set, get) => {
     lastFiredWindow: zeroLastFiredWindow(),
     damageDealtByTurn: {},
     eventSeq: 0,
+    deathNoticed: false,
+    ending: false,
 
     startRun(deck, cardData, seed) {
       const runSeed = seed ?? randomSeed();
@@ -904,6 +1143,8 @@ export const useGameStore = create<GameState>((set, get) => {
         lastFiredWindow: zeroLastFiredWindow(),
         damageDealtByTurn: {},
         eventSeq: 0,
+        deathNoticed: false,
+        ending: false,
       });
 
       appendLog('run', `Run started: ${deck.name} (seed ${runSeed})`, {
@@ -992,81 +1233,89 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     moveCard(iid, toZone, options) {
-      const state = get();
-      const card = state.cards[iid];
-      if (!card || card.zone === toZone) return;
+      action(() => {
+        const state = get();
+        const card = state.cards[iid];
+        if (!card || card.zone === toZone) return;
 
-      // Counterspell seam. Every M0 path into the battlefield — drag,
-      // double-click, card menu — comes through here, so the interception lives
-      // here and the feature components stay untouched. Only hand → battlefield
-      // is a "cast"; scooping a card back from the graveyard is not.
-      const armed = state.counterArmed;
-      if (
-        armed &&
-        card.zone === 'hand' &&
-        toZone === 'battlefield' &&
-        manaValueOf(state, card) >= armed.threshold
-      ) {
-        raiseCounterEvent(iid, armed);
-        return;
-      }
+        // Counterspell seam. Every M0 path into the battlefield — drag,
+        // double-click, card menu — comes through here, so the interception lives
+        // here and the feature components stay untouched. Only hand → battlefield
+        // is a "cast"; scooping a card back from the graveyard is not.
+        const armed = state.counterArmed;
+        if (
+          armed &&
+          card.zone === 'hand' &&
+          toZone === 'battlefield' &&
+          manaValueOf(state, card) >= armed.threshold
+        ) {
+          raiseCounterEvent(iid, armed);
+          return;
+        }
 
-      performMove(iid, toZone, options);
+        performMove(iid, toZone, options);
+      });
     },
 
     drawCards(n) {
-      if (!get().run || n <= 0) return;
-      const available = get().libraryOrder.length;
-      const drawn = takeFromTop(Math.min(n, available));
-      const names = drawn.map((iid) => cardName(get(), iid));
-      appendLog('draw', `Drew ${drawn.length} card${drawn.length === 1 ? '' : 's'}`, {
-        count: drawn.length,
-        requested: n,
-        iids: drawn,
-        names,
-        libraryRemaining: get().libraryOrder.length,
-      });
-      if (drawn.length < n) {
-        appendLog('note', `Attempted to draw ${n} with ${available} card${available === 1 ? '' : 's'} in library`, {
+      action(() => {
+        if (!get().run || n <= 0) return;
+        const available = get().libraryOrder.length;
+        const drawn = takeFromTop(Math.min(n, available));
+        const names = drawn.map((iid) => cardName(get(), iid));
+        appendLog('draw', `Drew ${drawn.length} card${drawn.length === 1 ? '' : 's'}`, {
+          count: drawn.length,
           requested: n,
-          available,
-          emptyLibrary: true,
+          iids: drawn,
+          names,
+          libraryRemaining: get().libraryOrder.length,
         });
-      }
+        if (drawn.length < n) {
+          appendLog('note', `Attempted to draw ${n} with ${available} card${available === 1 ? '' : 's'} in library`, {
+            requested: n,
+            available,
+            emptyLibrary: true,
+          });
+        }
+      });
     },
 
     shuffleLibrary() {
-      if (!get().run) return;
-      shuffleSilently();
-      appendLog('shuffle', `Library shuffled (${get().libraryOrder.length} cards)`, {
-        size: get().libraryOrder.length,
+      action(() => {
+        if (!get().run) return;
+        shuffleSilently();
+        appendLog('shuffle', `Library shuffled (${get().libraryOrder.length} cards)`, {
+          size: get().libraryOrder.length,
+        });
       });
     },
 
     millCards(n) {
-      if (!get().run || n <= 0) return;
-      const milled = get().libraryOrder.slice(0, n);
-      if (milled.length === 0) {
-        appendLog('note', 'Nothing to mill: the library is empty', { requested: n, available: 0 });
-        return;
-      }
-      set((s) => {
-        const cards = { ...s.cards };
-        let stamp = s.moveCounter;
-        for (const iid of milled) {
-          stamp += 1;
-          cards[iid] = { ...cards[iid], zone: 'graveyard', tapped: false, counters: {}, movedAt: stamp };
+      action(() => {
+        if (!get().run || n <= 0) return;
+        const milled = get().libraryOrder.slice(0, n);
+        if (milled.length === 0) {
+          appendLog('note', 'Nothing to mill: the library is empty', { requested: n, available: 0 });
+          return;
         }
-        return { cards, libraryOrder: s.libraryOrder.slice(milled.length), moveCounter: stamp };
-      });
-      const names = milled.map((iid) => cardName(get(), iid));
-      appendLog('move', `Milled ${milled.length}: ${names.join(', ')}`, {
-        count: milled.length,
-        requested: n,
-        iids: milled,
-        names,
-        from: 'library',
-        to: 'graveyard',
+        set((s) => {
+          const cards = { ...s.cards };
+          let stamp = s.moveCounter;
+          for (const iid of milled) {
+            stamp += 1;
+            cards[iid] = { ...cards[iid], zone: 'graveyard', tapped: false, counters: {}, movedAt: stamp };
+          }
+          return { cards, libraryOrder: s.libraryOrder.slice(milled.length), moveCounter: stamp };
+        });
+        const names = milled.map((iid) => cardName(get(), iid));
+        appendLog('move', `Milled ${milled.length}: ${names.join(', ')}`, {
+          count: milled.length,
+          requested: n,
+          iids: milled,
+          names,
+          from: 'library',
+          to: 'graveyard',
+        });
       });
     },
 
@@ -1085,269 +1334,288 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     castCommander(iid) {
-      const state = get();
-      const card = state.cards[iid];
-      if (!card || !card.isCommander || !card.scryfallId) return;
-      const name = cardName(state, iid);
-      const key = card.scryfallId;
-      const tax = commanderTax(state, key);
-      const priorCasts = state.commanderCasts[key] ?? 0;
+      action(() => {
+        const state = get();
+        const card = state.cards[iid];
+        if (!card || !card.isCommander || !card.scryfallId) return;
+        const name = cardName(state, iid);
+        const key = card.scryfallId;
+        const tax = commanderTax(state, key);
+        const priorCasts = state.commanderCasts[key] ?? 0;
 
-      // Commanders are counterable like anything else. The threshold compares
-      // the printed mana value — commander tax is paid on top of the cost, it
-      // does not make the spell bigger.
-      const armed = state.counterArmed;
-      if (armed && manaValueOf(state, card) >= armed.threshold) {
-        // The cast still happened, so the tax still accrues: the commander is
-        // on the stack when it gets answered, and comes back more expensive.
-        set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
-        appendLog(
-          'commander',
-          `Cast ${name} (cast #${priorCasts + 1}, tax +${tax}). Met by a counter`,
-          {
-            iid,
-            name,
-            scryfallId: key,
-            castNumber: priorCasts + 1,
-            taxPaid: tax,
-            nextTax: 2 * (priorCasts + 1),
-            from: card.zone,
-            to: 'stack',
-            countered: true,
+        // Commanders are counterable like anything else. The threshold compares
+        // the printed mana value — commander tax is paid on top of the cost, it
+        // does not make the spell bigger.
+        const armed = state.counterArmed;
+        if (armed && manaValueOf(state, card) >= armed.threshold) {
+          // The cast still happened, so the tax still accrues: the commander is
+          // on the stack when it gets answered, and comes back more expensive.
+          set((s) => ({ commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 } }));
+          appendLog(
+            'commander',
+            `Cast ${name} (cast #${priorCasts + 1}, tax +${tax}). Met by a counter`,
+            {
+              iid,
+              name,
+              scryfallId: key,
+              castNumber: priorCasts + 1,
+              taxPaid: tax,
+              nextTax: 2 * (priorCasts + 1),
+              from: card.zone,
+              to: 'stack',
+              countered: true,
+            },
+          );
+          raiseCounterEvent(iid, armed);
+          return;
+        }
+
+        set((s) => ({
+          cards: {
+            ...s.cards,
+            [iid]: { ...s.cards[iid], zone: 'battlefield', counters: {}, movedAt: s.moveCounter + 1 },
           },
-        );
-        raiseCounterEvent(iid, armed);
-        return;
-      }
+          libraryOrder: s.libraryOrder.filter((x) => x !== iid),
+          commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 },
+          moveCounter: s.moveCounter + 1,
+        }));
 
-      set((s) => ({
-        cards: {
-          ...s.cards,
-          [iid]: { ...s.cards[iid], zone: 'battlefield', counters: {}, movedAt: s.moveCounter + 1 },
-        },
-        libraryOrder: s.libraryOrder.filter((x) => x !== iid),
-        commanderCasts: { ...s.commanderCasts, [key]: priorCasts + 1 },
-        moveCounter: s.moveCounter + 1,
-      }));
-
-      appendLog('commander', `Cast ${name} (cast #${priorCasts + 1}, tax +${tax})`, {
-        iid,
-        name,
-        scryfallId: key,
-        castNumber: priorCasts + 1,
-        taxPaid: tax,
-        nextTax: 2 * (priorCasts + 1),
-        from: card.zone,
-        to: 'battlefield',
+        appendLog('commander', `Cast ${name} (cast #${priorCasts + 1}, tax +${tax})`, {
+          iid,
+          name,
+          scryfallId: key,
+          castNumber: priorCasts + 1,
+          taxPaid: tax,
+          nextTax: 2 * (priorCasts + 1),
+          from: card.zone,
+          to: 'battlefield',
+        });
       });
     },
 
     toggleTapped(iid) {
-      const state = get();
-      const card = state.cards[iid];
-      if (!card) return;
-      const name = cardName(state, iid);
-      const tapped = !card.tapped;
-      set((s) => ({ cards: { ...s.cards, [iid]: { ...s.cards[iid], tapped } } }));
-      appendLog('tap', `${name} ${tapped ? 'tapped' : 'untapped'}`, { iid, name, tapped });
+      action(() => {
+        const state = get();
+        const card = state.cards[iid];
+        if (!card) return;
+        const name = cardName(state, iid);
+        const tapped = !card.tapped;
+        set((s) => ({ cards: { ...s.cards, [iid]: { ...s.cards[iid], tapped } } }));
+        appendLog('tap', `${name} ${tapped ? 'tapped' : 'untapped'}`, { iid, name, tapped });
+      });
     },
 
     untapAll() {
-      if (!get().run) return;
-      const count = untapAllSilently();
-      appendLog('tap', `Untapped all (${count} permanent${count === 1 ? '' : 's'})`, { count });
+      action(() => {
+        if (!get().run) return;
+        const count = untapAllSilently();
+        appendLog('tap', `Untapped all (${count} permanent${count === 1 ? '' : 's'})`, { count });
+      });
     },
 
     addCounter(iid, kind, delta) {
-      const state = get();
-      const card = state.cards[iid];
-      if (!card || delta === 0) return;
-      const name = cardName(state, iid);
-      const before = card.counters[kind] ?? 0;
-      const after = Math.max(0, before + delta);
+      action(() => {
+        const state = get();
+        const card = state.cards[iid];
+        if (!card || delta === 0) return;
+        const name = cardName(state, iid);
+        const before = card.counters[kind] ?? 0;
+        const after = Math.max(0, before + delta);
 
-      set((s) => {
-        const counters = { ...s.cards[iid].counters };
-        if (after === 0) delete counters[kind];
-        else counters[kind] = after;
-        return { cards: { ...s.cards, [iid]: { ...s.cards[iid], counters } } };
-      });
+        set((s) => {
+          const counters = { ...s.cards[iid].counters };
+          if (after === 0) delete counters[kind];
+          else counters[kind] = after;
+          return { cards: { ...s.cards, [iid]: { ...s.cards[iid], counters } } };
+        });
 
-      appendLog('counter', `${name}: ${kind} ${before} → ${after}`, {
-        iid,
-        name,
-        kind,
-        delta,
-        before,
-        after,
+        appendLog('counter', `${name}: ${kind} ${before} → ${after}`, {
+          iid,
+          name,
+          kind,
+          delta,
+          before,
+          after,
+        });
       });
     },
 
     createToken(spec, n) {
-      if (!get().run || n <= 0) return;
-      const created: string[] = [];
-      set((s) => {
-        const cards = { ...s.cards };
-        let stamp = s.moveCounter;
-        for (let i = 0; i < n; i++) {
-          const inst = makeInstance(null, 'battlefield', false, ++stamp);
-          inst.tokenSpec = spec;
-          cards[inst.iid] = inst;
-          created.push(inst.iid);
-        }
-        return { cards, moveCounter: stamp };
-      });
-      const size = spec.power && spec.toughness ? `${spec.power}/${spec.toughness} ` : '';
-      appendLog('token', `Created ${n} ${size}${spec.name} token${n === 1 ? '' : 's'}`, {
-        count: n,
-        iids: created,
-        spec,
+      action(() => {
+        if (!get().run || n <= 0) return;
+        const created: string[] = [];
+        set((s) => {
+          const cards = { ...s.cards };
+          let stamp = s.moveCounter;
+          for (let i = 0; i < n; i++) {
+            const inst = makeInstance(null, 'battlefield', false, ++stamp);
+            inst.tokenSpec = spec;
+            cards[inst.iid] = inst;
+            created.push(inst.iid);
+          }
+          return { cards, moveCounter: stamp };
+        });
+        const size = spec.power && spec.toughness ? `${spec.power}/${spec.toughness} ` : '';
+        appendLog('token', `Created ${n} ${size}${spec.name} token${n === 1 ? '' : 's'}`, {
+          count: n,
+          iids: created,
+          spec,
+        });
       });
     },
 
     adjustLife(target, delta) {
-      if (!get().run || delta === 0) return;
+      action(() => {
+        if (!get().run || delta === 0) return;
 
-      if (target === 'player') {
-        const before = get().playerLife;
-        const after = before + delta;
-        set({ playerLife: after });
-        appendLog('life', `You: ${before} → ${after}`, { target, delta, before, after });
-        if (after <= 0) {
-          appendLog('note', 'Player life reached 0', { target, life: after });
+        if (target === 'player') {
+          const before = get().playerLife;
+          const after = before + delta;
+          set({ playerLife: after });
+          appendLog('life', `You: ${before} → ${after}`, { target, delta, before, after });
+          return;
         }
-        return;
-      }
 
-      const seat = get().seats.find((s) => s.id === target);
-      if (!seat) return;
-      const before = seat.life;
-      const after = before + delta;
-      const damage = Math.max(0, -delta);
-      // Hurting a seat makes it less scary and shrinks the board it presents.
-      const shrunk = applyDamageToSeat(seat.threat, seat.silhouette, damage, before);
+        const seat = get().seats.find((s) => s.id === target);
+        if (!seat) return;
+        const before = seat.life;
+        const after = before + delta;
+        const damage = Math.max(0, -delta);
+        // Hurting a seat makes it less scary and shrinks the board it presents.
+        const shrunk = applyDamageToSeat(seat.threat, seat.silhouette, damage, before);
 
-      // The trend arrow reports what the *pod* did between windows, so damage the
-      // player just dealt moves the baseline with it: hitting a seat must not
-      // read back as "falling" when nothing about the seat's own play changed.
-      const threatShift = shrunk.threat - seat.threat;
+        // The trend arrow reports what the *pod* did between windows, so damage the
+        // player just dealt moves the baseline with it: hitting a seat must not
+        // read back as "falling" when nothing about the seat's own play changed.
+        const threatShift = shrunk.threat - seat.threat;
 
-      set((s) => ({
-        seats: s.seats.map((x) =>
-          x.id === target
-            ? { ...x, life: after, threat: shrunk.threat, silhouette: shrunk.silhouette }
-            : x,
-        ),
-        previousThreat: threatShift
-          ? {
-              ...s.previousThreat,
-              [target]: (s.previousThreat[target] ?? seat.threat) + threatShift,
-            }
-          : s.previousThreat,
-        damageDealtByTurn: damage
-          ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + damage }
-          : s.damageDealtByTurn,
-      }));
-
-      appendLog('life', `Seat ${target}: ${before} → ${after}`, {
-        target,
-        seatId: target,
-        delta,
-        before,
-        after,
-        threatBefore: seat.threat,
-        threatAfter: shrunk.threat,
-        silhouetteBefore: seat.silhouette,
-      });
-      checkSeatElimination(target);
-    },
-
-    dealCommanderDamage(seatId, amount) {
-      if (!get().run || amount === 0) return;
-      const seat = get().seats.find((s) => s.id === seatId);
-      if (!seat) return;
-      const cmdBefore = seat.commanderDamage;
-      const cmdAfter = Math.max(0, cmdBefore + amount);
-      const lifeBefore = seat.life;
-      const lifeAfter = lifeBefore - amount;
-      const shrunk = applyDamageToSeat(
-        seat.threat,
-        seat.silhouette,
-        Math.max(0, amount),
-        lifeBefore,
-      );
-
-      // Same as `adjustLife`: your own damage moves the trend baseline with the
-      // threat it shrinks, so it stays trend-neutral.
-      const threatShift = shrunk.threat - seat.threat;
-
-      set((s) => ({
-        seats: s.seats.map((x) =>
-          x.id === seatId
+        set((s) => ({
+          seats: s.seats.map((x) =>
+            x.id === target
+              ? { ...x, life: after, threat: shrunk.threat, silhouette: shrunk.silhouette }
+              : x,
+          ),
+          previousThreat: threatShift
             ? {
-                ...x,
-                commanderDamage: cmdAfter,
-                life: lifeAfter,
-                threat: shrunk.threat,
-                silhouette: shrunk.silhouette,
+                ...s.previousThreat,
+                [target]: (s.previousThreat[target] ?? seat.threat) + threatShift,
               }
-            : x,
-        ),
-        previousThreat: threatShift
-          ? {
-              ...s.previousThreat,
-              [seatId]: (s.previousThreat[seatId] ?? seat.threat) + threatShift,
-            }
-          : s.previousThreat,
-        damageDealtByTurn:
-          amount > 0
-            ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + amount }
+            : s.previousThreat,
+          damageDealtByTurn: damage
+            ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + damage }
             : s.damageDealtByTurn,
-      }));
+        }));
 
-      appendLog(
-        'damage',
-        `Seat ${seatId} took ${amount} commander damage (${cmdAfter}/${LETHAL_COMMANDER_DAMAGE}); life ${lifeBefore} → ${lifeAfter}`,
-        {
-          seatId,
-          amount,
-          commanderDamageBefore: cmdBefore,
-          commanderDamageAfter: cmdAfter,
-          lifeBefore,
-          lifeAfter,
+        appendLog('life', `Seat ${target}: ${before} → ${after}`, {
+          target,
+          seatId: target,
+          delta,
+          before,
+          after,
           threatBefore: seat.threat,
           threatAfter: shrunk.threat,
           silhouetteBefore: seat.silhouette,
-        },
-      );
-      checkSeatElimination(seatId);
+        });
+        checkSeatElimination(target);
+      });
+    },
+
+    dealCommanderDamage(seatId, amount) {
+      action(() => {
+        if (!get().run || amount === 0) return;
+        const seat = get().seats.find((s) => s.id === seatId);
+        if (!seat) return;
+        const cmdBefore = seat.commanderDamage;
+        const cmdAfter = Math.max(0, cmdBefore + amount);
+        const lifeBefore = seat.life;
+        const lifeAfter = lifeBefore - amount;
+        const shrunk = applyDamageToSeat(
+          seat.threat,
+          seat.silhouette,
+          Math.max(0, amount),
+          lifeBefore,
+        );
+
+        // Same as `adjustLife`: your own damage moves the trend baseline with the
+        // threat it shrinks, so it stays trend-neutral.
+        const threatShift = shrunk.threat - seat.threat;
+
+        set((s) => ({
+          seats: s.seats.map((x) =>
+            x.id === seatId
+              ? {
+                  ...x,
+                  commanderDamage: cmdAfter,
+                  life: lifeAfter,
+                  threat: shrunk.threat,
+                  silhouette: shrunk.silhouette,
+                }
+              : x,
+          ),
+          previousThreat: threatShift
+            ? {
+                ...s.previousThreat,
+                [seatId]: (s.previousThreat[seatId] ?? seat.threat) + threatShift,
+              }
+            : s.previousThreat,
+          damageDealtByTurn:
+            amount > 0
+              ? { ...s.damageDealtByTurn, [s.turn]: (s.damageDealtByTurn[s.turn] ?? 0) + amount }
+              : s.damageDealtByTurn,
+        }));
+
+        appendLog(
+          'damage',
+          `Seat ${seatId} took ${amount} commander damage (${cmdAfter}/${LETHAL_COMMANDER_DAMAGE}); life ${lifeBefore} → ${lifeAfter}`,
+          {
+            seatId,
+            amount,
+            commanderDamageBefore: cmdBefore,
+            commanderDamageAfter: cmdAfter,
+            lifeBefore,
+            lifeAfter,
+            threatBefore: seat.threat,
+            threatAfter: shrunk.threat,
+            silhouetteBefore: seat.silhouette,
+          },
+        );
+        checkSeatElimination(seatId);
+      });
     },
 
     nextPhase() {
-      if (!get().run) return;
-      const from = get().phase;
-      const to = nextPhaseOf(from);
-      const wrapping = from === 'end';
+      action(() => {
+        if (!get().run) return;
+        const from = get().phase;
+        const to = nextPhaseOf(from);
+        const wrapping = from === 'end';
 
-      if (wrapping) {
-        beginNextTurn('phase');
-        return;
-      }
+        if (wrapping) {
+          beginNextTurn('phase');
+          return;
+        }
 
-      set({ phase: to });
-      appendLog('phase', `Phase: ${to}`, { from, to, turn: get().turn });
+        set({ phase: to });
+        appendLog('phase', `Phase: ${to}`, { from, to, turn: get().turn });
 
-      if (to === 'untap') performUntapStep();
-      if (to === 'draw') performDrawStep();
+        if (to === 'untap') performUntapStep();
+        if (to === 'draw') performDrawStep();
+      });
     },
 
     nextTurn() {
-      beginNextTurn('skip');
+      action(() => {
+        beginNextTurn('skip');
+      });
     },
 
     async endRun(result) {
       const state = get();
-      if (!state.run) return;
+      // The guard is synchronous and the await is not: without it, a second
+      // action landing while the Dexie write is in flight would end the same run
+      // again and the log would carry two "Run ended" entries.
+      if (!state.run || state.ending) return;
+      set({ ending: true });
       const endedAt = Date.now();
 
       appendLog('run', `Run ended: ${result}`, {
@@ -1400,140 +1668,153 @@ export const useGameStore = create<GameState>((set, get) => {
         lastFiredWindow: zeroLastFiredWindow(),
         damageDealtByTurn: {},
         eventSeq: 0,
+        deathNoticed: false,
+        ending: false,
       });
     },
 
     logNote(message) {
-      const text = message.trim();
-      if (!get().run || !text) return;
-      appendLog('note', text, { note: text, playerAuthored: true });
+      action(() => {
+        const text = message.trim();
+        if (!get().run || !text) return;
+        appendLog('note', text, { note: text, playerAuthored: true });
+      });
     },
 
     undoLastLifeChange() {
-      const run = get().run;
-      if (!run) return;
+      // 'recovery': taking a life change back is how a player climbs out of a
+      // noticed death, so it can never be the action that settles one.
+      action(() => {
+        const run = get().run;
+        if (!run) return;
 
-      // The log is append-only: an undo never removes the entry it reverses, it
-      // marks it with `undoOf`. So "already undone" is read back off the log.
-      const undone = new Set<number>();
-      for (const entry of run.log) {
-        const of = entry.payload.undoOf;
-        if (typeof of === 'number') undone.add(of);
-      }
-
-      let target: LogEntry | undefined;
-      for (let i = run.log.length - 1; i >= 0; i--) {
-        const entry = run.log[i];
-        if (isUndoableLifeEntry(entry) && !undone.has(entry.seq)) {
-          target = entry;
-          break;
+        // The log is append-only: an undo never removes the entry it reverses, it
+        // marks it with `undoOf`. So "already undone" is read back off the log.
+        const undone = new Set<number>();
+        for (const entry of run.log) {
+          const of = entry.payload.undoOf;
+          if (typeof of === 'number') undone.add(of);
         }
-      }
 
-      if (!target) {
-        appendLog('note', 'Nothing to undo: no life change left in the log', {
-          undo: true,
-          noop: true,
-        });
-        return;
-      }
-
-      const entry = target;
-
-      // Threat and silhouette were snapshotted on the entry being undone, so
-      // rolling back life rolls back the pressure it caused too.
-      const restoredThreat = entry.payload.threatBefore as number | undefined;
-      const restoredSilhouette = entry.payload.silhouetteBefore as Silhouette | undefined;
-
-      function restorePressure(seat: Seat): Seat {
-        return {
-          ...seat,
-          threat: restoredThreat ?? seat.threat,
-          silhouette: restoredSilhouette ?? seat.silhouette,
-        };
-      }
-
-      /**
-       * The mirror of the baseline shift `adjustLife` applied on the way in: the
-       * undo puts the threat back, so the trend baseline goes back with it.
-       */
-      function restoreBaseline(
-        s: GameState,
-        seatId: SeatId,
-      ): Record<SeatId, number> {
-        const seat = s.seats.find((x) => x.id === seatId);
-        if (!seat || restoredThreat === undefined) return s.previousThreat;
-        const shift = restoredThreat - seat.threat;
-        if (!shift) return s.previousThreat;
-        return {
-          ...s.previousThreat,
-          [seatId]: (s.previousThreat[seatId] ?? seat.threat) + shift,
-        };
-      }
-
-      if (entry.kind === 'life') {
-        const who = entry.payload.target as LifeTarget;
-        const life = entry.payload.before as number;
-
-        if (who === 'player') {
-          set((s) => ({
-            playerLife: life,
-            // Undoing a change made on an earlier turn must not rewrite this
-            // turn's swing, so the turn's opening total moves with it.
-            turnStartLife:
-              entry.turn < s.turn ? s.turnStartLife + (life - s.playerLife) : s.turnStartLife,
-          }));
-        } else {
-          set((s) => ({
-            seats: s.seats.map((x) =>
-              x.id === who
-                ? restorePressure({
-                    ...x,
-                    life,
-                    eliminated: stillEliminated(x, life, x.commanderDamage),
-                  })
-                : x,
-            ),
-            previousThreat: restoreBaseline(s, who),
-          }));
+        let target: LogEntry | undefined;
+        for (let i = run.log.length - 1; i >= 0; i--) {
+          const entry = run.log[i];
+          if (isUndoableLifeEntry(entry) && !undone.has(entry.seq)) {
+            target = entry;
+            break;
+          }
         }
+
+        if (!target) {
+          appendLog('note', 'Nothing to undo: no life change left in the log', {
+            undo: true,
+            noop: true,
+          });
+          return;
+        }
+
+        const entry = target;
+
+        // Threat and silhouette were snapshotted on the entry being undone, so
+        // rolling back life rolls back the pressure it caused too.
+        const restoredThreat = entry.payload.threatBefore as number | undefined;
+        const restoredSilhouette = entry.payload.silhouetteBefore as Silhouette | undefined;
+
+        function restorePressure(seat: Seat): Seat {
+          return {
+            ...seat,
+            threat: restoredThreat ?? seat.threat,
+            silhouette: restoredSilhouette ?? seat.silhouette,
+          };
+        }
+
+        /**
+         * The mirror of the baseline shift `adjustLife` applied on the way in: the
+         * undo puts the threat back, so the trend baseline goes back with it.
+         */
+        function restoreBaseline(
+          s: GameState,
+          seatId: SeatId,
+        ): Record<SeatId, number> {
+          const seat = s.seats.find((x) => x.id === seatId);
+          if (!seat || restoredThreat === undefined) return s.previousThreat;
+          const shift = restoredThreat - seat.threat;
+          if (!shift) return s.previousThreat;
+          return {
+            ...s.previousThreat,
+            [seatId]: (s.previousThreat[seatId] ?? seat.threat) + shift,
+          };
+        }
+
+        if (entry.kind === 'life') {
+          const who = entry.payload.target as LifeTarget;
+          const life = entry.payload.before as number;
+
+          if (who === 'player') {
+            set((s) => ({
+              playerLife: life,
+              // Undoing a change made on an earlier turn must not rewrite this
+              // turn's swing, so the turn's opening total moves with it.
+              turnStartLife:
+                entry.turn < s.turn ? s.turnStartLife + (life - s.playerLife) : s.turnStartLife,
+            }));
+          } else {
+            // A seat can come back to life here. Its canceled events do not come
+            // with it: they were logged as canceled once, and the scorer has
+            // already written them off as never offered. The seat simply returns
+            // with an empty queue, which is the consistent reading of a log that
+            // is only ever appended to.
+            set((s) => ({
+              seats: s.seats.map((x) =>
+                x.id === who
+                  ? restorePressure({
+                      ...x,
+                      life,
+                      eliminated: stillEliminated(x, life, x.commanderDamage),
+                    })
+                  : x,
+              ),
+              previousThreat: restoreBaseline(s, who),
+            }));
+          }
+
+          appendLog('life', `Undid: ${target.message}`, {
+            undoOf: target.seq,
+            target: who,
+            restoredLife: life,
+            restoredThreat,
+          });
+          return;
+        }
+
+        // Commander damage: life and the commander-damage tally both roll back.
+        const seatId = target.payload.seatId as SeatId;
+        const life = target.payload.lifeBefore as number;
+        const commanderDamage = target.payload.commanderDamageBefore as number;
+
+        set((s) => ({
+          seats: s.seats.map((x) =>
+            x.id === seatId
+              ? restorePressure({
+                  ...x,
+                  life,
+                  commanderDamage,
+                  eliminated: stillEliminated(x, life, commanderDamage),
+                })
+              : x,
+          ),
+          previousThreat: restoreBaseline(s, seatId),
+        }));
 
         appendLog('life', `Undid: ${target.message}`, {
           undoOf: target.seq,
-          target: who,
+          target: seatId,
+          seatId,
           restoredLife: life,
+          restoredCommanderDamage: commanderDamage,
           restoredThreat,
         });
-        return;
-      }
-
-      // Commander damage: life and the commander-damage tally both roll back.
-      const seatId = target.payload.seatId as SeatId;
-      const life = target.payload.lifeBefore as number;
-      const commanderDamage = target.payload.commanderDamageBefore as number;
-
-      set((s) => ({
-        seats: s.seats.map((x) =>
-          x.id === seatId
-            ? restorePressure({
-                ...x,
-                life,
-                commanderDamage,
-                eliminated: stillEliminated(x, life, commanderDamage),
-              })
-            : x,
-        ),
-        previousThreat: restoreBaseline(s, seatId),
-      }));
-
-      appendLog('life', `Undid: ${target.message}`, {
-        undoOf: target.seq,
-        target: seatId,
-        seatId,
-        restoredLife: life,
-        restoredCommanderDamage: commanderDamage,
-        restoredThreat,
-      });
+      }, 'recovery');
     },
 
     resolveOpponentWindow(upcomingTurn) {
@@ -1541,176 +1822,183 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     respondToActiveEvent(note) {
-      const state = get();
-      const event = state.activeEvent;
-      if (!state.run || !event) return;
+      // Answering an event applies nothing, so it cannot end a run on its own.
+      // It settles anyway, as the safety net that keeps every event-queue exit
+      // on the same footing.
+      action(() => {
+        const state = get();
+        const event = state.activeEvent;
+        if (!state.run || !event) return;
 
-      // A countered spell you force through actually resolves — the card
-      // finishes the trip to the battlefield the interception interrupted,
-      // whether it was cast from hand or off the command zone.
-      if (event.type === 'counter' && event.targetIid) {
-        const held = state.cards[event.targetIid];
-        if (held && held.zone !== 'battlefield') performMove(event.targetIid, 'battlefield');
-      }
+        // A countered spell you force through actually resolves — the card
+        // finishes the trip to the battlefield the interception interrupted,
+        // whether it was cast from hand or off the command zone.
+        if (event.type === 'counter') forceCounterThrough(event);
 
-      const answered: PressureEvent = { ...event, state: 'negated' };
-      const trimmed = note?.trim();
-      appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` · "${trimmed}"` : ''}`, {
-        ...eventPayload(answered),
-        responded: true,
-        negated: true,
-        note: trimmed,
+        const answered: PressureEvent = { ...event, state: 'negated' };
+        const trimmed = note?.trim();
+        appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` · "${trimmed}"` : ''}`, {
+          ...eventPayload(answered),
+          responded: true,
+          negated: true,
+          note: trimmed,
+        });
+        advanceQueue();
       });
-      advanceQueue();
     },
 
     resolveActiveEvent(payload) {
-      const state = get();
-      const event = state.activeEvent;
-      if (!state.run || !event) return;
+      action(() => {
+        const state = get();
+        const event = state.activeEvent;
+        if (!state.run || !event) return;
 
-      const outcome: Record<string, unknown> = {};
-      /** Appended to the log message when the outcome needs naming. */
-      let detail = '';
+        const outcome: Record<string, unknown> = {};
+        /** Appended to the log message when the outcome needs naming. */
+        let detail = '';
 
-      switch (event.type) {
-        case 'wipe': {
-          const nonlands = payload?.wipeNonlands ?? event.variant === 'nonlands';
-          const victims = wipeVictims(nonlands);
-          for (const iid of victims) performMove(iid, 'graveyard');
-          outcome.scope = nonlands ? 'nonlands' : 'creatures';
-          outcome.swept = victims.length;
-          outcome.iids = victims;
-          break;
-        }
-
-        case 'removal': {
-          const iid = payload?.targetIid ?? event.targetIid;
-          const card = iid ? state.cards[iid] : undefined;
-          if (iid && card && card.zone === 'battlefield') {
-            outcome.targetIid = iid;
-            outcome.targetName = cardName(state, iid);
-            performMove(iid, 'graveyard');
-          } else {
-            outcome.noTarget = true;
+        switch (event.type) {
+          case 'wipe': {
+            const nonlands = payload?.wipeNonlands ?? event.variant === 'nonlands';
+            const victims = wipeVictims(nonlands);
+            for (const iid of victims) performMove(iid, 'graveyard');
+            outcome.scope = nonlands ? 'nonlands' : 'creatures';
+            outcome.swept = victims.length;
+            outcome.iids = victims;
+            break;
           }
-          break;
-        }
 
-        case 'counter': {
-          const iid = payload?.targetIid ?? event.targetIid;
-          const card = iid ? state.cards[iid] : undefined;
-          if (iid && card) {
-            const name = cardName(state, iid);
-            outcome.counteredIid = iid;
-            outcome.counteredName = name;
-            outcome.commander = card.isCommander ? 1 : 0;
-
-            if (card.isCommander) {
-              // A countered commander never sees the graveyard — it goes back
-              // to the command zone. The tax it accrued on the way stays paid,
-              // so the next attempt costs more.
-              const nextTax = card.scryfallId ? commanderTax(state, card.scryfallId) : 0;
-              outcome.returnedTo = 'command';
-              outcome.nextTax = nextTax;
-              if (card.zone !== 'command') performMove(iid, 'command');
-              appendLog(
-                'commander',
-                `${name} countered. Returned to the command zone (next cast tax ${nextTax})`,
-                {
-                  iid,
-                  name,
-                  scryfallId: card.scryfallId,
-                  countered: true,
-                  from: card.zone,
-                  to: 'command',
-                  nextTax,
-                },
-              );
-              detail = ` (${name} returned to the command zone)`;
-            } else if (card.zone !== 'graveyard') {
-              outcome.returnedTo = 'graveyard';
+          case 'removal': {
+            const iid = payload?.targetIid ?? event.targetIid;
+            const card = iid ? state.cards[iid] : undefined;
+            if (iid && card && card.zone === 'battlefield') {
+              outcome.targetIid = iid;
+              outcome.targetName = cardName(state, iid);
               performMove(iid, 'graveyard');
-              detail = ` (${name} countered)`;
-            }
-          }
-          break;
-        }
-
-        case 'combat': {
-          const offered = event.severity.damage ?? 0;
-          const taken = payload?.damageTaken ?? offered;
-          outcome.offered = offered;
-          outcome.taken = taken;
-          if (taken > 0) get().adjustLife('player', -taken);
-          break;
-        }
-
-        case 'resource': {
-          const discardIid = payload?.discardIid;
-          const sacrificeIid = payload?.sacrificeIid;
-          const iid = discardIid ?? sacrificeIid;
-          const card = iid ? state.cards[iid] : undefined;
-          if (iid && card) {
-            // Which payload field the caller filled in is a claim; the card's
-            // actual zone is the truth. A card in hand is discarded, one on the
-            // battlefield is sacrificed — believe the board, and say so.
-            const claimed = discardIid ? 'discard' : 'sacrifice';
-            const actual =
-              card.zone === 'hand'
-                ? 'discard'
-                : card.zone === 'battlefield'
-                  ? 'sacrifice'
-                  : null;
-            const mode = actual ?? claimed;
-            const name = cardName(state, iid);
-
-            outcome.mode = mode;
-            outcome.claimedMode = claimed;
-            outcome.fromZone = card.zone;
-            outcome.iid = iid;
-            outcome.name = name;
-            if (actual && actual !== claimed) outcome.modeCorrected = true;
-            if (!actual) outcome.unexpectedZone = card.zone;
-
-            performMove(iid, 'graveyard');
-            detail = ` (${mode === 'discard' ? 'discarded' : 'sacrificed'} ${name})`;
-          } else {
-            const mode = event.variant ?? 'tax';
-            outcome.mode = mode;
-            if (mode === 'discard' || mode === 'sacrifice') {
-              // No card came with the resolution: the player had nothing to give.
-              // Say so on the entry, otherwise the log reads as an unexplained
-              // no-op and the scorer cannot tell a whiff from a mis-click.
-              outcome.noTarget = true;
-              detail = mode === 'discard' ? ' (nothing to discard)' : ' (nothing to sacrifice)';
             } else {
-              // The 'tax' variant has no bookkeeping — acknowledging it is enough.
-              outcome.acknowledged = true;
+              outcome.noTarget = true;
             }
+            break;
           }
-          break;
+
+          case 'counter': {
+            const iid = payload?.targetIid ?? event.targetIid;
+            const card = iid ? state.cards[iid] : undefined;
+            if (iid && card) {
+              const name = cardName(state, iid);
+              outcome.counteredIid = iid;
+              outcome.counteredName = name;
+              outcome.commander = card.isCommander ? 1 : 0;
+
+              if (card.isCommander) {
+                // A countered commander never sees the graveyard — it goes back
+                // to the command zone. The tax it accrued on the way stays paid,
+                // so the next attempt costs more.
+                const nextTax = card.scryfallId ? commanderTax(state, card.scryfallId) : 0;
+                outcome.returnedTo = 'command';
+                outcome.nextTax = nextTax;
+                if (card.zone !== 'command') performMove(iid, 'command');
+                appendLog(
+                  'commander',
+                  `${name} countered. Returned to the command zone (next cast tax ${nextTax})`,
+                  {
+                    iid,
+                    name,
+                    scryfallId: card.scryfallId,
+                    countered: true,
+                    from: card.zone,
+                    to: 'command',
+                    nextTax,
+                  },
+                );
+                detail = ` (${name} returned to the command zone)`;
+              } else if (card.zone !== 'graveyard') {
+                outcome.returnedTo = 'graveyard';
+                performMove(iid, 'graveyard');
+                detail = ` (${name} countered)`;
+              }
+            }
+            break;
+          }
+
+          case 'combat': {
+            const offered = event.severity.damage ?? 0;
+            const taken = payload?.damageTaken ?? offered;
+            outcome.offered = offered;
+            outcome.taken = taken;
+            // A lethal hit does not end the run here. `adjustLife` is a nested
+            // action, so settlement waits for this one's tail and the "Resolved
+            // combat" entry below lands in the log before "Run ended".
+            if (taken > 0) get().adjustLife('player', -taken);
+            break;
+          }
+
+          case 'resource': {
+            const discardIid = payload?.discardIid;
+            const sacrificeIid = payload?.sacrificeIid;
+            const iid = discardIid ?? sacrificeIid;
+            const card = iid ? state.cards[iid] : undefined;
+            if (iid && card) {
+              // Which payload field the caller filled in is a claim; the card's
+              // actual zone is the truth. A card in hand is discarded, one on the
+              // battlefield is sacrificed — believe the board, and say so.
+              const claimed = discardIid ? 'discard' : 'sacrifice';
+              const actual =
+                card.zone === 'hand'
+                  ? 'discard'
+                  : card.zone === 'battlefield'
+                    ? 'sacrifice'
+                    : null;
+              const mode = actual ?? claimed;
+              const name = cardName(state, iid);
+
+              outcome.mode = mode;
+              outcome.claimedMode = claimed;
+              outcome.fromZone = card.zone;
+              outcome.iid = iid;
+              outcome.name = name;
+              if (actual && actual !== claimed) outcome.modeCorrected = true;
+              if (!actual) outcome.unexpectedZone = card.zone;
+
+              performMove(iid, 'graveyard');
+              detail = ` (${mode === 'discard' ? 'discarded' : 'sacrificed'} ${name})`;
+            } else {
+              const mode = event.variant ?? 'tax';
+              outcome.mode = mode;
+              if (mode === 'discard' || mode === 'sacrifice') {
+                // No card came with the resolution: the player had nothing to give.
+                // Say so on the entry, otherwise the log reads as an unexplained
+                // no-op and the scorer cannot tell a whiff from a mis-click.
+                outcome.noTarget = true;
+                detail = mode === 'discard' ? ' (nothing to discard)' : ' (nothing to sacrifice)';
+              } else {
+                // The 'tax' variant has no bookkeeping — acknowledging it is enough.
+                outcome.acknowledged = true;
+              }
+            }
+            break;
+          }
+
+          case 'clock': {
+            // A clock is a standing warning, not a one-off hit. Acknowledging it
+            // files the prompt away; the clock itself lives on in `state.clock`
+            // until you win, eliminate the seat, or declare interaction.
+            outcome.acknowledged = true;
+            outcome.deadlineTurn = event.severity.deadlineTurn;
+            break;
+          }
         }
 
-        case 'clock': {
-          // A clock is a standing warning, not a one-off hit. Acknowledging it
-          // files the prompt away; the clock itself lives on in `state.clock`
-          // until you win, eliminate the seat, or declare interaction.
-          outcome.acknowledged = true;
-          outcome.deadlineTurn = event.severity.deadlineTurn;
-          break;
-        }
-      }
-
-      const resolved: PressureEvent = { ...event, state: 'resolved' };
-      const trimmed = payload?.note?.trim();
-      appendLog('event', `Resolved ${event.type}: ${event.prompt}${detail}${trimmed ? ` · "${trimmed}"` : ''}`, {
-        ...eventPayload(resolved),
-        resolved: true,
-        outcome,
-        note: trimmed,
+        const resolved: PressureEvent = { ...event, state: 'resolved' };
+        const trimmed = payload?.note?.trim();
+        appendLog('event', `Resolved ${event.type}: ${event.prompt}${detail}${trimmed ? ` · "${trimmed}"` : ''}`, {
+          ...eventPayload(resolved),
+          resolved: true,
+          outcome,
+          note: trimmed,
+        });
+        advanceQueue();
       });
-      advanceQueue();
     },
 
     declareInteraction() {

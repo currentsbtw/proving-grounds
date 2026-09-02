@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "verify:scorecard": "tsx scripts/verify-scorecard.ts"
+    "verify:scorecard": "tsx scripts/verify-scorecard.ts",
+    "verify:review": "tsx scripts/verify-review.ts",
+    "verify:share-image": "tsx scripts/verify-share-image.ts",
+    "verify:engine": "tsx scripts/verify-engine.ts",
+    "probe:pressure": "tsx scripts/probe-pressure.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

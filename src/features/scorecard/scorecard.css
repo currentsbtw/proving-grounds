@@ -827,3 +827,100 @@
   letter-spacing: 0.06em;
   color: var(--accent);
 }
+
+/* ── Review ─────────────────────────────────────────────────────────────── */
+
+/* Ruled rows, not cards: the same printed-sheet form the readout blocks and the
+   metric slots use. The kind is a word before it is a colour, so MISS still
+   reads as a miss in greyscale and under forced colours. */
+.sc-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sc-review-row {
+  display: grid;
+  grid-template-columns: 42px 46px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 10px;
+  padding: 7px 0 8px;
+  border-top: 1px solid var(--line);
+}
+
+.sc-review-kind {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-review-row.is-miss .sc-review-kind {
+  color: var(--danger);
+}
+
+.sc-review-row.is-good .sc-review-kind {
+  color: var(--ok);
+}
+
+/* Turns are figures and sit in a fixed slot, so the column never reflows as the
+   numerals tick. */
+.sc-review-turn {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-review-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sc-review-title {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.sc-review-row.is-miss .sc-review-title {
+  color: var(--danger);
+}
+
+.sc-review-detail {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The limits of the reading, printed once under the list it qualifies. */
+.sc-review-foot {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* Narrow centre panel: the two printed columns fold above the sentence rather
+   than squeezing the detail into a ribbon. */
+@media (max-width: 720px) {
+  .sc-review-row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .sc-review-turn {
+    grid-column: 2;
+  }
+
+  .sc-review-body {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+}

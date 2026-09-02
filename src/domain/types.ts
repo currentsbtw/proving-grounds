@@ -72,6 +72,14 @@ export interface Seat {
   /** 0–10 pressure rating. Rises every opponent window, falls when damaged. */
   threat: number;
   silhouette: Silhouette;
+  /**
+   * The highest threat this seat has held this run, and the board it held it
+   * with. Killing a seat must never relieve pressure: burning it down sheds
+   * threat on the way, so elimination redistributes these peaks rather than the
+   * post-damage numbers. Absent on a seat that has never been scored.
+   */
+  peakThreat?: number;
+  peakSilhouette?: Silhouette;
 }
 
 export type EventType = 'wipe' | 'removal' | 'counter' | 'combat' | 'clock' | 'resource';

@@ -657,6 +657,17 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
       }
 
       case 'event': {
+        const canceledId = readString(p, 'eventId');
+        if (canceledId && isTrue(p, 'canceled')) {
+          // The seat that owned this event was eliminated before the player ever
+          // had to answer it, so it was not offered at all: it leaves no ledger
+          // row, no tally, and no wipe to recover from.
+          events.delete(canceledId);
+          eventTurns.delete(canceledId);
+          const at = wipes.findIndex((w) => w.eventId === canceledId);
+          if (at >= 0) wipes.splice(at, 1);
+          break;
+        }
         const row = ledgerFor(entry);
         if (!row) break;
         if (row.type === 'clock') {

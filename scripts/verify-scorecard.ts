@@ -47,7 +47,7 @@ import type {
   ZoneId,
 } from '../src/domain/types.ts';
 
-const SEED = process.argv[2] ?? 'scorecard-verify';
+const SEED = process.argv[2] ?? 'scorecard-verify-12';
 const MULLIGAN_SEED = `${SEED}-mull`;
 const TURNS = 12;
 const BRACKET = 4;

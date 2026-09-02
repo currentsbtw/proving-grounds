@@ -29,15 +29,34 @@ import {
   SHARE_IMAGE_HEIGHT,
   SHARE_IMAGE_WIDTH,
 } from '../src/features/scorecard/shareImage.ts';
+import { verdictOf } from '../src/features/scorecard/verdict.ts';
 import type { CardData, Deck, RunRecord } from '../src/domain/types.ts';
 
-const SEED = process.argv[2] ?? 'scorecard-verify';
+/**
+ * The same default `scripts/verify-scorecard.ts` runs on. The two harnesses
+ * script their own games and share nothing but this string; keeping it in step
+ * means a seed judged good enough for the scorer is the one the receipt is drawn
+ * from too. On the current pressure tuning it puts two wipes and a terminal
+ * verdict on the card, which is the shape the colour and layout checks want.
+ */
+const SEED = process.argv[2] ?? 'scorecard-verify-12';
 const TURNS = 10;
 const BRACKET = 4;
 const DECK_NAME = 'Scorecard Verification';
 
 /** The renderer's own device scale — the stub asserts against backing pixels. */
 const DEVICE_SCALE = 2;
+
+/**
+ * The header band the verdict sentence has to live in: under the meta line,
+ * above the rule that the tile row hangs off. Node has no document, so the
+ * renderer draws with its own fallback palette and these are the two colours
+ * the sentence is allowed to take.
+ */
+const VERDICT_BAND = { top: 124, bottom: 158 };
+const TILE_TOP = 172;
+const INK = '#e8e6e1';
+const MUTED = '#a0a3aa';
 
 // ---------------------------------------------------------------------------
 // A synthetic 99 + 1 deck (the minimum from verify-scorecard.ts)
@@ -197,6 +216,8 @@ interface DrawnText {
   font: string;
   align: string;
   tracking: number;
+  /** The fill in force when the run was drawn, so a colour rule can be checked. */
+  color: string;
   method: 'fillText' | 'strokeText';
 }
 
@@ -276,6 +297,7 @@ function createRecordingContext(recording: Recording): unknown {
       font: String(props.font),
       align: String(props.textAlign),
       tracking: trackingOf(String(props.letterSpacing)),
+      color: String(props.fillStyle),
       method,
     });
   };
@@ -409,6 +431,16 @@ function extentOf(drawn: DrawnText): { left: number; right: number } {
   return { left: drawn.x, right: drawn.x + width };
 }
 
+/**
+ * The sentence as drawn: either the whole of it, or the prefix `fit` kept when
+ * even the smallest step could not hold it on one line.
+ */
+function matchesVerdict(drawnText: string, sentence: string): boolean {
+  if (drawnText === sentence) return true;
+  if (!drawnText.endsWith('…') || drawnText.length < 12) return false;
+  return sentence.startsWith(drawnText.slice(0, -1).trimEnd());
+}
+
 /** A degenerate scorecard: no turns, no events, nothing to divide by. */
 function emptyScorecard(): Scorecard {
   return {
@@ -533,6 +565,43 @@ async function main(): Promise<void> {
   check('the deck name is drawn', drawn.includes(DECK_NAME), `drew: ${drawn.slice(0, 6).join(' | ')}`);
   check('the result word is drawn', drawn.includes('WIN'), `result was ${scorecard.result}`);
   check('the wordmark is drawn', drawn.includes('PROVING GROUNDS'));
+
+  // --- the verdict sentence -------------------------------------------------
+  // The receipt is the artefact that gets posted, so it has to carry the one
+  // line the player actually read, not just the word the run ended on. The
+  // sentence comes from the same module the panel prints, so a check that finds
+  // it here finds the panel's copy of it too.
+  const verdict = verdictOf(scorecard);
+  const verdictRun = recording.texts.find((t) => matchesVerdict(t.text, verdict.text));
+  check(
+    'the verdict sentence is drawn',
+    verdictRun !== undefined,
+    `wanted "${verdict.text}"; drew: ${drawn.slice(0, 8).join(' | ')}`,
+  );
+  check(
+    'the verdict sentence sits under the header and clear of the tiles',
+    verdictRun !== undefined &&
+      verdictRun.y > VERDICT_BAND.top &&
+      verdictRun.y <= VERDICT_BAND.bottom &&
+      verdictRun.y + fontSizeOf(verdictRun.font) * 0.3 < TILE_TOP,
+    verdictRun ? `baseline y ${verdictRun.y}, tiles start ${TILE_TOP}` : '(not drawn)',
+  );
+  check(
+    'the verdict sentence is set in headline type, on one line',
+    verdictRun !== undefined &&
+      /^600 /.test(verdictRun.font) &&
+      fontSizeOf(verdictRun.font) >= 18 &&
+      !verdictRun.text.includes('\n'),
+    verdictRun?.font ?? '(not drawn)',
+  );
+  // DESIGN.md, the One Accent Rule: accent is spent on what needs an answer now,
+  // never on a heading. The sentence prints in ink here exactly as it does on
+  // screen, and drops to muted when no metric crossed its threshold.
+  check(
+    'a verdict naming a finding is printed in ink, not the accent',
+    verdictRun !== undefined && verdictRun.color === (verdict.clear ? MUTED : INK),
+    verdictRun ? `${verdictRun.color} with clear=${verdict.clear}` : '(not drawn)',
+  );
   check(
     'the meta line names the bracket, seed and turn count',
     drawn.some((t) => t.includes(`Bracket ${BRACKET}`) && t.includes(SEED) && t.includes(`T${scorecard.turns}`)),
@@ -656,6 +725,20 @@ async function main(): Promise<void> {
     'the empty run has an UNFINISHED verdict',
     emptyRecording.texts.some((t) => t.text === 'UNFINISHED'),
   );
+  // Nothing was tested, so nothing needs answering: the sentence still prints,
+  // in muted rather than in the accent.
+  const emptyVerdict = verdictOf(emptyScorecard());
+  const emptyVerdictRun = emptyRecording.texts.find((t) => matchesVerdict(t.text, emptyVerdict.text));
+  check(
+    'the empty run still prints a verdict sentence',
+    emptyVerdictRun !== undefined,
+    `wanted "${emptyVerdict.text}"`,
+  );
+  check(
+    'a clear verdict is printed muted, not in the accent',
+    emptyVerdict.clear && emptyVerdictRun?.color === MUTED,
+    `${emptyVerdictRun?.color ?? '(not drawn)'} with clear=${emptyVerdict.clear}`,
+  );
   const emptyBars = emptyRecording.filled.filter(
     (s) => Math.abs(s.bottom - AXIS_Y) < 0.6 && s.top >= 328 && s.right - s.left <= 40,
   );
@@ -703,6 +786,7 @@ async function main(): Promise<void> {
     `canvas calls        ${recording.calls.length}`,
     `text runs           ${recording.texts.length}`,
     `bars                ${bars.length}, event marks ${eventMarks.length}`,
+    `verdict             "${verdictRun?.text ?? '(none drawn)'}" at y ${verdictRun?.y ?? '-'} in ${verdictRun?.color ?? '-'}`,
     `events / wipes      ${scorecard.events.length} / ${scorecard.wipes.length}`,
     `widest text run     ${Math.max(...recording.texts.map((t) => extentOf(t).right)).toFixed(0)}px (edge 1144)`,
   ];

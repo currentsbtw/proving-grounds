@@ -31,6 +31,10 @@ export interface SeatSnapshot {
   eliminated: boolean;
   threat: number;
   silhouette: Silhouette;
+  /** Highest threat held this run; defaults to `threat` when absent. */
+  peakThreat?: number;
+  /** The board held at that peak; defaults to `silhouette` when absent. */
+  peakSilhouette?: Silhouette;
 }
 
 /** One of the player's permanents, flattened for the targeting heuristic. */
@@ -210,24 +214,30 @@ export function playerThreatOf(player: PlayerSummary): number {
 // Hazard rolls
 // ---------------------------------------------------------------------------
 
-/** Probability for one hazard this window, before the caller's own gates. */
+/**
+ * Probability for one hazard this window, before the caller's own gates. Every
+ * dial is bracket-indexed, so the bracket moves the *schedule* — when the
+ * hazard switches on and how steeply it climbs — not just an overall frequency.
+ * A negative `perTurn` is legal: it makes a hazard decay out of the game.
+ */
 export function hazardChance(
   hazard: Hazard,
   turn: number,
   bracket: number,
   scale = 1,
 ): number {
-  if (turn < hazard.startTurn) return 0;
-  const ramp = hazard.base + hazard.perTurn * (turn - hazard.startTurn);
-  const scaled = ramp * byBracket(PRESSURE.bracket.frequency, bracket) * scale;
-  return clamp(scaled, 0, hazard.max);
+  const startTurn = byBracket(hazard.startTurn, bracket);
+  if (turn < startTurn) return 0;
+  const ramp =
+    byBracket(hazard.base, bracket) + byBracket(hazard.perTurn, bracket) * (turn - startTurn);
+  return clamp(ramp * scale, 0, byBracket(hazard.max, bracket));
 }
 
 function offCooldown(input: WindowInput, type: EventType, hazard: Hazard): boolean {
-  if (input.firedCounts[type] >= hazard.cap) return false;
+  if (input.firedCounts[type] >= byBracket(hazard.cap, input.bracket)) return false;
   const last = input.lastFiredWindow[type];
   if (last === 0) return true;
-  return input.windowIndex - last > hazard.cooldown;
+  return input.windowIndex - last > byBracket(hazard.cooldown, input.bracket);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,22 +321,31 @@ export function applyDamageToSeat(
  * the pod stays as dangerous, it is just concentrated in fewer hands. Event
  * *frequency* is already seat-independent, so this only moves threat and board.
  * Returns updates for the survivors only.
+ *
+ * What flows is the dead seat's *peak*, not its last reading. Damage sheds
+ * threat and shrinks a silhouette on the way down, so a seat burned from 40 to
+ * 0 arrives here at threat 0 with an empty board — and redistributing that
+ * would mean killing a seat relieved the table's pressure, which is exactly the
+ * thing the rule forbids. `peakThreat`/`peakSilhouette` fall back to the live
+ * values, so a caller that does not track peaks still gets the old behaviour.
  */
 export function redistribute(seats: SeatSnapshot[], deadSeatId: SeatId): SeatUpdate[] {
   const dead = seats.find((s) => s.id === deadSeatId);
   const survivors = seats.filter((s) => s.id !== deadSeatId && !s.eliminated);
   if (!dead || survivors.length === 0) return [];
 
-  const threatEach = (dead.threat * PRESSURE.threat.eliminationInheritShare) / survivors.length;
+  const deadThreat = Math.max(dead.threat, dead.peakThreat ?? 0);
+  const deadBoard = dead.peakSilhouette ?? dead.silhouette;
+  const threatEach = (deadThreat * PRESSURE.threat.eliminationInheritShare) / survivors.length;
   const share = PRESSURE.silhouette.eliminationInheritShare / survivors.length;
 
   return survivors.map((s) => ({
     id: s.id,
     threat: clampThreat(s.threat + threatEach),
     silhouette: {
-      creatures: s.silhouette.creatures + Math.round(dead.silhouette.creatures * share),
-      power: s.silhouette.power + Math.round(dead.silhouette.power * share),
-      artifacts: s.silhouette.artifacts + Math.round(dead.silhouette.artifacts * share),
+      creatures: s.silhouette.creatures + Math.round(deadBoard.creatures * share),
+      power: s.silhouette.power + Math.round(deadBoard.power * share),
+      artifacts: s.silhouette.artifacts + Math.round(deadBoard.artifacts * share),
       openMana: s.silhouette.openMana,
     },
   }));
@@ -386,7 +405,13 @@ export function resolveWindow(input: WindowInput): WindowResult {
   // --- 1 & 2: growth -------------------------------------------------------
   const growthJitter = PRESSURE.threat.jitterMin;
   const growthSpan = PRESSURE.threat.jitterSpan;
-  const perWindow = byBracket(PRESSURE.bracket.threatGrowth, bracket);
+  // Growth ramps with the turn: a low-bracket pod builds slowly and only gets
+  // scary late, a high-bracket pod opens fast and then runs into the 0–10 cap.
+  const perWindow = Math.max(
+    0,
+    byBracket(PRESSURE.bracket.threatGrowth, bracket) +
+      byBracket(PRESSURE.bracket.threatGrowthRamp, bracket) * Math.max(0, turn - 2),
+  );
 
   const working: SeatSnapshot[] = input.seats.map((seat) => {
     if (seat.eliminated) return { ...seat, silhouette: { ...seat.silhouette } };
@@ -558,7 +583,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
     const owner = highestThreatSeat(working);
     if (
       owner &&
-      owner.threat >= PRESSURE.clock.minThreat &&
+      owner.threat >= byBracket(PRESSURE.clock.minThreat, bracket) &&
       offCooldown(input, 'clock', clockHazard) &&
       rng() < hazardChance(clockHazard, turn, bracket)
     ) {
@@ -583,13 +608,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
   if (turn >= counterStart) {
     const armScale =
       PRESSURE.counter.playerThreatBase + playerThreat * PRESSURE.counter.playerThreatPer;
-    const chance = clamp(
-      byBracket(PRESSURE.counter.armChance, bracket) *
-        byBracket(PRESSURE.bracket.frequency, bracket) *
-        armScale,
-      0,
-      0.9,
-    );
+    const chance = clamp(byBracket(PRESSURE.counter.armChance, bracket) * armScale, 0, 0.9);
     if (rng() < chance) {
       // The seat with the most open mana is the credible threat to hold up.
       const holder = bestSeat(alive(), (s) => s.silhouette.openMana + s.threat / 10);
@@ -648,6 +667,8 @@ export function toSnapshot(seat: Seat): SeatSnapshot {
     eliminated: seat.eliminated,
     threat: seat.threat,
     silhouette: seat.silhouette,
+    peakThreat: seat.peakThreat,
+    peakSilhouette: seat.peakSilhouette,
   };
 }
 

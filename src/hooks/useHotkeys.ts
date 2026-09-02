@@ -124,6 +124,11 @@ export function useHotkeys(): void {
       const action = actionForKey(hk.keymap, key);
       if (!action) return;
 
+      // Preview belongs to the card under the keyboard and to nothing else. It
+      // was handed to that card above; with focus anywhere else the key stands
+      // down rather than stealing focus from whatever holds it.
+      if (action === 'preview') return;
+
       e.preventDefault();
       e.stopPropagation();
       blurActiveControl();

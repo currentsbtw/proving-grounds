@@ -8,6 +8,7 @@ export type ActionId =
   | 'shuffle'
   | 'untap'
   | 'mulligan'
+  | 'preview'
   | 'focusNote'
   | 'respondOne'
   | 'respondTwo'
@@ -33,6 +34,12 @@ export const HOTKEY_ACTIONS: readonly HotkeyAction[] = [
     label: 'Take a mulligan',
     note: 'only while the opening hand is undecided',
     defaultKey: 'm',
+  },
+  {
+    id: 'preview',
+    label: 'Preview the focused card',
+    note: 'only while a card has keyboard focus',
+    defaultKey: 'v',
   },
   { id: 'focusNote', label: 'Log a note', defaultKey: 'n' },
   {

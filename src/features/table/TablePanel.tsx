@@ -20,6 +20,7 @@ import { Hand } from './Hand';
 import { MulliganBar } from './MulliganBar';
 import { askNumber, MenuHead, MenuItem, MenuSep, MenuTitle, PopMenu } from './PopMenu';
 import { CommandZone, LibraryStack, ZoneStack } from './ZoneStack';
+import EventToast from '../pressure/EventToast';
 import './table.css';
 
 type OpenZone = Extract<ZoneId, 'graveyard' | 'exile' | 'command'>;
@@ -167,6 +168,11 @@ function TableSurface() {
         aria-label="Table"
       >
         <Battlefield cards={zones.battlefield} />
+
+        {/* Shares the battlefield's grid cell at zero height, so it hangs over
+            the top of the board without taking a pixel from it, without
+            covering the hand, and outside every drop surface. */}
+        <EventToast />
 
         <div className="tbl-strip">
           <div className="tbl-stack-group">

@@ -54,6 +54,8 @@ Undecided product facts:
 - Silhouette granularity (aggregate vs per-creature sizes) is open.
 - Mobile layout is explicitly "later, only if earned." The desktop shell holds without horizontal scroll down to about 820px wide (audited 2026-09-01); below 1280px the readout column narrows and seat rows fold, below 940px the bottom strip scrolls.
 - Monetization is not planned; the name shares a card name and would need a recheck before any monetization.
+- Importing opponent decklists to "simulate a pod" (requested 2026-09-01) crosses the no-AI-opponents non-goal. The spec-safe version is list-derived seat pressure profiles: a seat imports a list only to set its threat curve, wipe density and interaction count. Not scheduled.
+- Free placement or a snapping grid on the battlefield (requested 2026-09-01). The board is a flow layout; grouping matters more than position. Revisit after more real runs.
 
 ## Brand Commitments
 

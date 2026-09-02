@@ -6,7 +6,7 @@ import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { EVENT_RESPONSE_EVENT } from '../../hooks/useHotkeys';
 import type { EventResponseDetail } from '../../hooks/useHotkeys';
 import { CardView } from '../table/CardView';
-import { collectChoices, EVENT_LABEL, seatLabel } from './pressureUi';
+import { collectChoices, describeAnswers, EVENT_LABEL, seatLabel } from './pressureUi';
 import type { Choice } from './pressureUi';
 
 interface PickerProps {
@@ -119,7 +119,19 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   const variant = event.variant ?? 'tax';
   const needsDiscard = event.type === 'resource' && variant === 'discard' && hand.length > 0;
   const needsSacrifice = event.type === 'resource' && variant === 'sacrifice' && creatures.length > 0;
-  const resolveBlocked = (needsDiscard || needsSacrifice) && !pickIid;
+
+  // Both answers, worded and gated in the one place the toast over the board
+  // reads them from too. Every edit the player has made rides along, so the
+  // second button keeps naming the card, the figure and the target it will
+  // actually use. Read from the snapshot: this body re-renders whenever `cards`,
+  // the target or the pick moves, which is everything the labels depend on.
+  const answers = describeAnswers(event, useGameStore.getState(), {
+    pickIid,
+    targetIid,
+    damage,
+    nonlands,
+  });
+  const resolveBlocked = answers.blocked;
 
   function doRespond(): void {
     onRetired(false);
@@ -163,14 +175,14 @@ function DockBody({ event, onRetired }: DockBodyProps) {
    * Held in a ref so the listener below is registered once and still calls the
    * current closures — every one of them reads local state that moves.
    */
-  const answers = useRef<{ first: () => void; second: () => void; blocked: boolean }>({
+  const handlers = useRef<{ first: () => void; second: () => void; blocked: boolean }>({
     first: doRespond,
     second: doResolve,
     blocked: false,
   });
 
   useEffect(() => {
-    answers.current = {
+    handlers.current = {
       first: event.type === 'clock' ? doDeclare : doRespond,
       second: doResolve,
       blocked: resolveBlocked,
@@ -180,7 +192,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   useEffect(() => {
     function onResponse(e: Event): void {
       const slot = (e as CustomEvent<EventResponseDetail>).detail?.slot;
-      const current = answers.current;
+      const current = handlers.current;
       if (slot === 1) current.first();
       // A resolution still missing the card it needs is a no-op, not a guess.
       if (slot === 2 && !current.blocked) current.second();
@@ -189,35 +201,12 @@ function DockBody({ event, onRetired }: DockBodyProps) {
     return () => window.removeEventListener(EVENT_RESPONSE_EVENT, onResponse);
   }, []);
 
-  /** Mana-cost-free wording: the button says what happens at the table. */
-  function resolveLabel(): string {
-    switch (event.type) {
-      case 'wipe':
-        return nonlands ? 'Destroy all nonlands' : 'Destroy all creatures';
-      case 'removal':
-        return targetOnBoard && targetName ? `Destroy ${targetName}` : 'Nothing to destroy';
-      case 'counter':
-        return 'It gets countered';
-      case 'combat':
-        return `Take ${Math.max(0, Math.round(damage) || 0)}`;
-      case 'resource':
-        if (variant === 'discard') return pickName ? `Discard ${pickName}` : 'Discard a card';
-        if (variant === 'sacrifice') return pickName ? `Sacrifice ${pickName}` : 'Sacrifice a creature';
-        return 'Pay the tax';
-      case 'clock':
-        return 'The clock stands';
-      default:
-        return 'It resolves';
-    }
-  }
-
-  const respondLabel = event.type === 'counter' ? 'Force it through' : 'I answer it';
   const firstKey = keyLabel(keymap.respondOne);
   const secondKey = keyLabel(keymap.respondTwo);
   // Card names have no length limit worth designing to (the longest printed one
   // runs 141 characters), and this label carries one. It is clamped to two lines
   // in CSS and the whole string rides in the tooltip.
-  const resolveText = resolveLabel();
+  const resolveText = answers.second;
 
   return (
     <>
@@ -333,17 +322,19 @@ function DockBody({ event, onRetired }: DockBodyProps) {
         {event.type === 'clock' ? (
           <>
             <button type="button" className="pgp-btn is-primary" onClick={doDeclare}>
-              <span className="pgp-answer-key">{firstKey}</span>Declare held interaction
+              <span className="pgp-answer-key">{firstKey}</span>
+              {answers.first}
             </button>
             <button type="button" className="pgp-btn" onClick={doResolve}>
-              <span className="pgp-answer-key">{secondKey}</span>The clock stands
+              <span className="pgp-answer-key">{secondKey}</span>
+              {resolveText}
             </button>
           </>
         ) : (
           <>
             <button type="button" className="pgp-btn" onClick={doRespond}>
               <span className="pgp-answer-key">{firstKey}</span>
-              <span className="pgp-btn-label">{respondLabel}</span>
+              <span className="pgp-btn-label">{answers.first}</span>
             </button>
             <button
               type="button"

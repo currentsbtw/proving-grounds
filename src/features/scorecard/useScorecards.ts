@@ -2,6 +2,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getCachedCardsByName, listRuns } from '../../db/db';
 import { scoreRun } from '../../engine/scorecard';
 import type { Scorecard } from '../../engine/scorecard';
+import { reviewRun } from '../../engine/review';
+import type { Review } from '../../engine/review';
+import { REVIEW } from '../../data/review';
 import type { CardData, RosterEntry, RunRecord } from '../../domain/types';
 
 /**
@@ -17,6 +20,21 @@ import type { CardData, RosterEntry, RunRecord } from '../../domain/types';
  * the lookup arrives rather than being cached forever as `partial`.
  */
 const cache = new Map<string, Scorecard>();
+
+/**
+ * The review is a second replay of the same log and is cached the same way, on
+ * the same key plus the tuning version — a review produced under one set of
+ * thresholds is not the review the current build would produce. It is built
+ * here rather than in the panel so it reads the card facts the scorer read: a
+ * legacy run's facts arrive by name lookup, and a review that skipped them
+ * would flag nothing at all.
+ */
+const reviews = new Map<string, Review>();
+
+/** Immutable per run, and per how many names resolved while the run is legacy. */
+function cacheKey(run: RunRecord, facts: Map<string, RosterEntry> | undefined): string {
+  return run.roster ? run.id : `${run.id}::${facts?.size ?? 0}`;
+}
 
 /** Names the scorer could use to identify a card, harvested from the whole log. */
 function namesInLog(run: RunRecord): string[] {
@@ -55,7 +73,7 @@ async function factsForLegacy(runs: RunRecord[]): Promise<Map<string, RosterEntr
 }
 
 function scoreCached(run: RunRecord, facts: Map<string, RosterEntry> | undefined): Scorecard {
-  const key = run.roster ? run.id : `${run.id}::${facts?.size ?? 0}`;
+  const key = cacheKey(run, facts);
   const hit = cache.get(key);
   if (hit) return hit;
   const card = scoreRun(run, facts ? { factsByName: (name) => facts.get(name) } : undefined);
@@ -63,9 +81,28 @@ function scoreCached(run: RunRecord, facts: Map<string, RosterEntry> | undefined
   return card;
 }
 
+function reviewCached(
+  run: RunRecord,
+  card: Scorecard,
+  facts: Map<string, RosterEntry> | undefined,
+): Review {
+  const key = `${cacheKey(run, facts)}::r${REVIEW.version}`;
+  const hit = reviews.get(key);
+  if (hit) return hit;
+  const review = reviewRun(run, card, facts ? { factsByName: (name) => facts.get(name) } : undefined);
+  reviews.set(key, review);
+  return review;
+}
+
 export interface ScoredRun {
   run: RunRecord;
   card: Scorecard;
+  review: Review;
+}
+
+function scoredRun(run: RunRecord, facts: Map<string, RosterEntry> | undefined): ScoredRun {
+  const card = scoreCached(run, facts);
+  return { run, card, review: reviewCached(run, card, facts) };
 }
 
 /**
@@ -90,7 +127,7 @@ export function useScorecard(runId: string | null): ScoredLookup | undefined {
     const run = await db.runs.get(runId);
     if (!run) return { runId, scored: null };
     const facts = await factsForLegacy([run]);
-    return { runId, scored: { run, card: scoreCached(run, facts) } };
+    return { runId, scored: scoredRun(run, facts) };
   }, [runId]);
 }
 

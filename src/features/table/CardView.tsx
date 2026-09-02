@@ -1,16 +1,15 @@
 import { useDraggable } from '@dnd-kit/core';
 import type { DraggableAttributes } from '@dnd-kit/core';
-import type { HTMLAttributes, MouseEvent, ReactNode } from 'react';
+import { useCallback, useRef } from 'react';
+import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type { CardData, CardInstance } from '../../domain/types';
 import { useGameStore } from '../../state/gameStore';
+import { normalizeKey, useHotkeyStore } from '../../state/hotkeyStore';
 import { useCardMenu } from './CardMenu';
+import { CardPreview, useCardPreview } from './CardPreview';
+import { CARD_ASPECT, cardHeight } from './cardGeometry';
 
-/** Standard MTG card aspect (height / width). */
-export const CARD_ASPECT = 1.396;
-
-export function cardHeight(width: number): number {
-  return Math.round(width * CARD_ASPECT);
-}
+export { CARD_ASPECT, cardHeight };
 
 export function counterLabel(kind: string, n: number): string {
   return kind.includes('/') ? `${kind} ×${n}` : `${kind} ${n}`;
@@ -156,8 +155,54 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
   const data = useGameStore((s) => (card.scryfallId ? s.cardData[card.scryfallId] : undefined));
   const openMenu = useCardMenu();
 
+  // The panel sits beside this element, so the preview needs the node the drag
+  // library is already holding.
+  const host = useRef<HTMLDivElement | null>(null);
+  const dndRef = dnd?.setNodeRef;
+  const setRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      host.current = el;
+      dndRef?.(el);
+    },
+    [dndRef],
+  );
+
+  // Nothing to preview for a face-down card, a card whose Scryfall data has not
+  // arrived, or a token with no spec. A card being dragged, and the drag
+  // overlay's copy of it, are both off limits: the card is in the air.
+  const previewable =
+    !faceDown &&
+    !card.faceDown &&
+    !lifted &&
+    !dnd?.isDragging &&
+    (card.isToken ? Boolean(card.tokenSpec) : Boolean(card.scryfallId && data));
+  const preview = useCardPreview(previewable);
+
   const height = cardHeight(width);
   const interactive = Boolean(onClick || onDoubleClick || dnd);
+
+  // The drag library points `aria-describedby` at its own keyboard
+  // instructions, so the preview is added to that list rather than over it.
+  const describedBy =
+    [dnd?.attributes['aria-describedby'], preview.open ? preview.id : null]
+      .filter(Boolean)
+      .join(' ') || undefined;
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+    if (onActivate && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {
+      e.preventDefault();
+      e.stopPropagation();
+      onActivate();
+      return;
+    }
+    if (!previewable || e.metaKey || e.ctrlKey || e.altKey) return;
+    // Read the binding at press time: the key is rebindable and every card on
+    // the table would otherwise subscribe to the keymap.
+    if (normalizeKey(e.nativeEvent) !== useHotkeyStore.getState().keymap.preview) return;
+    e.preventDefault();
+    e.stopPropagation();
+    preview.toggle();
+  }
 
   const classes = ['tbl-card'];
   if (card.tapped) classes.push('is-tapped');
@@ -172,13 +217,19 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
 
   const inner = (
     <div
-      ref={dnd?.setNodeRef}
+      ref={setRefs}
       className={classes.join(' ')}
       title={title}
       // The global hotkey listener stands down for a keyboard-focused card
       // carrying this attribute, which is what lets Space reach the card here
-      // instead of stepping the phase behind it.
+      // instead of stepping the phase behind it. (The preview key needs no such
+      // attribute: the global listener stands down for it everywhere.)
       data-card-activate={onActivate ? '' : undefined}
+      onPointerEnter={preview.onPointerEnter}
+      onPointerMove={preview.onPointerMove}
+      onPointerLeave={preview.onPointerLeave}
+      // Tab moving off the card takes the panel with it.
+      onBlur={preview.close}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       // A mouse press focuses the card, and a focused card owns Enter and
@@ -194,16 +245,7 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
             }
           : undefined
       }
-      onKeyDown={
-        onActivate
-          ? (e) => {
-              if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
-              e.preventDefault();
-              e.stopPropagation();
-              onActivate();
-            }
-          : undefined
-      }
+      onKeyDown={onKeyDown}
       onContextMenu={
         menu
           ? (e) => {
@@ -215,6 +257,7 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
       }
       {...(dnd?.attributes ?? {})}
       {...(dnd?.listeners ?? {})}
+      aria-describedby={describedBy}
     >
       <div className="tbl-card-face">
         <CardArt card={card} data={data} small={small} faceDown={faceDown} />
@@ -239,6 +282,15 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
   return (
     <div className="tbl-slot" style={{ width, height }}>
       {inner}
+      {preview.open && (
+        <CardPreview
+          id={preview.id}
+          card={card}
+          data={data}
+          anchor={host}
+          onDismiss={preview.close}
+        />
+      )}
     </div>
   );
 }

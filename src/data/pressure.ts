@@ -2,31 +2,61 @@ import type { EventType } from '../domain/types';
 
 /**
  * Every number the pressure engine reads lives here, so tuning is one file and
- * the type checker guards the shape. Values were fitted by Monte-Carlo probe
- * against the bracket-3 design anchors (see the M1 report):
+ * the type checker guards the shape.
  *
- *   - a board wipe lands by turn 7 in ~65–75% of runs, and is rare before turn 4
- *   - targeted removal answers the player's commander 1–2 times per run
- *   - a race clock spawns from turn ~7 with a 3-turn deadline
- *   - resource attacks land ~1–2 times per run
+ * ## The tuning story (version 2)
+ *
+ * Version 1 gave every hazard a single start turn and scaled the whole curve by
+ * one per-bracket `frequency` multiplier. That made brackets differ only in *how
+ * often* the pod acted, never in *when* — a cEDH pod threatened to win on turn 9
+ * and a precon pod on turn 10.7, which reads as noise rather than as a bracket.
+ * Version 2 deletes the global multiplier and makes every hazard dial a bracket
+ * table, so the schedule itself moves: a bracket-5 clock starts on turn 4 and a
+ * bracket-1 clock on turn 11.
+ *
+ * The shape each bracket is tuned to:
+ *
+ *   1 exhibition — almost nothing happens on schedule. Wraths arrive late if at
+ *     all, the pod rarely holds up mana, and the "we win next turn" clock only
+ *     appears in the last couple of turns, in about 40% of runs.
+ *   2 core/precon — the same game one gear up: a wrath around turn 7, a clock
+ *     from turn 9, occasional interaction.
+ *   3 upgraded — the reference bracket the M1 report was fitted to. Wipe by
+ *     turn 7 in ~68% of runs, commander answered 1–2 times, clock from turn 7
+ *     with a 3-turn deadline. Every anchor in that report still holds here.
+ *   4 optimized — the peak of fair pressure. The most wraths, hardest combat,
+ *     removal on a one-window cooldown, a clock from turn 5 with a 2-turn
+ *     deadline. This is the bracket that hurts the most on the board.
+ *   5 cEDH — deliberately *not* "bracket 4 but more". A cEDH pod wraths and
+ *     attacks less than an optimized casual pod (its wrath curve decays after
+ *     the early turns, hence the negative `perTurn`); it interacts instead —
+ *     the most removal, the most counter-armed windows, and a clock from turn 4
+ *     because the win is a combo, not an army.
  *
  * Bracket tables are indexed by `bracket - 1`, i.e. `[b1, b2, b3, b4, b5]`.
+ * Values were fitted with `npm run probe:pressure 1000`, which carries the
+ * target for every metric and fails non-zero when one drifts out of band.
  */
 
-/** A per-window probability curve for one event type. */
+/**
+ * A per-window probability curve for one event type. Every field is a bracket
+ * table: the bracket changes when a hazard turns on, how steeply it ramps, and
+ * how many times it may fire — not just a single frequency dial.
+ */
 export interface Hazard {
-  /** No roll happens for a window entering a turn below this. */
-  startTurn: number;
+  /** No roll fires for a window entering a turn below this. */
+  startTurn: BracketTable;
   /** Probability at `startTurn`. */
-  base: number;
-  /** Added to the probability for each turn past `startTurn`. */
-  perTurn: number;
+  base: BracketTable;
+  /** Added to the probability for each turn past `startTurn`. May be negative
+   *  for a hazard whose bracket loses interest as the game speeds up. */
+  perTurn: BracketTable;
   /** Ceiling applied after the per-turn ramp and every multiplier. */
-  max: number;
+  max: BracketTable;
   /** Hard limit on firings per run. */
-  cap: number;
+  cap: BracketTable;
   /** Windows that must elapse after a firing before this type can fire again. */
-  cooldown: number;
+  cooldown: BracketTable;
 }
 
 export type BracketTable = readonly [number, number, number, number, number];
@@ -44,25 +74,89 @@ export function byBracket(table: BracketTable, bracket: number): number {
 
 export const PRESSURE = {
   /** Bumped whenever the numbers below change, so logged runs stay comparable. */
-  version: 1,
+  version: 2,
 
   bracket: {
-    /** Multiplies every hazard probability. */
-    frequency: [0.5, 0.72, 1, 1.3, 1.6] as BracketTable,
     /** Multiplies damage and other magnitudes. */
     severity: [0.6, 0.8, 1, 1.2, 1.45] as BracketTable,
-    /** Threat gained per opponent window, before jitter. */
-    threatGrowth: [0.2, 0.28, 0.36, 0.46, 0.58] as BracketTable,
+    /**
+     * Threat gained per opponent window on the first window, before jitter.
+     * Low brackets start slow and accelerate (`threatGrowthRamp`); high
+     * brackets open scary and flatten out against the 0–10 ceiling.
+     */
+    threatGrowth: [0.045, 0.21, 0.37, 0.51, 0.87] as BracketTable,
+    /** Added to `threatGrowth` for each turn past turn 2. */
+    threatGrowthRamp: [0.036, 0.01, 0, -0.011, -0.042] as BracketTable,
     /** Cap on events created in a single window (the race clock is exempt). */
     maxEventsPerWindow: [1, 2, 2, 3, 3] as BracketTable,
   },
 
   hazards: {
-    wipe: { startTurn: 3, base: 0.03, perTurn: 0.093, max: 0.5, cap: 3, cooldown: 3 },
-    removal: { startTurn: 2, base: 0.04, perTurn: 0.018, max: 0.26, cap: 5, cooldown: 1 },
-    combat: { startTurn: 4, base: 0.45, perTurn: 0.06, max: 0.85, cap: 99, cooldown: 0 },
-    resource: { startTurn: 2, base: 0.065, perTurn: 0.016, max: 0.25, cap: 3, cooldown: 2 },
-    clock: { startTurn: 7, base: 0.1, perTurn: 0.07, max: 0.6, cap: 4, cooldown: 0 },
+    /**
+     * The pod's reset. Bracket 4 wraths the most (82% by turn 7); bracket 1
+     * the least, and rarely before turn 8. Bracket 5 is the odd one out — it
+     * wraths early or not at all, holding the highest chance of any bracket on
+     * turn 4 and decaying to nothing by turn 10, which is what its negative
+     * `perTurn` buys. A low `base` starting early (bracket 3) and a high `base`
+     * starting late (bracket 5) are different games, not one curve shifted.
+     */
+    wipe: {
+      startTurn: [5, 4, 3, 3, 4] as BracketTable,
+      base: [0.09, 0.07, 0.03, 0.16, 0.27] as BracketTable,
+      perTurn: [0.045, 0.055, 0.093, 0.075, -0.04] as BracketTable,
+      max: [0.3, 0.4, 0.5, 0.55, 0.4] as BracketTable,
+      cap: [2, 2, 3, 3, 2] as BracketTable,
+      cooldown: [3, 3, 3, 2, 2] as BracketTable,
+    },
+    /**
+     * Targeted answers — the one hazard whose pressure climbs all the way to
+     * bracket 5 (0.6 removals a run at bracket 1, 2.5 at bracket 5). Three
+     * dials share that climb: bracket 3 and up start rolling on turn 2, the
+     * cooldown halves, and the cap rises, so `base` alone does not read
+     * monotonic.
+     */
+    removal: {
+      startTurn: [5, 4, 2, 2, 2] as BracketTable,
+      base: [0.06, 0.06, 0.045, 0.085, 0.13] as BracketTable,
+      perTurn: [0.012, 0.014, 0.016, 0.021, 0.026] as BracketTable,
+      max: [0.2, 0.24, 0.28, 0.36, 0.45] as BracketTable,
+      cap: [3, 4, 5, 6, 6] as BracketTable,
+      cooldown: [2, 2, 1, 1, 1] as BracketTable,
+    },
+    /**
+     * Turning the silhouette sideways. Bracket 4 is the hardest-hitting board;
+     * bracket 5 attacks later and less, because it is holding up interaction
+     * and winning off a combo instead.
+     */
+    combat: {
+      startTurn: [5, 4, 4, 3, 4] as BracketTable,
+      base: [0.3, 0.4, 0.45, 0.44, 0.22] as BracketTable,
+      perTurn: [0.04, 0.05, 0.06, 0.07, 0.025] as BracketTable,
+      max: [0.6, 0.75, 0.85, 0.9, 0.4] as BracketTable,
+      cap: [99, 99, 99, 99, 99] as BracketTable,
+      cooldown: [0, 0, 0, 0, 0] as BracketTable,
+    },
+    /** Discard, sacrifice, tax. Rare below bracket 3, routine at bracket 5. */
+    resource: {
+      startTurn: [5, 4, 3, 2, 2] as BracketTable,
+      base: [0.05, 0.08, 0.09, 0.085, 0.1] as BracketTable,
+      perTurn: [0.01, 0.014, 0.016, 0.02, 0.018] as BracketTable,
+      max: [0.15, 0.2, 0.25, 0.3, 0.35] as BracketTable,
+      cap: [2, 3, 3, 4, 4] as BracketTable,
+      cooldown: [3, 2, 2, 2, 1] as BracketTable,
+    },
+    /**
+     * "We win in N turns." The single most bracket-defining number in the file:
+     * turn 11 at bracket 1, turn 4 at bracket 5.
+     */
+    clock: {
+      startTurn: [11, 9, 7, 5, 4] as BracketTable,
+      base: [0.23, 0.28, 0.28, 0.31, 0.4] as BracketTable,
+      perTurn: [0, 0, 0.01, 0.015, 0.02] as BracketTable,
+      max: [0.4, 0.45, 0.5, 0.6, 0.7] as BracketTable,
+      cap: [4, 4, 4, 4, 4] as BracketTable,
+      cooldown: [0, 0, 0, 0, 0] as BracketTable,
+    },
   } satisfies Record<Exclude<EventType, 'counter'>, Hazard>,
 
   wipe: {
@@ -82,7 +176,7 @@ export const PRESSURE = {
     /** First turn a seat may be armed. */
     startTurn: [5, 4, 3, 2, 2] as BracketTable,
     /** Chance a seat is armed for the coming turn, before the player-threat scale. */
-    armChance: [0.12, 0.18, 0.25, 0.35, 0.45] as BracketTable,
+    armChance: [0.06, 0.14, 0.24, 0.36, 0.55] as BracketTable,
     /** Mana value at or above which an armed seat counters. */
     threshold: [6, 5, 4, 4, 3] as BracketTable,
     playerThreatBase: 0.6,
@@ -103,8 +197,12 @@ export const PRESSURE = {
   clock: {
     /** Deadline = spawn turn + this. */
     deadlineOffset: [5, 4, 3, 2, 2] as BracketTable,
-    /** A seat needs at least this much threat to start a clock. */
-    minThreat: 4,
+    /**
+     * A seat needs at least this much threat to start a clock. Lower at the low
+     * brackets, where nobody's board ever gets scary but somebody still ends up
+     * closest to winning.
+     */
+    minThreat: [2.5, 3, 3.5, 4, 4] as BracketTable,
   },
 
   resource: {

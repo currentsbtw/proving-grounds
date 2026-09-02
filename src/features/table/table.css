@@ -618,6 +618,120 @@
   background: var(--raised);
 }
 
+/* Card preview ----------------------------------------------------------- */
+
+/* Hover or the preview key lifts the card out of the board's sizing and prints
+   it beside itself with the text no card at table size can carry. Portalled to
+   the body, so the hand row, the zone stacks and the browse overlay cannot clip
+   it; positioned by CardPreview.tsx, which flips it to the side with room and
+   clamps it inside the viewport. */
+.tbl-preview {
+  position: fixed;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px var(--shadow-strong);
+  /* A tooltip is never the thing you are pointing at. */
+  pointer-events: none;
+  animation: tbl-preview-in 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tbl-preview {
+    animation: none;
+  }
+}
+
+@keyframes tbl-preview-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The face gives up height first when the window is short: the text below it is
+   the reason the panel opened. */
+.tbl-preview-img {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  flex: 0 1 auto;
+  object-fit: contain;
+  background: var(--raised);
+}
+
+.tbl-preview-text {
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 9px 12px 11px;
+  border-top: 1px solid var(--line);
+}
+
+/* No image (a token, or a face that never arrived): the text is the preview. */
+.tbl-preview-text:first-child {
+  border-top: 0;
+}
+
+.tbl-preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tbl-preview-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.tbl-preview-cost {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tbl-preview-pt {
+  margin-top: 4px;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+/* The card's own type line is content, not a printed label naming a value, so
+   it is set as small body rather than in the label recipe. */
+.tbl-preview-type {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* Scryfall writes its own line breaks into the oracle text, and they are how
+   the card is read: one ability to a line. */
+.tbl-preview-oracle {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
 /* Mana value badge ------------------------------------------------------- */
 
 /* The same small square the readout prints its hotkeys in. */

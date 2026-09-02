@@ -1,6 +1,7 @@
 import type { DeckProfile, EventLedgerRow, Scorecard, TurnRow } from '../../engine/scorecard';
 import type { EventType } from '../../domain/types';
 import { EVENT_MARK, EVENT_MARK_KEY } from './eventMarks';
+import { pct, verdictOf } from './verdict';
 
 /** Pixel size of the shareable card. 2:1 so it posts cleanly to Discord/Twitter. */
 export const SHARE_IMAGE_WIDTH = 1200;
@@ -155,6 +156,16 @@ const CARD_RADIUS = 16;
 const L = CARD_X + 32;
 const R = CARD_X + CARD_W - 32;
 const CONTENT_W = R - L;
+
+/* The header band. The wordmark, deck name and meta line all sit one step
+   higher than they used to so the verdict sentence gets a line of its own above
+   the rule; the tile row, the plot and the strip below it do not move. */
+const CHIP_Y = 38;
+const WORDMARK_Y = 58;
+const NAME_Y = 96;
+const META_Y = 120;
+const VERDICT_Y = 146;
+const HEADER_RULE_Y = 158;
 
 const TILE_Y = 172;
 const TILE_H = 100;
@@ -373,12 +384,13 @@ function dot(ctx: Ctx2D, x: number, y: number, r: number, color: string): void {
 // Reading the scorecard
 // ---------------------------------------------------------------------------
 
-interface Verdict {
+interface ResultWord {
   word: string;
   color: string;
 }
 
-function verdictOf(card: Scorecard, C: Palette): Verdict {
+/** The result the run ended on. The verdict *sentence* comes from `verdict.ts`. */
+function resultWordOf(card: Scorecard, C: Palette): ResultWord {
   switch (card.result) {
     case 'win':
       return { word: 'WIN', color: C.ok };
@@ -444,7 +456,7 @@ function tilesFor(card: Scorecard): Tile[] {
     },
     {
       label: 'ANSWER RATE',
-      value: rate === null ? 'n/a' : `${Math.round(rate * 100)}%`,
+      value: pct(rate),
       sub: `${answers.responded}/${terminal} ended`,
     },
     {
@@ -474,25 +486,25 @@ function formatDate(stamp: number | null): string {
 // ---------------------------------------------------------------------------
 
 function drawHeader(ctx: Ctx2D, card: Scorecard, C: Palette): void {
-  const verdict = verdictOf(card, C);
+  const result = resultWordOf(card, C);
 
   // The chip is measured first: the deck name gets whatever is left over.
   ctx.font = `600 26px ${BODY_FONT}`;
   const chipTracking = 3;
-  const wordWidth = measure(ctx, verdict.word, chipTracking);
+  const wordWidth = measure(ctx, result.word, chipTracking);
   const chipW = wordWidth + 44;
-  const chipH = 48;
+  const chipH = 46;
   const chipX = R - chipW;
-  const chipY = 44;
+  const chipY = CHIP_Y;
 
   box(ctx, chipX, chipY, chipW, chipH, {
-    fill: alpha(verdict.color, 0.14),
-    stroke: alpha(verdict.color, 0.55),
+    fill: alpha(result.color, 0.14),
+    stroke: alpha(result.color, 0.55),
     radius: 14,
   });
-  text(ctx, verdict.word, chipX + chipW / 2, chipY + 32, {
+  text(ctx, result.word, chipX + chipW / 2, chipY + 31, {
     size: 26,
-    color: verdict.color,
+    color: result.color,
     weight: 600,
     tracking: chipTracking,
     align: 'center',
@@ -501,13 +513,13 @@ function drawHeader(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const nameWidth = chipX - 24 - L;
 
   // The one run on the card allowed the display face.
-  text(ctx, 'PROVING GROUNDS', L, 66, {
+  text(ctx, 'PROVING GROUNDS', L, WORDMARK_Y, {
     size: 13,
     color: C.accent,
     display: true,
     tracking: 4.5,
   });
-  text(ctx, card.deckName || 'Untitled deck', L, 106, {
+  text(ctx, card.deckName || 'Untitled deck', L, NAME_Y, {
     size: 34,
     color: C.ink,
     weight: 500,
@@ -521,14 +533,56 @@ function drawHeader(ctx: Ctx2D, card: Scorecard, C: Palette): void {
     formatDate(card.endedAt ?? card.startedAt),
   ];
   if (card.partial) meta.push('partial');
-  text(ctx, meta.join('  ·  '), L, 132, {
+  text(ctx, meta.join('  ·  '), L, META_Y, {
     size: 13,
     color: C.muted,
     tracking: 0.4,
     maxWidth: nameWidth,
   });
 
-  line(ctx, L, 152, R, 152, C.line);
+  drawVerdictLine(ctx, card, C);
+
+  line(ctx, L, HEADER_RULE_Y, R, HEADER_RULE_Y, C.line);
+}
+
+/**
+ * The sentence the player read on the scorecard, printed on the receipt under
+ * the result word. The tiles below are six readings at equal weight; this says
+ * which of them the run actually failed on, and it is the line a reader on
+ * Discord takes the image in by.
+ *
+ * Headline type, not body: one line, one step under the deck name, so the pair
+ * reads as "this deck / did this". It never wraps into the tile row — a run
+ * long enough to need it steps down through the sizes below and, past the
+ * smallest, is cut with an ellipsis by `fit`.
+ */
+const VERDICT_SIZES = [22, 20, 18];
+const VERDICT_TRACKING = -0.2;
+
+function drawVerdictLine(ctx: Ctx2D, card: Scorecard, C: Palette): void {
+  const verdict = verdictOf(card);
+  const maxWidth = CONTENT_W;
+
+  let size = VERDICT_SIZES[VERDICT_SIZES.length - 1];
+  for (const candidate of VERDICT_SIZES) {
+    ctx.font = `600 ${candidate}px ${BODY_FONT}`;
+    if (measure(ctx, verdict.text, VERDICT_TRACKING) <= maxWidth) {
+      size = candidate;
+      break;
+    }
+  }
+
+  text(ctx, verdict.text, L, VERDICT_Y, {
+    size,
+    // Ink, the same as on screen. Accent is spent on what needs an answer now
+    // and on interaction affordances, never on a heading (DESIGN.md, the One
+    // Accent Rule), and nothing on a receipt can be answered. A run with nothing
+    // over a threshold has nothing to report either, so it drops to muted.
+    color: verdict.clear ? C.muted : C.ink,
+    weight: 600,
+    tracking: VERDICT_TRACKING,
+    maxWidth,
+  });
 }
 
 function drawTiles(ctx: Ctx2D, card: Scorecard, C: Palette): void {
