@@ -44,6 +44,15 @@ export const STARTING_LIFE = 40;
 export const STARTING_HAND_SIZE = 7;
 export const LETHAL_COMMANDER_DAMAGE = 21;
 
+/**
+ * Cards to put on the bottom after `mulliganCount` mulligans. Commander gives
+ * the first mulligan free (CR 103.5c), so the first one bottoms nothing and
+ * every later one bottoms one more.
+ */
+export function mulliganBottomCount(mulliganCount: number): number {
+  return Math.max(0, mulliganCount - 1);
+}
+
 export type LifeTarget = 'player' | SeatId;
 
 /** Extra options for `moveCard`. The bare 'top' | 'bottom' form is still accepted. */
@@ -1195,8 +1204,11 @@ export const useGameStore = create<GameState>((set, get) => {
       });
       shuffleSilently();
       const count = get().mulliganCount;
-      appendLog('mull', `Mulligan to ${Math.max(0, STARTING_HAND_SIZE - count)}`, {
+      const bottomCount = mulliganBottomCount(count);
+      const keptSize = Math.max(0, STARTING_HAND_SIZE - bottomCount);
+      appendLog('mull', `Mulligan to ${keptSize}${bottomCount === 0 ? ' (free)' : ''}`, {
         mulliganCount: count,
+        bottomCount,
         returned: hand.length,
       });
       const drawn = takeFromTop(STARTING_HAND_SIZE);

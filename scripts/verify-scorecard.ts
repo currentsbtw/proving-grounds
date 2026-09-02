@@ -27,6 +27,7 @@ import {
   cardsInZone,
   isLandCard,
   manaValueOf,
+  mulliganBottomCount,
   useGameStore,
   type GameState,
 } from '../src/state/gameStore.ts';
@@ -431,14 +432,21 @@ function endRunQuietly(result: RunResult): void {
   void store().endRun(result);
 }
 
-/** A short run that only exists to exercise the mulligan path. */
-function playMulliganRun(seed: string): { record: RunRecord; hand: string[] } {
+/**
+ * A short run that only exists to exercise the mulligan path. `mulligans` is
+ * how many are taken; the number bottomed follows the Commander rule (the first
+ * mulligan is free), so this mirrors what the UI allows.
+ */
+function playMulliganRun(seed: string, mulligans = 1): { record: RunRecord; hand: string[] } {
   capturedRun = null;
   oracle = freshOracle();
   store().startRun(DECK, CARD_DATA, seed);
-  store().takeMulligan();
-  const first = cardsInZone(store(), 'hand')[0];
-  store().resolveMulligan([first.iid]);
+  for (let i = 0; i < mulligans; i += 1) store().takeMulligan();
+  const bottomCount = mulliganBottomCount(mulligans);
+  const bottom = cardsInZone(store(), 'hand')
+    .slice(0, bottomCount)
+    .map((c) => c.iid);
+  store().resolveMulligan(bottom);
   const hand = cardsInZone(store(), 'hand').map((c) => c.iid);
   endRunQuietly('concede');
   const finished = lastCapturedRun();
@@ -667,10 +675,12 @@ function main(): void {
   );
 
   // --- mulligans -----------------------------------------------------------
+  // The first mulligan is free in Commander (CR 103.5c): it keeps seven. The
+  // second bottoms one.
   const mull = playMulliganRun(MULLIGAN_SEED);
   const mullCard = scoreRun(mull.record);
   checkEqual('mulligan count', mullCard.keep.mulligans, 1);
-  checkEqual('kept hand size', mullCard.keep.keptHandSize, 6);
+  checkEqual('kept hand size after the free mulligan', mullCard.keep.keptHandSize, 7);
   checkEqual(
     'derived hand after a mulligan matches the store',
     sorted(replayZones(mull.record).hand),
@@ -679,6 +689,16 @@ function main(): void {
   check(
     'lands in the opening seven were counted',
     mullCard.keep.landsInOpeningSeven >= 0 && mullCard.keep.landsInOpeningSeven <= 7,
+  );
+
+  const mull2 = playMulliganRun(`${MULLIGAN_SEED}-2`, 2);
+  const mull2Card = scoreRun(mull2.record);
+  checkEqual('mulligan count after two', mull2Card.keep.mulligans, 2);
+  checkEqual('kept hand size after two mulligans', mull2Card.keep.keptHandSize, 6);
+  checkEqual(
+    'derived hand after two mulligans matches the store',
+    sorted(replayZones(mull2.record).hand),
+    sorted(mull2.hand),
   );
 
   // --- summary -------------------------------------------------------------

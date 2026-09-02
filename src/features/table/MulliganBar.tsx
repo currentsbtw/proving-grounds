@@ -1,4 +1,4 @@
-import { STARTING_HAND_SIZE } from '../../state/gameStore';
+import { mulliganBottomCount, STARTING_HAND_SIZE } from '../../state/gameStore';
 
 export interface MulliganBarProps {
   mulliganCount: number;
@@ -22,17 +22,19 @@ export function MulliganBar({
   onConfirmBottoming,
   onCancelBottoming,
 }: MulliganBarProps) {
-  const nextSize = Math.max(0, STARTING_HAND_SIZE - mulliganCount - 1);
+  // Commander's first mulligan is free: bottom nothing after one, one after two.
+  const bottomCount = mulliganBottomCount(mulliganCount);
+  const nextSize = Math.max(0, STARTING_HAND_SIZE - mulliganBottomCount(mulliganCount + 1));
 
   if (selecting) {
     return (
       <div className="tbl-mull" role="group" aria-label="Bottom cards after mulligan">
-        <span className="tbl-mull-label">Bottom {mulliganCount}</span>
+        <span className="tbl-mull-label">Bottom {bottomCount}</span>
         <span>
-          Click {mulliganCount} card{mulliganCount === 1 ? '' : 's'} in hand to put on the bottom{' '}
+          Click {bottomCount} card{bottomCount === 1 ? '' : 's'} in hand to put on the bottom{' '}
           ·{' '}
           <span className="num">
-            {selectedCount}/{mulliganCount}
+            {selectedCount}/{bottomCount}
           </span>{' '}
           chosen
         </span>
@@ -43,10 +45,10 @@ export function MulliganBar({
         <button
           type="button"
           className="is-primary"
-          disabled={selectedCount !== mulliganCount}
+          disabled={selectedCount !== bottomCount}
           onClick={onConfirmBottoming}
         >
-          Put {mulliganCount} on the bottom
+          Put {bottomCount} on the bottom
         </button>
       </div>
     );
@@ -64,9 +66,9 @@ export function MulliganBar({
       <button type="button" onClick={onMulligan}>
         Mulligan to {nextSize}
       </button>
-      {mulliganCount > 0 ? (
+      {bottomCount > 0 ? (
         <button type="button" className="is-primary" onClick={onStartBottoming}>
-          Keep and bottom {mulliganCount}
+          Keep and bottom {bottomCount}
         </button>
       ) : (
         <button type="button" className="is-primary" onClick={onKeep}>
