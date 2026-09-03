@@ -103,6 +103,12 @@ export type JudgeErrorCode =
   | 'no_key'
   /** The claude-code driver's CLI is not logged in (run `claude /login` once). */
   | 'no_login'
+  /**
+   * Credentials are fine and there is nothing left to spend: a Claude plan's
+   * session window is used up, or the API is rate limiting. Nothing to fix, and
+   * nothing to retry until the time the proxy's message names.
+   */
+  | 'limit'
   | 'no_corpus'
   | 'upstream'
   | 'bad_request';

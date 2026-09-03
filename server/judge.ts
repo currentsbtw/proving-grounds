@@ -23,7 +23,7 @@ import type {
 import { JUDGE_ENDPOINT, JUDGE_HEALTH_ENDPOINT, JUDGE_PORT } from '../src/domain/judge.ts';
 import { type Corpus, corpusExists, loadCorpus } from './judge/corpus.ts';
 import { askJudge, JudgeBadRequestError } from './judge/core.ts';
-import { ModelAuthError, ModelUpstreamError } from './judge/model.ts';
+import { classifyModelFailure } from './judge/model.ts';
 import { probeDriver, selectDriver } from './judge/drivers/index.ts';
 
 const MAX_BODY_BYTES = 256 * 1024;
@@ -114,22 +114,6 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-/**
- * The 503 for "reached nothing usable", worded for whichever driver is running.
- * The api driver wants a key in the environment; the claude-code driver wants a
- * login the player performs once, in a terminal, and never thinks about again.
- */
-function failNoCredentials(res: ServerResponse): string {
-  return driver === 'claude-code'
-    ? fail(
-        res,
-        503,
-        'no_login',
-        'Judge is not logged in. Run claude /login once in a terminal, then ask again.',
-      )
-    : fail(res, 503, 'no_key', "No ANTHROPIC_API_KEY in the judge's environment.");
-}
-
 async function handleAsk(req: IncomingMessage, res: ServerResponse): Promise<string> {
   if (!corpus) {
     return fail(res, 503, 'no_corpus', 'Run npm run judge:corpus first.');
@@ -186,12 +170,14 @@ async function handleAsk(req: IncomingMessage, res: ServerResponse): Promise<str
     if (timedOut) {
       return fail(res, 504, 'upstream', `No answer within ${ANSWER_TIMEOUT_MS / 1000}s.`);
     }
-    // A driver that could not authenticate is the one failure the player can
-    // fix, so it keeps its own code and its own sentence.
-    if (err instanceof ModelAuthError) return failNoCredentials(res);
+    // A failure the driver named -- no credentials, no usage left, nothing
+    // usable back -- has its own code and its own sentence, worded for whichever
+    // driver is running. `classifyModelFailure` owns that mapping so the harness
+    // can check it without starting a server.
+    const failure = classifyModelFailure(err, driver);
+    if (failure) return fail(res, failure.status, failure.code, failure.error);
     if (err instanceof JudgeBadRequestError) return fail(res, 400, 'bad_request', err.message);
-    if (err instanceof ModelUpstreamError) return fail(res, 502, 'upstream', err.message);
-    // Rate limits, 5xx, a dead socket: the driver passed them through as-is.
+    // 5xx, a dead socket, anything else: the driver passed them through as-is.
     return fail(res, 502, 'upstream', (err as Error).message);
   } finally {
     clearTimeout(cap);

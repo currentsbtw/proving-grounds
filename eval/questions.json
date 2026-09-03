@@ -1,5 +1,682 @@
 [
   {
+    "id": "0456ec64-2c81-4763-a352-8ff64a4c3d6b#0",
+    "card": "Deadly Rollick",
+    "question": "I'm playing a Commander game and I have Deadly Rollick in hand. My own two commanders are both in the command zone, but earlier I gained control of an opponent's commander creature with a Mind Control effect and it's on the battlefield under my control. Can I cast Deadly Rollick without paying its mana cost, and would controlling just one of my own two commanders be enough?",
+    "answerKey": "Yes on both counts. It doesn't matter whose commander you control — any one will do, including an opponent's commander you've gained control of. And if you have two commanders, you only need to control one of them to cast Deadly Rollick without paying its mana cost.",
+    "ruling": "It doesn't matter whose commander you control. Any one will do. If you have two commanders, you just need to control one of them.",
+    "publishedAt": "2020-04-17",
+    "source": "wotc",
+    "otherCards": [
+      "Mind Control"
+    ]
+  },
+  {
+    "id": "0456ec64-2c81-4763-a352-8ff64a4c3d6b#1",
+    "card": "Deadly Rollick",
+    "question": "I control my commander and I announce Deadly Rollick, choosing to cast it without paying its mana cost. In response to my announcement, my opponent wants to kill my commander with an instant so that I no longer control a commander and have to pay Deadly Rollick's mana cost instead. Can they do that?",
+    "answerKey": "No. Once you begin casting Deadly Rollick, players can't take any other actions until you're done casting it — nobody receives priority mid-cast. So they can't try to remove the commander you control to make you pay its cost; the alternative cost is locked in as part of casting the spell.",
+    "ruling": "Once you begin casting this spell, players can't take any other actions until you're done casting it. Notably, they can't try to remove the commander you control to make you pay its cost.",
+    "publishedAt": "2020-04-17",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "07a0cba9-8768-4fd9-a3d5-b0f83b4bf8e8#0",
+    "card": "Chaos Warp",
+    "question": "I cast Chaos Warp targeting my opponent's creature, and they shuffle it into their library and reveal the top card, which turns out to be an instant. Where does that revealed instant end up — does it go to their graveyard, their hand, or somewhere else?",
+    "answerKey": "Nowhere — since the revealed card is not a permanent card, it simply stays on top of that player's library.",
+    "ruling": "If the revealed card is not a permanent card, it remains on top of that library.",
+    "publishedAt": "2011-09-22",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "07a0cba9-8768-4fd9-a3d5-b0f83b4bf8e8#1",
+    "card": "Chaos Warp",
+    "question": "I cast Chaos Warp targeting a creature token my opponent controls (it was created under their control). Who is considered the token's owner for the shuffle, and since a token in a library just stops existing, does anyone actually shuffle before the top card gets revealed?",
+    "answerKey": "The owner of a token is the player under whose control it was put onto the battlefield — so your opponent is its owner and does the shuffling. Even though a token shuffled into a library ceases to exist, that player still actually shuffles their library, and only then reveals the top card; if it's a permanent card, it's put onto the battlefield.",
+    "ruling": "The owner of a token is the player under whose control the token was put onto the battlefield. If a token is shuffled into a player's library this way, that player shuffles before revealing the top card of that library.",
+    "publishedAt": "2011-09-22",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "07a0cba9-8768-4fd9-a3d5-b0f83b4bf8e8#2",
+    "card": "Chaos Warp",
+    "question": "I cast Chaos Warp targeting my opponent's creature, so they shuffle it into their library and reveal the top card, which turns out to be Pacifism. At that moment there are no creatures on the battlefield at all, so the Aura has nothing it could legally enchant. What happens to the revealed Pacifism?",
+    "answerKey": "It stays on top of its owner's library. A permanent card that's revealed but can't enter the battlefield (such as an Aura with nothing legal to enchant) simply remains on top of that library.",
+    "ruling": "If the revealed card is a permanent card but can't enter (perhaps because it's an Aura with nothing to enchant), it remains on top of that library.",
+    "publishedAt": "2011-09-22",
+    "source": "wotc",
+    "otherCards": [
+      "Pacifism"
+    ]
+  },
+  {
+    "id": "07a0cba9-8768-4fd9-a3d5-b0f83b4bf8e8#3",
+    "card": "Chaos Warp",
+    "question": "I cast Chaos Warp targeting my opponent's creature. In response, they cast Blossoming Defense on it, giving it hexproof, so it's no longer a legal target for my spell. When Chaos Warp tries to resolve, does its owner still shuffle their library and reveal the top card, or does nothing at all happen?",
+    "answerKey": "Nothing happens. Chaos Warp has only one target, so if that target is illegal when Chaos Warp tries to resolve, the spell doesn't resolve and none of its effects occur — no library is shuffled, no card is revealed, and nothing is put onto the battlefield.",
+    "ruling": "If the permanent is an illegal target by the time Chaos Warp tries to resolve, it won't resolve and none of its effects will occur. No library will be shuffled and no card will be revealed.",
+    "publishedAt": "2011-09-22",
+    "source": "wotc",
+    "otherCards": [
+      "Blossoming Defense"
+    ]
+  },
+  {
+    "id": "07a0cba9-8768-4fd9-a3d5-b0f83b4bf8e8#4",
+    "card": "Chaos Warp",
+    "question": "I cast Chaos Warp targeting an opponent's permanent, and after they shuffle it away they reveal the top card of their library. Which card types on that revealed card would cause it to be put onto the battlefield?",
+    "answerKey": "It goes onto the battlefield only if it's a permanent card, meaning a card with one or more of these card types: artifact, creature, enchantment, land, or planeswalker. (Anything else, such as an instant or sorcery, just stays revealed on top of the library.)",
+    "ruling": "A permanent card is a card with one or more of the following card types: artifact, creature, enchantment, land, or planeswalker.",
+    "publishedAt": "2011-09-22",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261#0",
+    "card": "Liliana of the Veil",
+    "question": "I control Liliana of the Veil, and right now my hand is empty and so is every opponent's hand. Can I still activate her +1 ability that makes each player discard a card, or is the activation illegal because nobody can actually discard?",
+    "answerKey": "Yes, you can activate it. You may activate Liliana of the Veil's first ability even if some or all players will be unable to discard a card.",
+    "ruling": "You can activate Liliana’s first ability even if some or all players will be unable to discard a card.",
+    "publishedAt": "2022-09-09",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261#1",
+    "card": "Liliana of the Veil",
+    "question": "In a four-player Commander game it's my turn and I activate Liliana of the Veil's +1 ability, \"Each player discards a card.\" Each of us still has cards in hand. In what order do we choose our discards, and can the other players see what I pitch before deciding what to throw away themselves?",
+    "answerKey": "When Liliana's first ability resolves, first the player whose turn it is chooses a card in hand without revealing it, then each other player in turn order does the same. Then all the chosen cards are discarded at the same time. So no one sees another player's choice before making their own.",
+    "ruling": "When Liliana’s first ability resolves, first the player whose turn it is chooses a card in hand without revealing it, then each other player in turn order does the same. Then all the chosen cards are discarded at the same time.",
+    "publishedAt": "2022-09-09",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261#2",
+    "card": "Liliana of the Veil",
+    "question": "I activate Liliana of the Veil's −6 ability targeting my opponent, who controls a bunch of permanents including a creature that's enchanted by an Aura they control. When the ability resolves, who decides how the permanents are divided into the two piles, and can I split the enchanted creature and the Aura on it into different piles?",
+    "answerKey": "You (the ability's controller) do the separating: when Liliana of the Veil's third ability resolves, you put each permanent that player controls into one of the two piles. There's no requirement to keep related permanents together, so you could put the creature into one pile and the Aura enchanting it into the other. The targeted player then chooses one pile and sacrifices all permanents in it.",
+    "ruling": "When Liliana’s third ability resolves, you put each permanent the player controls into one of the two piles. For example, you could put a creature into one pile and an Aura enchanting that creature into the other pile.",
+    "publishedAt": "2022-09-09",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261#3",
+    "card": "Liliana of the Veil",
+    "question": "I activate Liliana of the Veil's −6 ability targeting my opponent, who controls several permanents. When I separate all permanents they control into two piles, am I required to put at least one permanent in each pile, and what happens if one pile has nothing in it?",
+    "answerKey": "No, you aren't required to put anything in both piles — a pile can be empty. If the targeted player chooses the empty pile, they sacrifice no permanents.",
+    "ruling": "A pile can be empty. If the player chooses an empty pile, no permanents will be sacrificed.",
+    "publishedAt": "2022-09-09",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "2f092562-9e17-43cd-aeb8-d0567f99363e#0",
+    "card": "Go for the Throat",
+    "question": "I cast Go for the Throat targeting my opponent's Grizzly Bears, which is just a normal green creature with no other types. In response, my opponent activates Liquimetal Coating targeting Grizzly Bears, making it an artifact creature until end of turn. When Go for the Throat goes to resolve, does the Bears still die?",
+    "answerKey": "Nothing — Go for the Throat won't resolve. Its only target must be a nonartifact creature, and when the spell tries to resolve, Grizzly Bears is an artifact creature, so the target is illegal. With all of its targets illegal, the spell is countered by the game rules (it doesn't resolve), so Grizzly Bears isn't destroyed.",
+    "ruling": "If the targeted creature is also an artifact when Go for the Throat tries to resolve, it won't resolve.",
+    "publishedAt": "2022-10-14",
+    "source": "wotc",
+    "otherCards": [
+      "Liquimetal Coating",
+      "Grizzly Bears"
+    ]
+  },
+  {
+    "id": "2f092562-9e17-43cd-aeb8-d0567f99363e#1",
+    "card": "Go for the Throat",
+    "question": "I cast Go for the Throat targeting my opponent's Ogre creature token, which is not an artifact. In response, my opponent activates Liquimetal Coating targeting that same creature, making it an artifact in addition to its other types until end of turn. What happens when Go for the Throat tries to resolve?",
+    "answerKey": "It won't resolve. Go for the Throat checks its target on resolution; because the Ogre is now an artifact creature, it's an illegal target, so the spell is countered by the game rules for having no legal targets and the creature isn't destroyed.",
+    "ruling": "If the targeted creature is also an artifact when Go for the Throat tries to resolve, it won't resolve.",
+    "publishedAt": "2011-06-01",
+    "source": "wotc",
+    "otherCards": [
+      "Liquimetal Coating"
+    ]
+  },
+  {
+    "id": "3407fe41-fdd3-4119-8f70-4bc4590a379f#0",
+    "card": "Negate",
+    "question": "My opponent casts Walking Ballista, which is an artifact creature spell. I have Negate in hand, which counters target noncreature spell. Since Walking Ballista is also an artifact, can I target it with Negate?",
+    "answerKey": "No. A \"creature spell\" is any spell with the creature card type, even if it has other types such as artifact or enchantment. Walking Ballista is an artifact creature spell, so it's a creature spell and isn't a legal target for Negate.",
+    "ruling": "A \"creature spell\" is any spell with the creature type, even if it has other types such as artifact or enchantment.",
+    "publishedAt": "2026-01-27",
+    "source": "wotc",
+    "otherCards": [
+      "Walking Ballista"
+    ]
+  },
+  {
+    "id": "3407fe41-fdd3-4119-8f70-4bc4590a379f#1",
+    "card": "Negate",
+    "question": "My opponent casts Gingerbrute, which is an artifact creature spell. I have Negate in hand, which counters target noncreature spell. Can I target the Gingerbrute spell with Negate since it's also an artifact?",
+    "answerKey": "No. A \"creature spell\" is any spell with the creature card type, even if it also has other types such as artifact or enchantment. Since Gingerbrute is an artifact creature spell, it isn't a noncreature spell and Negate can't target it.",
+    "ruling": "A \"creature spell\" is any spell with the creature type, even if it has other types such as artifact or enchantment.",
+    "publishedAt": "2024-11-08",
+    "source": "wotc",
+    "otherCards": [
+      "Gingerbrute"
+    ]
+  },
+  {
+    "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#0",
+    "card": "Krosan Grip",
+    "question": "My opponent casts Krosan Grip targeting my artifact. Since nobody can cast spells or activate non-mana abilities while it's on the stack, does the game just skip passing priority until Krosan Grip resolves, or do I still receive priority at all?",
+    "answerKey": "You still receive priority. Players continue to get priority normally while a spell with split second (such as Krosan Grip) is on the stack; it's just that the actions they can take with that priority are limited to activating mana abilities and taking certain special actions.",
+    "ruling": "Players still get priority while a card with split second is on the stack; their options are just limited to mana abilities and certain special actions.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#1",
+    "card": "Krosan Grip",
+    "question": "I cast Krosan Grip targeting my opponent's Sol Ring. My opponent controls a face-down 2/2 creature that is really Ainok Survivalist, and they have the mana to pay its megamorph cost. While Krosan Grip is still on the stack, can they turn Ainok Survivalist face up?",
+    "answerKey": "Yes. Turning a face-down creature face up is a special action, not casting a spell or activating an ability, so players may do it while a spell with split second, such as Krosan Grip, is on the stack.",
+    "ruling": "Players may turn face-down creatures face up while a spell with split second is on the stack.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Ainok Survivalist",
+      "Sol Ring"
+    ]
+  },
+  {
+    "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#2",
+    "card": "Krosan Grip",
+    "question": "My opponent controls a Chalice of the Void with three charge counters on it, and I cast Krosan Grip (mana value 3, with split second) targeting an enchantment they control. Does Krosan Grip's split second do anything about the Chalice's triggered ability, and what happens to my spell?",
+    "answerKey": "Split second only stops players from casting spells and activating non-mana abilities; it does nothing to triggered abilities. Chalice of the Void's ability still triggers, your opponent puts it on the stack and chooses targets if it has any, and it resolves normally — so the Chalice trigger resolves and counters Krosan Grip.",
+    "ruling": "Split second doesn't stop triggered abilities from triggering, such as that of Chalice of the Void. If one does, its controller puts it on the stack and chooses targets for it, if any. Those abilities will resolve as normal.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Chalice of the Void"
+    ]
+  },
+  {
+    "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#3",
+    "card": "Krosan Grip",
+    "question": "My opponent casts a sorcery and, in response, activates an artifact's ability; both are on the stack. I then cast Krosan Grip targeting that artifact while those are still waiting to resolve. Does casting Krosan Grip stop the spell and ability that are already on the stack from resolving?",
+    "answerKey": "No. Casting a spell with split second won't affect spells and abilities that are already on the stack — they will still resolve normally. Split second only prevents players from casting spells or activating non-mana abilities while Krosan Grip is on the stack.",
+    "ruling": "Casting a spell with split second won't affect spells and abilities that are already on the stack.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#4",
+    "card": "Krosan Grip",
+    "question": "I attack with Etali, Primal Storm, and its attack trigger goes on the stack. In response, my opponent casts Krosan Grip targeting my Signet. When Etali's trigger resolves and exiles the top card of each library, can I cast one of those exiled cards for free while Krosan Grip is still on the stack?",
+    "answerKey": "No. If the resolution of a triggered ability involves casting a spell, that spell can't be cast while a spell with split second is on the stack.",
+    "ruling": "If the resolution of a triggered ability involves casting a spell, that spell can't be cast if a spell with split second is on the stack.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Etali, Primal Storm",
+      "Signet"
+    ]
+  },
+  {
+    "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#5",
+    "card": "Krosan Grip",
+    "question": "My opponent has a Cryptic Command on the stack targeting me, and in response I cast Krosan Grip to destroy their Propaganda. While the Grip is on the stack nobody can respond. Once Krosan Grip finishes resolving and destroys the Propaganda, do we have to let Cryptic Command resolve immediately, or can I cast an instant at that point?",
+    "answerKey": "You can act. After a spell with split second resolves (or otherwise leaves the stack), the restriction ends, and players may again cast spells and activate abilities before the next object on the stack — here, Cryptic Command — resolves.",
+    "ruling": "After a spell with split second resolves (or otherwise leaves the stack), players may again cast spells and activate abilities before the next object on the stack resolves.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Cryptic Command",
+      "Propaganda"
+    ]
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#0",
+    "card": "Devastation Tide",
+    "question": "During my draw step I draw Devastation Tide as the first card I've drawn this turn, and I want to cast it for its miracle cost of {1}{U}. If I pick it up and put it together with the other four cards already in my hand before saying anything, what does that do to my ability to use miracle, and what should I have done instead?",
+    "answerKey": "You need to reveal the miracle card before it gets mixed in with the other cards in your hand — that's the important timing point for the miracle ability.",
+    "ruling": "It's important to reveal a card with miracle before it is mixed with the other cards in your hand.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#1",
+    "card": "Devastation Tide",
+    "question": "During my opponent's end step, I cast Brainstorm, and the very first of the three cards I draw is Devastation Tide, which I haven't drawn any other card for this turn. Can I reveal it and cast it for its miracle cost even though it isn't my turn?",
+    "answerKey": "Yes. You can reveal and cast a card with miracle on any turn, not just your own, as long as it's the first card you've drawn that turn.",
+    "ruling": "You can reveal and cast a card with miracle on any turn, not just your own, if it's the first card you've drawn that turn.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": [
+      "Brainstorm"
+    ]
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#10",
+    "card": "Devastation Tide",
+    "question": "In my draw step I draw Devastation Tide, the first card I've drawn this turn, and I reveal it for miracle. I control Chasm Skulker, which says \"Whenever you draw a card, put a +1/+1 counter on Chasm Skulker.\" Does Chasm Skulker's ability trigger from that draw, and what happens to Devastation Tide if I decide not to pay its miracle cost?",
+    "answerKey": "Yes, it triggers. You still draw the card, whether you use the miracle ability or not, so any ability that triggers whenever you draw a card — such as Chasm Skulker's — will trigger. If you don't cast Devastation Tide using its miracle ability, it simply remains in your hand.",
+    "ruling": "You still draw the card, whether you use the miracle ability or not. Any ability that triggers whenever you draw a card, for example, will trigger. If you don't cast the card using its miracle ability, it will remain in your hand.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": [
+      "Chasm Skulker"
+    ]
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#2",
+    "card": "Devastation Tide",
+    "question": "It's my turn and I haven't drawn any cards yet — I skipped my draw step somehow. I cast a spell that tells me to draw three cards, and Devastation Tide is among the three cards I end up drawing. Can I ever use its miracle ability here, and does it matter which of the three it was?",
+    "answerKey": "Only if Devastation Tide was the very first of those three cards. Multiple card draws are always treated as a sequence of individual card draws, so you draw the three cards one at a time, and only the first card drawn this way may be revealed and cast using its miracle ability.",
+    "ruling": "Multiple card draws are always treated as a sequence of individual card draws. For example, if you haven't drawn any cards yet during a turn and cast a spell that instructs you to draw three cards, you'll draw them one at a time. Only the first card drawn this way may be revealed and cast using its miracle ability.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#3",
+    "card": "Devastation Tide",
+    "question": "In my Commander game I haven't drawn any cards yet this turn (I skipped my draw step effects aside, nothing has been drawn). I cast Diabolic Tutor, search my library, and put Devastation Tide into my hand — it's the first card to enter my hand this turn. Can I reveal it and cast it for its miracle cost of {1}{U}?",
+    "answerKey": "No. Miracle only works on a card you drew, and if an effect puts a card into your hand without using the word \"draw\" — like searching your library with Diabolic Tutor — the card wasn't drawn, so Devastation Tide's miracle ability doesn't trigger.",
+    "ruling": "If an effect puts a card into your hand without using the word \"draw,\" the card wasn't drawn.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": [
+      "Diabolic Tutor"
+    ]
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#4",
+    "card": "Devastation Tide",
+    "question": "During my draw step I draw Devastation Tide, and it's the first card I've drawn this turn. I don't want to cast it right now because my board is better than my opponent's. Am I required to reveal it to the table anyway since it has miracle?",
+    "answerKey": "No. Revealing a card with miracle is entirely optional — you don't have to reveal a drawn card with miracle if you don't wish to cast it at that time. You may simply put it in your hand without showing it.",
+    "ruling": "You don't have to reveal a drawn card with miracle if you don't wish to cast it at that time.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#5",
+    "card": "Devastation Tide",
+    "question": "I draw Devastation Tide as the first card I've drawn this turn, reveal it, and the miracle triggered ability goes on the stack. When it resolves I decide I'd rather wait until a better board state later in the turn, so I decline to cast it. Can I still cast Devastation Tide for its {1}{U} miracle cost later that turn, say in my main phase?",
+    "answerKey": "No. You can cast a card for its miracle cost only as the miracle triggered ability resolves. If you don't want to cast it at that time (or you can't cast it, perhaps because there are no legal targets available), you won't be able to cast it later for the miracle cost.",
+    "ruling": "You can cast a card for its miracle cost only as the miracle triggered ability resolves. If you don't want to cast it at that time (or you can't cast it, perhaps because there are no legal targets available), you won't be able to cast it later for the miracle cost.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#6",
+    "card": "Devastation Tide",
+    "question": "During my opponent's combat step, an effect makes me draw a card and it's the first card I've drawn this turn — it's Devastation Tide, a sorcery with miracle {1}{U}. I reveal it and the miracle trigger goes on the stack. Can I actually cast it right then, even though it's a sorcery and it isn't my main phase with an empty stack?",
+    "answerKey": "Yes. You cast the card with miracle during the resolution of the miracle triggered ability. Ignore any timing rules based on the card's type — so a sorcery like Devastation Tide can be cast this way on your opponent's turn during their combat step.",
+    "ruling": "You cast the card with miracle during the resolution of the triggered ability. Ignore any timing rules based on the card's type.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#7",
+    "card": "Devastation Tide",
+    "question": "I have Omniscience on the battlefield, which lets me cast spells from my hand without paying their mana costs. During my draw step I draw Devastation Tide, the first card I've drawn this turn, and I reveal it for miracle. Can I use Omniscience so that I cast it for its miracle trigger but pay nothing at all?",
+    "answerKey": "No. Miracle is an alternative cost to cast the spell with miracle, and it can't be combined with other alternative costs, such as casting a spell \"without paying its mana cost.\" You either cast Devastation Tide for its miracle cost of {1}{U}, or cast it some other legal way (such as via Omniscience later, from your hand, without paying its mana cost), but not both.",
+    "ruling": "Miracle is an alternative cost to cast the spell with miracle. It can't be combined with other alternative costs, such as casting a spell \"without paying its mana cost.\"",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": [
+      "Omniscience"
+    ]
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#8",
+    "card": "Devastation Tide",
+    "question": "I draw Devastation Tide (mana cost {3}{U}, miracle {1}{U}) as the first card I drew this turn and I want to cast it for its miracle cost. My opponent controls Thalia, Guardian of Thraben, which makes noncreature spells cost {1} more to cast, and I control Goblin Electromancer, which makes instant and sorcery spells cost {1} less to cast. What do I actually pay, and what is the spell's mana value while it's on the stack?",
+    "answerKey": "To determine the total cost, start with the cost you're paying — here the miracle cost {1}{U} — then add cost increases (Thalia's {1}, giving {2}{U}), then apply cost reductions (Goblin Electromancer's {1}, giving {1}{U}). So you pay {1}{U}. The spell's mana value is unchanged by any of this: it's 4, based on its printed mana cost {3}{U}, no matter what the total cost to cast it was.",
+    "ruling": "To determine the total cost of a spell, start with the mana cost or alternative cost (such as a miracle cost) you're paying, add any cost increases, then apply any cost reductions. The mana value of the spell remains unchanged, no matter what the total cost to cast it was.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": [
+      "Thalia, Guardian of Thraben",
+      "Goblin Electromancer"
+    ]
+  },
+  {
+    "id": "4245ee98-2d4c-49d1-8d07-80760cae2bf9#9",
+    "card": "Devastation Tide",
+    "question": "During my draw step, the first card I draw for the turn is Devastation Tide, so I reveal it and its miracle ability triggers. In response to that trigger, my opponent casts Thoughtseize targeting me and chooses Devastation Tide, so I discard it. When the miracle trigger resolves, can I still cast Devastation Tide for its miracle cost of {1}{U}?",
+    "answerKey": "No. Miracle only lets you cast the card as the triggered ability resolves, and it must still be in your hand at that time. Since Thoughtseize made you discard Devastation Tide in response, the card left your hand before the miracle trigger resolved, so the trigger does nothing and you can't cast it for its miracle cost.",
+    "ruling": "If the card with miracle leaves your hand before the triggered ability resolves, you won't be able to cast it using its miracle ability.",
+    "publishedAt": "2018-07-13",
+    "source": "wotc",
+    "otherCards": [
+      "Thoughtseize"
+    ]
+  },
+  {
+    "id": "46665089-aa3d-44c3-964d-6638dfbb5782#0",
+    "card": "Essence Scatter",
+    "question": "My opponent casts a spell that is an artifact creature, and another one that's an enchantment creature. I have Essence Scatter in hand, which says \"Counter target creature spell.\" Can Essence Scatter legally target spells like these that have card types in addition to creature?",
+    "answerKey": "Yes. A \"creature spell\" is any spell with the card type creature, even if it also has other card types such as artifact or enchantment, so Essence Scatter can legally target and counter it.",
+    "ruling": "A \"creature spell\" is any spell with the card type creature, even if it has other types such as artifact or enchantment.",
+    "publishedAt": "2026-03-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4b1bf05e-753e-4350-a913-894cf3cecc0c#0",
+    "card": "Fleshbag Marauder",
+    "question": "I cast Fleshbag Marauder and it's the only creature I control when its enter-the-battlefield trigger resolves. Does Fleshbag Marauder count as a creature I can sacrifice to its own ability, or do I just skip sacrificing?",
+    "answerKey": "Yes — Fleshbag Marauder itself is a legal choice for its own triggered ability when the ability resolves. Since it's the only creature you control, you must sacrifice Fleshbag Marauder.",
+    "ruling": "When its ability resolves, you may sacrifice Fleshbag Marauder itself. If you control no other creatures, you'll have to sacrifice Fleshbag Marauder.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4b1bf05e-753e-4350-a913-894cf3cecc0c#1",
+    "card": "Fleshbag Marauder",
+    "question": "In my four-player Commander game I cast Fleshbag Marauder on my turn, and its enters trigger resolves with all four of us controlling multiple creatures. How exactly do we determine which creatures get sacrificed — do we all pick secretly at once, and when do the creatures actually leave the battlefield?",
+    "answerKey": "As the ability resolves, the choices are made one at a time in turn order: first the player whose turn it is chooses a creature to sacrifice, then each other player in turn order chooses, and each of those later players knows the choices made before them. Once all choices are made, all of those creatures are sacrificed simultaneously.",
+    "ruling": "As Fleshbag Marauder's ability resolves, first the player whose turn it is chooses a creature to sacrifice, then each other player in turn order does the same knowing the choices made before them. Then all those creatures are sacrificed simultaneously.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "4eb813fd-2d5a-4b02-8193-662681ef4e7d#0",
+    "card": "Farewell",
+    "question": "I cast Farewell and choose three of its modes: exile all artifacts, exile all creatures, and exile all graveyards. My opponent wants to know whether all of that happens simultaneously or in some sequence, since it could matter for things like an artifact creature or triggers that put cards into graveyards. How is Farewell's resolution handled when more than one mode is chosen?",
+    "answerKey": "The modes aren't performed simultaneously. If you choose more than one mode for Farewell, you perform the actions in the order they're written on the card (artifacts, then creatures, then enchantments, then graveyards).",
+    "ruling": "If you choose more than one mode for Farewell, you perform the actions in the order written.",
+    "publishedAt": "2022-02-18",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "5c8e5092-962e-49ef-ab82-8434e475e4e7#0",
+    "card": "Food Chain",
+    "question": "I control Food Chain and exile a 3-mana creature to it, adding 4 blue mana that can only be spent to cast creature spells. I want to cast Aether Figment (a creature spell costing {1}{U} with Kicker {3}) and pay its kicker cost. Can I use the Food Chain mana to pay the kicker cost as well as the normal mana cost?",
+    "answerKey": "Yes. Mana produced by Food Chain may be used to pay additional costs to cast a creature spell, such as a kicker cost, as long as the spell being cast is a creature spell.",
+    "ruling": "This mana may be used on additional costs to cast the spell, such as Kicker.",
+    "publishedAt": "2004-10-04",
+    "source": "wotc",
+    "otherCards": [
+      "Aether Figment"
+    ]
+  },
+  {
+    "id": "5c8e5092-962e-49ef-ab82-8434e475e4e7#1",
+    "card": "Food Chain",
+    "question": "I control Food Chain and exile a creature with mana value 3 to it, adding four green mana that can only be spent on creature spells. I cast a creature spell for two of that mana, and my opponent responds with Mana Leak, countering it unless I pay {3}. Can I use my two remaining Food Chain mana (plus one from a Forest) to pay that {3}?",
+    "answerKey": "No. Food Chain's mana can only be spent to cast creature spells, and it may not be used to pay costs imposed after the spell has already been cast, such as Mana Leak's \"unless you pay {3}.\" You'd need to pay the {3} entirely with other mana.",
+    "ruling": "This mana may not be used to pay costs imposed after the spell is initially cast.",
+    "publishedAt": "2004-10-04",
+    "source": "wotc",
+    "otherCards": [
+      "Mana Leak"
+    ]
+  },
+  {
+    "id": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4#0",
+    "card": "Esper Sentinel",
+    "question": "During my opponent's turn they cast a Sign in Blood (a noncreature spell), it resolves, and then later that same turn I flash in nothing — but on my next turn I cast Esper Sentinel and it enters the battlefield. Wait, let me redo that: on my opponent's turn they cast an instant early in the turn, and afterward I put Esper Sentinel onto the battlefield with a flash effect. If that same opponent then casts a second noncreature spell later in that same turn, does Esper Sentinel's ability trigger?",
+    "answerKey": "No. That opponent already cast their first noncreature spell that turn, so Esper Sentinel's ability won't trigger for that opponent for the rest of that turn (it doesn't matter that Esper Sentinel wasn't on the battlefield yet).",
+    "ruling": "If a noncreature spell was already cast by an opponent the turn Esper Sentinel enters the battlefield, that opponent already cast their first noncreature spell this turn, and Esper Sentinel's ability won't trigger for that opponent that turn.",
+    "publishedAt": "2021-06-18",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4#1",
+    "card": "Esper Sentinel",
+    "question": "I control Esper Sentinel, a 1/1 with \"Whenever an opponent casts their first noncreature spell each turn, draw a card unless that player pays {X}, where X is this creature's power.\" An opponent casts their first noncreature spell of the turn, a Shock aimed at my Esper Sentinel, and the triggered ability goes on the stack above it. In response, I cast Giant Growth targeting Esper Sentinel making it 4/4; then the opponent, still holding priority stuff, lets everything resolve — but suppose instead they had a second removal spell and Esper Sentinel dies before my trigger resolves. In each case, how much does the opponent have to pay?",
+    "answerKey": "Esper Sentinel's ability checks its power when the ability resolves, not when it was put on the stack. So after Giant Growth resolves, the opponent must pay {4} when the trigger resolves or I draw a card. If Esper Sentinel is no longer on the battlefield when the ability resolves, use the power it had the last time it was on the battlefield (its last known information) — so if it died as a 4/4, X is 4; if it died as a 1/1, X is 1.",
+    "ruling": "This ability checks Esper Sentinel's power when it resolves, not when the ability goes on the stack. If Esper Sentinel is no longer on the battlefield when it resolves, use the power it had the last time it was on the battlefield.",
+    "publishedAt": "2021-06-18",
+    "source": "wotc",
+    "otherCards": [
+      "Shock",
+      "Giant Growth"
+    ]
+  },
+  {
+    "id": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4#2",
+    "card": "Esper Sentinel",
+    "question": "I control Esper Sentinel, but it's been hit with enough -X/-0 effects that its power is -2 when an opponent casts their first noncreature spell of the turn and the Sentinel's triggered ability resolves. What amount does that opponent have to pay to stop me from drawing, and can they decline to pay it?",
+    "answerKey": "If Esper Sentinel has negative power when the ability resolves, {X} is {0}. The opponent may still choose not to pay that cost if they want you to draw a card.",
+    "ruling": "If Esper Sentinel's has negative power when this ability resolves, then {X} is {0}. The opponent may still choose not to pay the cost if they want you to draw a card.",
+    "publishedAt": "2021-06-18",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "5f15125e-ae89-471e-b055-226a783bc7c1#0",
+    "card": "Aetherflux Reservoir",
+    "question": "I control Aetherflux Reservoir. Earlier this turn I've already cast two spells, and now I cast a third spell. When Aetherflux Reservoir's triggered ability resolves, how much life do I gain?",
+    "answerKey": "You gain 3 life. The first ability counts the spell that caused it to trigger plus any other spells you cast earlier in the turn.",
+    "ruling": "The first ability counts the spell that caused it to trigger plus any other spells you cast earlier in the turn.",
+    "publishedAt": "2016-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "5f15125e-ae89-471e-b055-226a783bc7c1#1",
+    "card": "Aetherflux Reservoir",
+    "question": "Earlier this turn I cast two spells before Aetherflux Reservoir was on the battlefield, and one of those two was countered by an opponent. I then cast Aetherflux Reservoir itself, and after it resolved I cast another spell. When that last spell's cast triggers Aetherflux Reservoir's first ability, how much life do I gain?",
+    "answerKey": "You gain 4 life. The ability counts every spell you've cast this turn, including spells you cast before you controlled Aetherflux Reservoir and spells that were countered — so the two earlier spells, the Reservoir itself, and the latest spell all count.",
+    "ruling": "The first ability counts spells you cast earlier in the turn even if you didn't control Aetherflux Reservoir as you cast them, and even if those spells were countered.",
+    "publishedAt": "2016-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "5f15125e-ae89-471e-b055-226a783bc7c1#2",
+    "card": "Aetherflux Reservoir",
+    "question": "I control Aetherflux Reservoir and I haven't cast anything yet this turn. During my main phase I cast a spell, and while its Aetherflux Reservoir trigger is still on the stack I hold priority and cast a second spell in response. Once everything resolves, how much life have I gained in total from Aetherflux Reservoir this turn, and why?",
+    "answerKey": "You gain 4 life total. The number of spells you've cast is counted only as Aetherflux Reservoir's triggered ability resolves, not when it triggers. The second spell's trigger resolves first and sees two spells cast this turn (gain 2), then the first spell's trigger resolves and also sees two spells cast (gain 2), for 4 life.",
+    "ruling": "The number of spells you've cast is counted only as Aetherflux Reservoir's triggered ability resolves. For example, if you cast a spell, then respond to the triggered ability with a second spell, you'll gain 4 life total.",
+    "publishedAt": "2016-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "5f15125e-ae89-471e-b055-226a783bc7c1#3",
+    "card": "Aetherflux Reservoir",
+    "question": "In my Commander game I cast two spells earlier this turn, then I cast Aetherflux Reservoir as my third spell of the turn and it resolves. Do I gain 3 life from Aetherflux Reservoir's triggered ability for casting the Reservoir itself?",
+    "answerKey": "No. Aetherflux Reservoir's first ability doesn't trigger when you cast Aetherflux Reservoir itself — it only triggers for spells you cast while it's already on the battlefield.",
+    "ruling": "Aetherflux Reservoir's first ability doesn't trigger when you cast Aetherflux Reservoir itself.",
+    "publishedAt": "2016-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "6791ec3c-c397-4087-8c8c-84d3797df415#0",
+    "card": "Innocent Blood",
+    "question": "In my Commander game I want to cast Innocent Blood, but I control no creatures at all and one of my three opponents also has an empty board. Can I even cast it in that situation, and what happens to the players with no creatures when it resolves?",
+    "answerKey": "Yes. You can cast Innocent Blood even if some (or all) players control no creatures. Those players are simply unaffected by it.",
+    "ruling": "You can cast Innocent Blood even if some (or all) players control no creatures. Those players are simply unaffected.",
+    "publishedAt": "2016-06-08",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "697bcfe1-ecbf-42a1-bfc7-0766d48ca56b#0",
+    "card": "Dockside Extortionist",
+    "question": "I cast Dockside Extortionist. One opponent controls three permanents: a plain artifact, a plain enchantment, and a single permanent whose type line reads \"Artifact Enchantment\" (it's both types at once). No other opponent controls any artifacts or enchantments. How many Treasure tokens does Dockside Extortionist's triggered ability create?",
+    "answerKey": "Three. A permanent that is both an artifact and an enchantment is counted only once for Dockside Extortionist's ability, so the artifact, the enchantment, and the artifact-enchantment together give X = 3 Treasure tokens.",
+    "ruling": "If an opponent controls an artifact that's also an enchantment, that permanent is counted only once for Dockside Extortionist's ability.",
+    "publishedAt": "2025-10-02",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "74d3277a-38e5-4732-afed-084a56148f20#0",
+    "card": "Mana Drain",
+    "question": "I cast Mana Drain targeting my opponent's spell. In one game the spell they cast was Carnage Tyrant, which can't be countered; in another game they respond to Mana Drain by making the targeted spell an illegal target for it. In each case, do I still get the colorless mana at the beginning of my next main phase?",
+    "answerKey": "If the target spell is an illegal target by the time Mana Drain tries to resolve, Mana Drain doesn't resolve at all, and you don't add mana at the beginning of your next main phase. If the target is still legal but simply isn't countered (such as Carnage Tyrant, which can't be countered), Mana Drain does resolve and you do add the mana.",
+    "ruling": "If the target spell is an illegal target by the time Mana Drain tries to resolve, Mana Drain doesn't resolve. You don't add mana at the beginning of your next main phase. If the target is legal but not countered (most likely because an effect says that the spell can't be countered), you do add mana.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": [
+      "Carnage Tyrant"
+    ]
+  },
+  {
+    "id": "74d3277a-38e5-4732-afed-084a56148f20#1",
+    "card": "Mana Drain",
+    "question": "During my own turn, I cast Mana Drain in my precombat main phase to counter an opponent's instant with mana value 3. When exactly does Mana Drain's delayed triggered ability trigger to give me the {C}, and how would that differ if I had instead cast it during my opponent's turn?",
+    "answerKey": "Mana Drain's delayed triggered ability triggers at the beginning of your next main phase. Usually (such as when you cast it on an opponent's turn or in your own end step) that's the beginning of your next precombat main phase. However, if you cast Mana Drain during your own precombat main phase or during your combat phase, the delayed ability triggers at the beginning of that same turn's postcombat main phase — so in your scenario you'd add {C}{C}{C} at the start of your postcombat main phase this turn.",
+    "ruling": "Mana Drain's delayed triggered ability will usually trigger at the beginning of your precombat main phase. However, if you cast Mana Drain during your precombat main phase or during your combat phase, its delayed triggered ability will trigger at the beginning of that turn's postcombat main phase.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "7735eeba-693b-47e2-bd51-414379cf1016#0",
+    "card": "Beast Within",
+    "question": "I cast Beast Within targeting my opponent's creature. In response, they give it hexproof and it becomes an illegal target — does anyone get a 3/3 Beast token? And separately, if instead the target is still legal on resolution but simply isn't destroyed because it has indestructible, does its controller get the Beast token?",
+    "answerKey": "If the target permanent is an illegal target by the time Beast Within tries to resolve, the spell won't resolve (it's countered by the game rules), so no player creates a Beast token. If the target is legal but not destroyed — most likely because it has indestructible — its controller does create the 3/3 green Beast token.",
+    "ruling": "If the target permanent is an illegal target by the time Beast Within tries to resolve, the spell won't resolve. No player creates a Beast token. If the target is legal but not destroyed (most likely because it has indestructible), its controller does create a Beast token.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "7a2484a9-04fd-41a0-8224-610c1c07ed10#0",
+    "card": "Blasphemous Act",
+    "question": "There are twelve creatures on the battlefield and I start casting Blasphemous Act, which costs {1} less for each creature on the battlefield. My opponent wants to sacrifice several of her creatures in response so that the spell ends up costing me more mana. Can she do that, and when exactly can she respond?",
+    "answerKey": "No. Although players may respond to Blasphemous Act once it's been cast, once it's announced, they can't respond before the cost is calculated and paid.",
+    "ruling": "Although players may respond to Blasphemous Act once it's been cast, once it's announced, they can't respond before the cost is calculated and paid.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "7a2484a9-04fd-41a0-8224-610c1c07ed10#1",
+    "card": "Blasphemous Act",
+    "question": "My opponent controls Thalia, Guardian of Thraben, so my noncreature, nonartifact spells cost {1} more to cast. There are exactly nine creatures on the battlefield, and I want to cast Blasphemous Act (mana cost {8}{R}). How much mana do I actually pay, in what order are the increase and reduction applied, and what is Blasphemous Act's mana value while it's on the stack?",
+    "answerKey": "To determine the total cost of a spell, start with the mana cost or alternative cost you're paying, add any cost increases, then apply any cost reductions (such as Blasphemous Act's). So start with {8}{R}, add Thalia's {1} to get {9}{R}, then reduce by {9} for the nine creatures, leaving {R} to pay. The mana value of the spell is determined only by its mana cost, no matter what the total cost to cast it was — so it's 9.",
+    "ruling": "To determine the total cost of a spell, start with the mana cost or alternative cost you're paying, add any cost increases, then apply any cost reductions (such as that of Blasphemous Act). The mana value of the spell is determined only by its mana cost, no matter what the total cost to cast the spell was.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": [
+      "Thalia, Guardian of Thraben"
+    ]
+  },
+  {
+    "id": "7a2484a9-04fd-41a0-8224-610c1c07ed10#2",
+    "card": "Blasphemous Act",
+    "question": "My opponent and I have a combined 20 creatures on the battlefield, and I want to cast Blasphemous Act, which costs {8}{R} and costs {1} less to cast for each creature on the battlefield. With that many creatures out, can the reduction make the spell free, or is there a minimum I still have to pay?",
+    "answerKey": "There's a minimum: Blasphemous Act's cost reduction can't reduce the total cost to cast the spell below {R}. Generic mana in the cost is reduced first and the colored requirement remains, so with 20 creatures out you'd still pay {R}.",
+    "ruling": "Blasphemous Act's ability can't reduce the total cost to cast the spell below {R}.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "7a2484a9-04fd-41a0-8224-610c1c07ed10#3",
+    "card": "Blasphemous Act",
+    "question": "There are exactly three creatures on the battlefield: my Skirk Prospector, another Goblin I control, and my opponent's creature. I want to cast Blasphemous Act ({8}{R}, costs {1} less for each creature on the battlefield) and pay part of it by sacrificing my other Goblin to Skirk Prospector for {R}. What do I actually end up paying, and does sacrificing that Goblin during payment change the cost?",
+    "answerKey": "The total cost is locked in before you pay it. With three creatures on the battlefield when you cast it, Blasphemous Act's total cost is {5}{R} ({8}{R} reduced by {3}). You then sacrifice the Goblin as a mana ability just before paying that cost; the creature leaving the battlefield at that point doesn't increase the already-determined cost, so you still pay {5}{R}.",
+    "ruling": "The total cost to cast Blasphemous Act is locked in before you pay that cost. For example, if there are three creatures on the battlefield, including one you can sacrifice to add {C}, the total cost of Blasphemous Act is {5}{R}. Then you can sacrifice the creature when you activate mana abilities just before paying the cost.",
+    "publishedAt": "2020-11-10",
+    "source": "wotc",
+    "otherCards": [
+      "Skirk Prospector"
+    ]
+  },
+  {
+    "id": "7f7c204f-be1a-47e4-91c6-ba6f906d9012#0",
+    "card": "Insurrection",
+    "question": "I cast Insurrection in a four-player Commander game. I have two creatures of my own on the battlefield, one tapped from attacking last turn and one that entered this turn, and my opponents control several creatures between them. Which creatures actually get untapped, controlled, and given haste by Insurrection?",
+    "answerKey": "All three effects apply to every creature on the battlefield: you untap all creatures, you gain control of all creatures, and all creatures gain haste until end of turn. So your own tapped creatures untap and gain haste too, and creatures already under your control are included in the control-change effect.",
+    "ruling": "You untap all creatures, control all creatures, and give all creatures haste.",
+    "publishedAt": "2004-10-04",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "8164b1e8-3350-465e-8a17-75f57d326344#0",
+    "card": "Exsanguinate",
+    "question": "In a multiplayer Commander game I cast Exsanguinate with X=4. One opponent is at 3 life and my other opponent is at 10 life, and nothing prevents or replaces the life loss. What life totals do my opponents end up at, and how much life do I gain?",
+    "answerKey": "Players can lose more life than they have. The opponent at 3 loses 4 and ends at -1 life, and the opponent at 10 ends at 6 life. A total of 8 life was lost this way, so you gain 8 life. (The player at -1 loses the game the next time state-based actions are checked.)",
+    "ruling": "Players can lose more life than they have. For example, say you're playing a multiplayer game in which one of your opponents has 3 life and your other opponent has 10 life. If you cast Exsanguinate with X of 4, your opponents will wind up at -1 life and 6 life, respectively. You'll gain 8 life.",
+    "publishedAt": "2011-01-01",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "8a52f3c0-2552-4425-b2e3-5496eb2232a7#0",
+    "card": "Mystic Remora",
+    "question": "My Mystic Remora has three age counters on it when my upkeep begins and its cumulative upkeep ability triggers. I only have two mana available — can I pay part of the cumulative upkeep cost to keep it around, or what exactly are my options here?",
+    "answerKey": "Paying cumulative upkeep is always optional, and partial payments can't be made — it's all or nothing. Mystic Remora already had three age counters, so the trigger puts a fourth one on it, making the total cost {4}. You either pay the full {4} or you sacrifice Mystic Remora; paying {2} does nothing and you'd still have to sacrifice it.",
+    "ruling": "Paying cumulative upkeep is always optional. If it's not paid, the permanent with cumulative upkeep is sacrificed. Partial payments of the total cumulative upkeep cost can't be made. For example, if Mystic Remora has three age counters on it when its cumulative upkeep ability triggers, it gets another age counter and then its controller chooses to either pay {4} or sacrifice it.",
+    "publishedAt": "2025-10-02",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "8a52f3c0-2552-4425-b2e3-5496eb2232a7#1",
+    "card": "Mystic Remora",
+    "question": "I cast Mystic Remora on turn two and it has survived to my third upkeep since then, with no other effects touching it. Mechanically, how does its cumulative upkeep {1} work each upkeep, and what exactly do I have to pay this upkeep to keep it?",
+    "answerKey": "Cumulative upkeep is a triggered ability that imposes an increasing cost on the permanent. \"Cumulative upkeep {1}\" means \"At the beginning of your upkeep, if this permanent is on the battlefield, put an age counter on this permanent. Then you may pay {1} for each age counter on it. If you don't, sacrifice it.\" So on this upkeep the trigger first puts a third age counter on Mystic Remora, and you must then pay {3} (one {1} per age counter) or sacrifice it.",
+    "ruling": "Cumulative upkeep is a triggered ability that imposes an increasing cost on a permanent. \"Cumulative upkeep [cost]\" means \"At the beginning of your upkeep, if this permanent is on the battlefield, put an age counter on this permanent. Then you may pay [cost] for each age counter on it. If you don't, sacrifice it.\"",
+    "publishedAt": "2025-10-02",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "8c52bd39-0586-48ca-b263-17210cf9feb6#0",
+    "card": "Craterhoof Behemoth",
+    "question": "I cast Craterhoof Behemoth and its enters trigger goes on the stack while I control six creatures including the Behemoth. The trigger resolves, and then later in my turn two of my creatures die in combat and I cast two more creature spells that resolve. Does the pump my remaining creatures got change as my creature count goes up and down during the turn?",
+    "answerKey": "No. The value of X is calculated only once, as Craterhoof Behemoth's last ability resolves — in this case X is 6, so the affected creatures keep trample and +6/+6 until end of turn regardless of later changes to your creature count. (Creatures that enter after the ability resolves get nothing.)",
+    "ruling": "The value of X is calculated only once, as Craterhoof Behemoth’s last ability resolves.",
+    "publishedAt": "2025-04-04",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "8c52bd39-0586-48ca-b263-17210cf9feb6#1",
+    "card": "Craterhoof Behemoth",
+    "question": "I cast Craterhoof Behemoth with two other creatures already on the battlefield, and its enters trigger resolves. Later that same turn, in my second main phase, I cast two more creature spells that resolve. Do those two new creatures have trample and the +X/+X bonus?",
+    "answerKey": "No. Craterhoof Behemoth's triggered ability affects only the creatures you control at the time the ability resolves. Creatures you begin to control later in the turn won't gain trample and won't get +X/+X.",
+    "ruling": "Craterhoof Behemoth’s triggered ability affects only creatures you control at the time it resolves. Creatures you begin to control later in the turn won’t gain trample and get +X/+X.",
+    "publishedAt": "2025-04-04",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "920c1dd4-c3f6-4020-a6f0-2e8acad2c212#1",
+    "card": "Hour of Revelation",
+    "question": "I'm casting Hour of Revelation ({3}{W}{W}{W}, \"This spell costs {3} less to cast if there are ten or more nonland permanents on the battlefield\"). The only nonland permanents anywhere on the battlefield are my opponent's Tezzeret the Schemer and the nine Etherium Cell artifact tokens he's given me, each of which can be sacrificed to add one mana of any color. Can I announce Hour of Revelation for the reduced cost and then sacrifice three Etherium Cells to pay it, even though that drops the battlefield below ten nonland permanents?",
+    "answerKey": "Yes. You determine the cost to cast Hour of Revelation before you pay any of that cost. With Tezzeret the Schemer and his nine Etherium Cells being the only nonland permanents, there are ten or more nonland permanents when the cost is locked in, so Hour of Revelation costs {W}{W}{W}. You may then sacrifice three Etherium Cells to produce {W}{W}{W} and pay that cost, even though there are no longer ten or more nonland permanents afterward.",
+    "ruling": "You determine the cost to cast Hour of Revelation before you pay any of that cost. For example, if the only nonland permanents on the battlefield are Tezzeret the Schemer and nine Etherium Cells he’s given you, Hour of Revelation costs {W}{W}{W} to cast. You may sacrifice three Etherium Cells to pay this cost, even though there are no longer ten or more nonland permanents after you produce {W}{W}{W}.",
+    "publishedAt": "2017-07-14",
+    "source": "wotc",
+    "otherCards": [
+      "Tezzeret the Schemer",
+      "Etherium Cell"
+    ]
+  },
+  {
+    "id": "956381ba-6d37-4a8a-846c-bad79222dbee#0",
+    "card": "Force of Will",
+    "question": "I want to cast Force of Will by paying 1 life and exiling a blue card from my hand instead of paying {3}{U}{U}. My opponent controls Thalia, Guardian of Thraben, which makes my noncreature spells cost {1} more to cast. In what order do I work out what I actually have to pay, and while Force of Will is on the stack, what is its mana value?",
+    "answerKey": "To determine the total cost of a spell, start with the mana cost or alternative cost you're paying (such as the alternative cost of Force of Will), add any cost increases, then apply any cost reductions. So you start with \"pay 1 life and exile a blue card,\" then add Thalia's {1}. Force of Will's mana value is always 5, no matter what you paid to cast it.",
+    "ruling": "To determine the total cost of a spell, start with the mana cost or alternative cost you're paying (such as the alternative cost of Force of Will), add any cost increases, then apply any cost reductions. Force of Will's mana value is always 5, no matter what you paid to cast it.",
+    "publishedAt": "2022-12-08",
+    "source": "wotc",
+    "otherCards": [
+      "Thalia, Guardian of Thraben"
+    ]
+  },
+  {
     "id": "981b0e21-e5e6-4a1e-bfde-679d56623f7f#0",
     "card": "Ad Nauseam",
     "question": "I cast Ad Nauseam at 22 life in my Commander game. When it starts resolving, do I have to announce up front how many cards I'm going to reveal and take, or can I keep deciding card by card as I go?",
@@ -20,6 +697,421 @@
     "otherCards": [
       "Fireball",
       "Blue Sun's Zenith"
+    ]
+  },
+  {
+    "id": "981b0e21-e5e6-4a1e-bfde-679d56623f7f#2",
+    "card": "Ad Nauseam",
+    "question": "I'm at 4 life in Commander and cast Ad Nauseam. After revealing a few cards my life total has dropped to 0, but I still haven't found the card I need. Can I keep revealing cards, and if so what happens to my life total and when do I lose the game?",
+    "answerKey": "Yes — Ad Nauseam's repetition isn't stopped by your life total. You may keep revealing cards even at 0 or less life, and you'll keep losing life, going further into negative numbers. State-based actions aren't checked while the spell is resolving, so as soon as you stop repeating the process and the spell finishes resolving, you lose the game as a state-based action.",
+    "ruling": "You may continue to reveal cards with Ad Nauseam even if your life total has been reduced to 0 or less. If you continue, you will continue to lose life, dropping your life total into negative numbers. As soon as you stop, you'll lose the game as a state-based action.",
+    "publishedAt": "2026-03-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#0",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "My Kiki-Jiki, Mirror Breaker is on the battlefield along with a tapped Llanowar Elves that has a +1/+1 counter on it, is enchanted with Rancor, and is equipped with Bonesplitter. I also control a Smuggler's Copter that I crewed this turn, so it's currently an artifact creature. If I tap Kiki-Jiki targeting the Llanowar Elves, what exactly does the token copy — and what would I get if I instead targeted the crewed Smuggler's Copter?",
+    "answerKey": "The token copies exactly what was printed on the original creature (except that the copy also has haste) and nothing else (unless it's copying a creature that's a token or that's itself copying something else). So the token of Llanowar Elves is an untapped 1/1 Llanowar Elves with haste: it doesn't copy that the original was tapped, the +1/+1 counter, the attached Rancor or Bonesplitter, or any non-copy effects that changed its power, toughness, types, color, and so on. Most notably, if the target isn't normally a creature — like the crewed Smuggler's Copter — the copy won't be a creature; you'd get a noncreature Vehicle token (with haste).",
+    "ruling": "The token copies exactly what was printed on the original creature (except that the copy also has haste) and nothing else (unless it's copying a creature that's a token or that's copying something else; see below). It doesn't copy whether the creature is tapped or untapped, whether it has any counters on it or Auras and/or Equipment attached to it, or any non-copy effects that changed its power, toughness, types, color, and so on. Most notably, if the target creature isn't normally a creature, the copy won't be a creature.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Llanowar Elves",
+      "Rancor",
+      "Bonesplitter",
+      "Smuggler's Copter"
+    ]
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#1",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "In my Commander game I cast Endless One with X=5, so it entered as a 5/5 with five +1/+1 counters. Later I activate my Kiki-Jiki, Mirror Breaker's ability targeting that Endless One to make a token copy of it — when the token's replacement effect asks for X (it enters with X +1/+1 counters), what is X?",
+    "answerKey": "For the token copy, X is 0. Copy effects use the copiable values of the original, and X in a spell's mana cost is treated as 0 on a permanent, so the Endless One token enters with zero +1/+1 counters as a 0/0 and is put into the graveyard as a state-based action.",
+    "ruling": "If the copied creature has {X} in its mana cost, X is 0.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Endless One"
+    ]
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#2",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "I control Kiki-Jiki, Mirror Breaker and a Clone that entered the battlefield as a copy of my Deranged Hermit. If I tap Kiki-Jiki targeting that Clone, what exactly is the token I create?",
+    "answerKey": "The token uses the copiable values of the targeted creature, so since the Clone is itself copying something, the token will be a copy of what the Clone is copying — in this case a Deranged Hermit (with haste, sacrificed at the beginning of the next end step).",
+    "ruling": "If a copied creature is copying something else, the token you create will use the copiable values of the target creature. In most cases, it will just be a copy of whatever that creature is copying.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Clone",
+      "Deranged Hermit"
+    ]
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#3",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "I cast Beast Within on my own Wastes and got a 3/3 green Beast creature token. Later I put a +1/+1 counter on that Beast and cast Giant Growth on it, then activated Kiki-Jiki, Mirror Breaker targeting the Beast token. What characteristics does the token Kiki-Jiki creates have?",
+    "answerKey": "Because the copied creature is a token that isn't itself a copy of something else, the new token copies the original characteristics of that token as stated by the effect that created it — here, a 3/3 green Beast creature (plus haste from Kiki-Jiki). The +1/+1 counter and the Giant Growth pump aren't copied, so it's a 3/3 with haste that's sacrificed at the beginning of the next end step.",
+    "ruling": "If a copied creature is a token that isn't a copy of something else, the copy copies the original characteristics of that token as stated by the effect that created it.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Beast Within",
+      "Giant Growth"
+    ]
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#4",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "I control Kiki-Jiki, Mirror Breaker and a Solemn Simulacrum, and I tap Kiki-Jiki targeting the Simulacrum to make a token copy of it. Does the token's enters-the-battlefield ability (searching for a basic land) actually trigger, and would replacement effects like \"as this enters\" or \"enters with counters\" from a copied creature also apply to such a token?",
+    "answerKey": "Yes. The token is a copy of the creature, so any enters-the-battlefield triggered abilities of the copied creature will trigger when the token enters the battlefield, and any \"as [this permanent] enters the battlefield\" or \"[this permanent] enters the battlefield with\" abilities of the copied creature will also work.",
+    "ruling": "Any enters-the-battlefield abilities of the copied creature will trigger when the token enters the battlefield. Any \"as [this permanent] enters the battlefield\" or \"[this permanent] enters the battlefield with\" abilities of the copied creature card will also work.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Solemn Simulacrum"
+    ]
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#5",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "I activate Kiki-Jiki, Mirror Breaker's ability targeting my Llanowar Elves, creating a token copy of it with haste. Before my end step, I cast Clone and have it enter the battlefield as a copy of that token. What exactly is my Clone, and does it get sacrificed at the beginning of the next end step along with the token?",
+    "answerKey": "The Clone copies what the token is copying — the Llanowar Elves card — except it also has haste. However, you won't sacrifice the new copy at the beginning of the next end step; only the original Kiki-Jiki token is sacrificed.",
+    "ruling": "If another creature becomes a copy of, or enters the battlefield as a copy of, the token, that creature will copy the creature card the token is copying, except it will also have haste. However, you won't sacrifice the new copy at the beginning of the next end step.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Clone",
+      "Llanowar Elves"
+    ]
+  },
+  {
+    "id": "a34b7416-cfe3-4a1e-a8c1-a3056b747519#6",
+    "card": "Kiki-Jiki, Mirror Breaker",
+    "question": "I control Kiki-Jiki, Mirror Breaker, a Doubling Season, and a nonlegendary Llanowar Elves. I tap Kiki-Jiki targeting the Llanowar Elves, and because of Doubling Season I end up with two hasty token copies instead of one. At the beginning of the next end step, what happens to those tokens?",
+    "answerKey": "Both tokens are sacrificed. If Kiki-Jiki's ability creates multiple tokens due to a replacement effect such as Doubling Season's, you sacrifice each of them at the beginning of the next end step.",
+    "ruling": "If Kiki-Jiki's ability creates multiple tokens due to a replacement effect (such as the one Doubling Season creates), you'll sacrifice each of them.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Doubling Season",
+      "Llanowar Elves"
+    ]
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#0",
+    "card": "Expropriate",
+    "question": "In a four-player Commander game I cast Expropriate, which has each player vote for time or money. Do all four of us vote secretly and simultaneously, or is there an order, and can the last player to vote see what the rest of us picked before deciding?",
+    "answerKey": "Votes aren't simultaneous or secret. Starting with you (the caster), votes are cast in turn order, and each player knows the votes of all players who voted before them.",
+    "ruling": "Votes are cast in turn order, and each player will know the votes of players who voted beforehand.",
+    "publishedAt": "2024-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#1",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in a four-player Commander game, and voting starts with me and goes around the table. One opponent says they don't want to help either option and would rather not vote at all — can a player decline to vote for time or money?",
+    "answerKey": "No. Each player must vote for one of the available options (time or money). They can't abstain.",
+    "ruling": "Each player must vote for one of the available options. They can't abstain.",
+    "publishedAt": "2024-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#2",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in my four-player Commander game, and everyone at the table wants to know how the votes will go before deciding whether to counter it. When exactly does the voting happen, and can players hold priority and respond to the spell after seeing what everyone voted for?",
+    "answerKey": "No player votes until Expropriate actually resolves. Any responses to the spell must be made without knowing the outcome of the vote.",
+    "ruling": "No player votes until Expropriate resolves. Any responses to the spell must be made without knowing the outcome of the vote.",
+    "publishedAt": "2024-09-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#3",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in a four-player Commander game, and when the voting starts one opponent says he doesn't want to give me an extra turn or a permanent, so he'd rather not vote at all. Can a player decline to vote when Expropriate resolves?",
+    "answerKey": "No. Each player must vote for one of the available options, time or money. You can't abstain.",
+    "ruling": "You must vote for one of the available options. You can't abstain.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#4",
+    "card": "Expropriate",
+    "question": "I cast Messenger Jays, whose enters-the-battlefield council's dilemma has each player vote for feather or quill, putting a +1/+1 counter on Messenger Jays for each feather vote and letting me draw a card for each quill vote. With the trigger on the stack, an opponent kills Messenger Jays, so it's gone before the ability resolves. When the ability resolves and we vote, are players still allowed to vote feather even though there's no creature left to put counters on?",
+    "answerKey": "Yes. Even though Messenger Jays is no longer on the battlefield and the +1/+1 counters can't be placed, players may still vote for feather when the ability resolves. Voting isn't restricted to options that will actually do something — players can vote for any option offered, including ones whose effect will do nothing (which is often exactly why a player would choose it).",
+    "ruling": "If a creature with an enters-the-battlefield council's dilemma ability leaves the battlefield before that ability resolves, players can still vote for any option that would put +1/+1 counters on that creature, even though—or perhaps especially because—those votes won't generate an effect.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": [
+      "Messenger Jays"
+    ]
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#5",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in a four-player Commander game. Two players (including me) vote for time and the other two vote for money, so there's no majority either way. How is the result of the vote determined — does only the option with the most votes happen, or something else?",
+    "answerKey": "Every vote counts individually. Unlike the \"will of the council\" cards from the original Conspiracy set, where a majority of votes determined what happened, each vote made for a council's dilemma card such as Expropriate adds to the ultimate effect. So with two time votes and two money votes, you take two extra turns after this one and you choose and gain control of one permanent owned by each of the two players who voted money.",
+    "ruling": "Unlike the will of the council cards from the original Conspiracy set, where a majority of votes determined what happened, each vote made for a council's dilemma card adds to the ultimate effect.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#6",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in my Commander game and all four of us vote. Before I actually take the extra turns and steal permanents, can an opponent respond to the votes — say, by sacrificing the permanent I'm about to take, or casting an instant now that they know the results?",
+    "answerKey": "No. Players can't do anything between voting and finishing the resolution of the spell or ability that included the vote — Expropriate finishes resolving (extra turns noted, permanents chosen and control gained, spell exiled) with no player receiving priority in between.",
+    "ruling": "Players can't do anything between voting and finishing the resolution of the spell or ability that included the vote.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#7",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in a four-player Commander game, and everyone passes priority... but before that, my opponent to my left wants to know whether he should counter it. When exactly do the players cast their votes for time or money — can opponents respond to Expropriate after seeing how the vote turns out?",
+    "answerKey": "No player votes until Expropriate actually resolves. Any responses to the spell must be made before the vote happens, so players must decide whether to respond without knowing the outcome of the vote.",
+    "ruling": "No player votes until the spell or ability resolves. Any responses to that spell or ability must be made without knowing the outcome of the vote.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#8",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in a four-player Commander game, and the votes come back as a mix of time and money votes. In what order do the parts of the card actually happen as it resolves — do I resolve each player's vote one at a time as they vote, or is there a set sequence for the voting, the extra turns, and the taking control of permanents?",
+    "answerKey": "The effects of a council's dilemma ability happen in the order stated on the card. First all the voting happens, then the first effect (you take an extra turn for each time vote), and finally the second effect (for each money vote, you choose and gain control of a permanent owned by that voter). Then Expropriate is exiled.",
+    "ruling": "The effects of each council's dilemma ability happen in the stated order. First the vote occurs, then the first effect, and finally the second effect.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "a69265b2-0e37-4d86-866e-e4a923233b4d#9",
+    "card": "Expropriate",
+    "question": "I cast Expropriate in a four-player Commander game, and each player has to vote for time or money. Do we all lock in our votes secretly at the same time, or does each player see what the others picked before deciding?",
+    "answerKey": "Votes aren't simultaneous or secret. Voting proceeds in turn order starting with you, so each player will know the votes of every player who voted before them when they choose time or money.",
+    "ruling": "Because the votes are made in turn order, each player will know the votes of players who voted beforehand.",
+    "publishedAt": "2016-08-23",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "ab1cc360-b9de-48d9-9983-4dfe4a7d2a37#0",
+    "card": "Arcane Denial",
+    "question": "I cast Arcane Denial targeting my opponent's spell, and it's countered. At the beginning of the next turn's upkeep, when does my opponent decide how many cards they're drawing, and can they choose to draw none?",
+    "answerKey": "They don't choose how many cards to draw until the delayed triggered ability actually resolves. At that point they may choose 0, 1, or 2 cards, and they must choose the number before drawing any cards.",
+    "ruling": "The controller of the countered spell doesn't choose how many cards to draw until the relevant ability resolves. The player may draw 0, 1, or 2 cards. They choose the number before drawing any cards.",
+    "publishedAt": "2007-09-16",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "ad09b3c3-c8e7-481c-8c45-e7f234935117#0",
+    "card": "Anguished Unmaking",
+    "question": "I cast Anguished Unmaking targeting my opponent's creature, and in response they give that creature hexproof so it's an illegal target when my spell tries to resolve. Do I still lose 3 life?",
+    "answerKey": "No. If the target nonland permanent is an illegal target as Anguished Unmaking tries to resolve, the spell doesn't resolve and none of its effects happen — you won't lose 3 life.",
+    "ruling": "If the target nonland permanent is an illegal target as Anguished Unmaking tries to resolve, it won't resolve and none of its effects will happen. You won't lose 3 life.",
+    "publishedAt": "2024-04-12",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "bd16434d-55ea-4c5a-a9ef-752971a4af16#0",
+    "card": "Despark",
+    "question": "My opponent cast Walking Ballista (mana cost {X}{X}) with X=4, paying eight mana, and it's now on the battlefield with four +1/+1 counters. I have Despark in hand, which exiles target permanent with mana value 4 or greater. Can I legally target that Walking Ballista with my Despark?",
+    "answerKey": "No. If a permanent has {X} in its mana cost, X is considered to be 0 while it's on the battlefield, so Walking Ballista's mana value is 0 regardless of the value chosen when it was cast. It isn't a legal target for Despark.",
+    "ruling": "If a permanent has {X} in its mana cost, X is considered to be 0.",
+    "publishedAt": "2019-05-03",
+    "source": "wotc",
+    "otherCards": [
+      "Walking Ballista"
+    ]
+  },
+  {
+    "id": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9#0",
+    "card": "Fierce Guardianship",
+    "question": "I have Fierce Guardianship in hand, but my own commander is in the command zone. However, earlier this turn I gained control of an opponent's commander creature with a Mind Control effect, and it's still on the battlefield under my control. Can I cast Fierce Guardianship without paying its mana cost, and would the answer change if I were playing a partner deck where only one of my two commanders is on the battlefield?",
+    "answerKey": "Yes, you can. It doesn't matter whose commander you control — any one will do, including an opponent's commander you've taken control of. And if you have two commanders, you just need to control one of them.",
+    "ruling": "It doesn't matter whose commander you control. Any one will do. If you have two commanders, you just need to control one of them.",
+    "publishedAt": "2020-04-17",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9#1",
+    "card": "Fierce Guardianship",
+    "question": "I control my commander and my opponent casts a Sorcery, so I announce Fierce Guardianship using its alternative cost. In response to me starting to cast it, my opponent wants to use a removal spell on my commander so that I have to pay Fierce Guardianship's mana cost instead. Can they do that?",
+    "answerKey": "No. Once you begin casting Fierce Guardianship, players can't take any other actions until you're done casting it. Notably, they can't try to remove the commander you control to make you pay its cost.",
+    "ruling": "Once you begin casting this spell, players can't take any other actions until you're done casting it. Notably, they can't try to remove the commander you control to make you pay its cost.",
+    "publishedAt": "2020-04-17",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b#0",
+    "card": "Cyclonic Rift",
+    "question": "I control Omniscience, which lets me cast instant and sorcery spells from my hand without paying their mana costs. I want to cast Cyclonic Rift and have it bounce every nonland permanent my opponents control. Can I use Omniscience to cast Cyclonic Rift and still apply its overload ability?",
+    "answerKey": "No. If you are instructed to cast a spell with overload \"without paying its mana cost,\" you can't choose to pay its overload cost instead — so Cyclonic Rift cast via Omniscience is cast normally and only returns a single target nonland permanent you don't control.",
+    "ruling": "If you are instructed to cast a spell with overload \"without paying its mana cost,\" you can't choose to pay its overload cost instead.",
+    "publishedAt": "2024-01-12",
+    "source": "wotc",
+    "otherCards": [
+      "Omniscience"
+    ]
+  },
+  {
+    "id": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b#1",
+    "card": "Cyclonic Rift",
+    "question": "I cast Cyclonic Rift for its overload cost of {6}{U}. An opponent controls a creature with hexproof and another creature with protection from blue. Do those two creatures get bounced?",
+    "answerKey": "Yes. Because a spell with overload doesn't target when its overload cost is paid, it may affect permanents with hexproof or with protection from the appropriate color, so both creatures are returned to their owner's hand.",
+    "ruling": "Because a spell with overload doesn't target when its overload cost is paid, it may affect permanents with hexproof or with protection from the appropriate color.",
+    "publishedAt": "2024-01-12",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b#2",
+    "card": "Cyclonic Rift",
+    "question": "In my Commander game I cast Cyclonic Rift for its overload cost of {6}{U} instead of its normal cost. An opponent wants to respond with a spell that only works if my spell has a target, and another opponent has a creature with hexproof. When I overload Cyclonic Rift, how many targets does the spell have, and how does that compare to casting it for its normal cost?",
+    "answerKey": "If you don't pay the overload cost, the spell has a single target. If you do pay the overload cost, the spell has no targets at all.",
+    "ruling": "If you don't pay the overload cost of a spell with overload, that spell will have a single target. If you pay the overload cost, the spell won't have any targets.",
+    "publishedAt": "2024-01-12",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b#3",
+    "card": "Cyclonic Rift",
+    "question": "I cast Cyclonic Rift for its overload cost of {6}{U} while my opponent controls Thalia, Guardian of Thraben, which makes my noncreature spells cost {1} more to cast. In what order do I work out what I actually pay, and while the spell is on the stack, what is Cyclonic Rift's mana value?",
+    "answerKey": "To determine the total cost of a spell, start with the mana cost or alternative cost you're paying (such as an overload cost), add any cost increases, then apply any cost reductions. So you start with {6}{U}, add Thalia's {1}, and pay {7}{U}. The mana value of the spell remains unchanged, no matter what the total cost to cast it was — Cyclonic Rift's mana value is still 2, from its printed mana cost {1}{U}.",
+    "ruling": "To determine the total cost of a spell, start with the mana cost or alternative cost you're paying (such as an overload cost), add any cost increases, then apply any cost reductions. The mana value of the spell remains unchanged, no matter what the total cost to cast it was.",
+    "publishedAt": "2024-01-12",
+    "source": "wotc",
+    "otherCards": [
+      "Thalia, Guardian of Thraben"
+    ]
+  },
+  {
+    "id": "e1e96802-fd0c-41f1-aa21-3287d75a0e88#0",
+    "card": "Overwhelming Stampede",
+    "question": "I cast Overwhelming Stampede while I control a 2/1, a 2/2, a 2/4, a 4/1, a 5/5, and a 5/6 creature, with no other effects changing power. When is the value of X determined, and what bonus does each of my creatures end up with?",
+    "answerKey": "You check the power of your creatures as Overwhelming Stampede resolves. With a 2/1, a 2/2, a 2/4, a 4/1, a 5/5, and a 5/6 on the battlefield at that time, the greatest power is 5, so each of your creatures gets +5/+5 and gains trample until end of turn.",
+    "ruling": "You check the power of your creatures as Overwhelming Stampede resolves. For example, if you control a 2/1 creature, a 2/2 creature, a 2/4 creature, a 4/1 creature, a 5/5 creature, and a 5/6 creature at that time, each of your creatures gets +5/+5 and gains trample until end of turn.",
+    "publishedAt": "2010-08-15",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "e4125377-34c0-4b54-bdf8-4e88f5d24565#0",
+    "card": "Approach of the Second Sun",
+    "question": "Earlier this game I cast Approach of the Second Sun from my hand and it resolved, putting it seventh from the top of my library and gaining me 7 life. I've since drawn it again and cast it from my hand a second time, but in response an opponent casts Counterspell targeting it. Do I still win the game since I've now cast a second Approach of the Second Sun?",
+    "answerKey": "No. Approach of the Second Sun has no effect until it's resolving. If the second one you cast is countered, you won't win the game.",
+    "ruling": "Approach of the Second Sun has no effect until it's resolving. If the second one you cast is countered, you won't win the game.",
+    "publishedAt": "2017-07-14",
+    "source": "wotc",
+    "otherCards": [
+      "Counterspell"
+    ]
+  },
+  {
+    "id": "e4125377-34c0-4b54-bdf8-4e88f5d24565#1",
+    "card": "Approach of the Second Sun",
+    "question": "Earlier this game I controlled Bolas's Citadel and cast Approach of the Second Sun off the top of my library by paying life; it resolved, went into my library seventh from the top, and I gained 7 life. I've since drawn that same Approach of the Second Sun and I'm now casting it from my hand. Does it make me win the game?",
+    "answerKey": "Yes. Only the second Approach of the Second Sun you cast must be cast from your hand; the first one may have been cast from anywhere, including from the top of your library with Bolas's Citadel. Since this one is cast from your hand and you've already cast another spell named Approach of the Second Sun this game, you win the game as it resolves.",
+    "ruling": "The second Approach of the Second Sun that you cast must be cast from your hand, but first may have been cast from anywhere.",
+    "publishedAt": "2017-04-18",
+    "source": "wotc",
+    "otherCards": [
+      "Bolas's Citadel"
+    ]
+  },
+  {
+    "id": "e4125377-34c0-4b54-bdf8-4e88f5d24565#2",
+    "card": "Approach of the Second Sun",
+    "question": "This game I've cast Approach of the Second Sun exactly once, from my hand, and it resolved (I gained 7 life and it went seventh from the top). Later I draw it again and cast it from my hand, and in response my teammate casts Reverberate targeting it, creating a copy of it on the stack. Does that copy resolving win the game for me, and if not, does it at least count toward the \"another spell named Approach of the Second Sun\" requirement?",
+    "answerKey": "No. A copy of a spell isn't cast, so the Reverberate copy won't count as either the first or the second Approach of the Second Sun. The copy resolves as an Approach that wasn't cast from your hand, so it just puts itself seventh from the top and gains you 7 life. (The original Approach you actually cast from your hand is your second cast copy, so it wins you the game when it resolves.)",
+    "ruling": "A copy of a spell isn't cast, so it won't count as the first nor as the second Approach of the Second Sun.",
+    "publishedAt": "2017-04-18",
+    "source": "wotc",
+    "otherCards": [
+      "Reverberate"
+    ]
+  },
+  {
+    "id": "e4125377-34c0-4b54-bdf8-4e88f5d24565#3",
+    "card": "Approach of the Second Sun",
+    "question": "I cast Approach of the Second Sun from my hand on turn 5; it resolves, I gain 7 life, and it goes into my library seventh from the top. A few turns later I draw that exact same physical card and cast it from my hand again. Since it's literally the same card I already cast, does it count as \"another spell named Approach of the Second Sun\" and win me the game?",
+    "answerKey": "Yes. A card that changes zones is considered a new object, so casting the same Approach of the Second Sun card on a later turn counts as \"another spell\" named Approach of the Second Sun, and you win the game.",
+    "ruling": "A card that changes zones is considered a new object, so casting the same Approach of the Second Sun card on a later turn is “another spell” named Approach of the Second Sun.",
+    "publishedAt": "2017-04-18",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "e4125377-34c0-4b54-bdf8-4e88f5d24565#4",
+    "card": "Approach of the Second Sun",
+    "question": "I cast Approach of the Second Sun from my hand, but it's the first one I've cast this game, so it goes into my library seventh from the top and I gain 7 life. How exactly do I do that, and what happens if my library only has three cards in it at that moment?",
+    "answerKey": "If you have fewer than six cards in your library, you'll put Approach of the Second Sun on the bottom of your library. Otherwise, you'll lift up the top six cards without looking at them and place Approach of the Second Sun just under them.",
+    "ruling": "If you have fewer than six cards in your library, you'll put Approach of the Second Sun on the bottom of your library. Otherwise, you'll lift up the top six cards without looking at them and place Approach of the Second Sun just under them.",
+    "publishedAt": "2017-04-18",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "e4125377-34c0-4b54-bdf8-4e88f5d24565#5",
+    "card": "Approach of the Second Sun",
+    "question": "Earlier this game I cast Approach of the Second Sun from my hand, but an opponent countered it with Counterspell, so it never resolved and just went to my graveyard. Later I draw another copy and cast it from my hand, and this time it resolves. Do I win the game, or does the first one needing to have resolved stop that?",
+    "answerKey": "You win the game. As your second Approach of the Second Sun resolves, it checks only whether you cast another spell named Approach of the Second Sun this game, not whether that first one resolved. Since the first was cast (even though it was countered), the second one resolving from your hand wins you the game.",
+    "ruling": "As your second Approach of the Second Sun resolves, it checks only whether the first one was cast, not whether the first one resolved. If your first Approach of the Second Sun was countered, you'll still win the game as your second one resolves.",
+    "publishedAt": "2017-04-18",
+    "source": "wotc",
+    "otherCards": [
+      "Counterspell"
+    ]
+  },
+  {
+    "id": "f3e213a4-ba5a-468a-93b3-c0a34e1bd725#0",
+    "card": "Pact of Negation",
+    "question": "I cast Pact of Negation targeting my opponent's spell, but before it resolves another opponent casts Dispel and counters my Pact of Negation. At the beginning of my next upkeep, am I required to pay {3}{U}{U} or lose the game?",
+    "answerKey": "No. If Pact of Negation is countered or otherwise doesn't resolve (for example, because its target became an illegal target), the delayed triggered ability that threatens you with a game loss is never created, so it won't trigger at the beginning of your next upkeep and you owe nothing.",
+    "ruling": "If Pact of Negation is countered or otherwise doesn't resolve (perhaps because its target became illegal), the delayed triggered ability that threatens you with a game loss won't trigger at the beginning of your next upkeep.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Dispel"
+    ]
+  },
+  {
+    "id": "f3e213a4-ba5a-468a-93b3-c0a34e1bd725#1",
+    "card": "Pact of Negation",
+    "question": "My opponent casts Supreme Verdict, which says it can't be countered. I respond with Pact of Negation targeting it; Supreme Verdict is still a legal target, so Pact resolves but the Verdict isn't countered and goes on to wrath the board. Do I still have to pay {3}{U}{U} on my next upkeep?",
+    "answerKey": "Yes. If Pact of Negation resolves with a legal target but fails to counter that spell (most likely because that spell can't be countered), the delayed triggered ability will still trigger at the beginning of your next upkeep and you will have to pay {3}{U}{U}. Or else you lose the game.",
+    "ruling": "If Pact of Negation resolves with a legal target but fails to counter that spell (most likely because that spell can't be countered), the delayed triggered ability will still trigger at the beginning of your next upkeep and you will have to pay. Or else.",
+    "publishedAt": "2021-03-19",
+    "source": "wotc",
+    "otherCards": [
+      "Supreme Verdict"
+    ]
+  },
+  {
+    "id": "fae37e28-e137-4177-b973-fa8b4dd8f409#0",
+    "card": "Generous Gift",
+    "question": "I cast Generous Gift targeting an opponent's Blightsteel Colossus, which is indestructible. In a second, separate game, I cast Generous Gift targeting an opponent's Llanowar Elves and they respond with Snakeskin Veil, giving it +1/+1 and hexproof until end of turn. In each case, does anyone end up with a 3/3 green Elephant creature token?",
+    "answerKey": "In the Snakeskin Veil case the target is an illegal target when Generous Gift tries to resolve, so the spell doesn't resolve at all and no player creates an Elephant. In the Blightsteel Colossus case the target is still legal but simply isn't destroyed because it's indestructible, so its controller does create a 3/3 green Elephant token.",
+    "ruling": "If the target permanent is an illegal target by the time Generous Gift tries to resolve, the spell doesn't resolve. No player creates an Elephant. If the target is legal but not destroyed (most likely because it has indestructible), its controller does create an Elephant.",
+    "publishedAt": "2019-06-14",
+    "source": "wotc",
+    "otherCards": [
+      "Blightsteel Colossus",
+      "Snakeskin Veil",
+      "Llanowar Elves"
     ]
   }
 ]

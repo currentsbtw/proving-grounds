@@ -11,7 +11,9 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 
 import {
   ModelAuthError,
+  ModelLimitError,
   ModelUpstreamError,
+  parseResetsAt,
   toJudgeUsage,
   type JudgeModel,
   type ModelRequest,
@@ -96,7 +98,13 @@ export function createApiModel(opts?: { client?: Anthropic; model?: string }): J
         if (isMissingCredentials(err)) {
           throw new ModelAuthError((err as Error).message);
         }
-        // Rate limits, 5xx and the rest stay themselves: the proxy maps them.
+        // A 429 is the API's version of "nothing left to spend right now". It is
+        // the same event as a spent plan window on the other driver, so it
+        // crosses the seam as the same error and a batch caller stops on either.
+        if (err instanceof Anthropic.RateLimitError) {
+          throw new ModelLimitError(err.message, parseResetsAt(err.message));
+        }
+        // 5xx and the rest stay themselves: the proxy maps them.
         throw err;
       }
 

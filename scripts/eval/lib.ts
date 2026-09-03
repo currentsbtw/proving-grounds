@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { JudgeDriver } from '../../src/domain/judge.ts';
-import { ModelAuthError, type JudgeModel } from '../../server/judge/model.ts';
+import { ModelAuthError, ModelLimitError, type JudgeModel } from '../../server/judge/model.ts';
 import { probeApiCredentials, probeClaudeCode, selectDriver } from '../../server/judge/drivers/index.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +54,34 @@ export function flagValue(argv: string[], name: string): string | null {
   const i = argv.indexOf(name);
   return i === -1 ? null : (argv[i + 1] ?? null);
 }
+
+/**
+ * Refuse a value-taking flag that was given no value.
+ *
+ * `flagValue` cannot tell "absent" from "present with nothing after it", so a
+ * trailing `--show-request` read as absent and started a full live run. Both
+ * shapes of empty are caught here: nothing after the flag, and another flag
+ * after it. Called before anything resolves a driver, so a typo costs nothing.
+ */
+export function requireFlagValues(argv: string[], names: string[]): void {
+  const bad = names.filter((name) => {
+    const i = argv.indexOf(name);
+    if (i === -1) return false;
+    const value = argv[i + 1];
+    return value === undefined || value.startsWith('--');
+  });
+  if (bad.length === 0) return;
+  console.error(`${bad.join(', ')} need${bad.length === 1 ? 's' : ''} a value.`);
+  process.exit(1);
+}
+
+/**
+ * A question the generator wrote as working rather than as a finished question
+ * ("Wait, let me redo that"). Shared so the two scripts cannot disagree:
+ * `eval-run` refuses to grade one, and `eval-build` treats a cached one as
+ * ungenerated so the next run replaces it.
+ */
+export const SELF_CORRECTION = /wait,? let me|redo that|scratch that/i;
 
 export interface ResolvedModel {
   driver: JudgeDriver;
@@ -141,21 +169,37 @@ export async function resolveModel(
   };
 }
 
+/** Why a run stopped early, when it did. Both are the driver saying "not now". */
+export type StopKind = 'auth' | 'limit';
+
 /**
- * The one sentence a driver with no usable login gets, said the same way by both
- * scripts. Returns false when `err` was some other failure, which the caller owns.
+ * The one sentence a run that cannot continue gets, said the same way by both
+ * scripts. Returns null when `err` was some other failure, which the caller owns.
  *
- * A driver that cannot log in would fail every remaining item identically, so the
- * player has exactly one thing to do about it and it is said exactly once.
+ * Two failures end a batch rather than an item. A driver that cannot log in would
+ * fail every remaining call identically; a driver out of plan usage would too,
+ * and until a stated time nothing can be done about either. So the player has
+ * exactly one thing to read, it is said exactly once, and the caller uses the
+ * returned kind to record why.
  */
-export function reportAuthFailure(driver: JudgeDriver, err: unknown): boolean {
-  if (!(err instanceof ModelAuthError)) return false;
-  console.error(
-    driver === 'claude-code'
-      ? `Stopped: Claude Code is not logged in (${err.message}). Run claude /login once, then run this again.`
-      : `Stopped: no usable API credentials (${err.message}).`,
-  );
-  return true;
+export function reportStop(driver: JudgeDriver, err: unknown): StopKind | null {
+  if (err instanceof ModelLimitError) {
+    console.error(
+      err.resetsAt
+        ? `Stopped: out of plan usage until ${err.resetsAt} (${err.message}). Run this again after that; graded items are kept.`
+        : `Stopped: rate limited (${err.message}). Run this again shortly; graded items are kept.`,
+    );
+    return 'limit';
+  }
+  if (err instanceof ModelAuthError) {
+    console.error(
+      driver === 'claude-code'
+        ? `Stopped: Claude Code is not logged in (${err.message}). Run claude /login once, then run this again.`
+        : `Stopped: no usable API credentials (${err.message}).`,
+    );
+    return 'auth';
+  }
+  return null;
 }
 
 /** Runs `work` over `items` with at most `limit` in flight. Order is preserved. */

@@ -92,6 +92,39 @@ The eval scripts take the same choice as `--driver api|claude-code` and `--model
 `npm run eval:judge` also takes `--grounding full|retrieval`. On the `claude-code` driver they
 run two calls at a time and say that usage is drawing on your subscription.
 
+### Eval resume and plan limits
+
+A full `npm run eval:judge` is a few hundred model calls, and on the subscription path a plan's
+session window can run out partway through. When that happens the run stops rather than
+failing: nothing new is dispatched, the calls in flight are allowed to land, every item that
+reached a verdict is written to `eval/results/`, and the last line says when the plan resets
+(`Stopped: out of plan usage until 11:20pm (America/Los_Angeles)`). Items that were never asked
+are simply absent from the results, not recorded as errors they did not commit. The exit code
+is 1 and the gate reports the stop, so a partial run can never read as a pass. A login that
+expires mid-run stops the same way. `npm run eval:build` behaves the same: finished work is on
+disk before it says why it stopped.
+
+Runs resume by default, so the next run picks up where the stopped one left off. Before
+dispatching anything, `eval:judge` looks for the newest results file that both stopped early and
+was the same measurement, and carries over every item in it that reached a verdict. "The same
+measurement" is the corpus date, the driver, the model, the grounding, and a `harness`
+fingerprint stored in each file: a short hash of the policy prompt, the eval's request shape and
+what retrieval selects. The fingerprint is the one that matters, because a verdict earned
+against a bare question says nothing about the same question asked with the card's oracle text
+under it; changing any of that invalidates every earlier file, deliberately. A completed run is
+never resumed from either, or the first good run would make every later one grade nothing and
+print PASS from old verdicts, and neither is a `--limit`, `--filter` or `--no-examples` run,
+which measured a chosen part of the set. A resumed run that grades everything still outstanding
+is a full run and can PASS. It prints `resumed N graded items from <file>`, marks those rows `~`
+in the table, and reports their tokens and cost separately from what this run spent.
+
+Use `--resume <path>` to name a file (it says why and exits non-zero rather than quietly
+grading everything if that file is a different measurement or a complete run), `--no-resume` to
+grade everything again, `--show-request <id or card>` to print one item's question, card-text
+reference block and retrieved rules without calling anything, and `--mock --mock-limit-after
+<n>` to exercise the stop path offline. One known cost: an item whose judge call succeeded but
+whose grader call hit the limit is not written, so its answer is bought again next run.
+
 **One-time login for the subscription path.** The CLI needs its own login once; after that the
 judge just works. On Windows the desktop app ships the CLI inside its MSIX package, so from
 your own terminal use the `Packages` path:
@@ -113,7 +146,9 @@ At startup the proxy asks the CLI `auth status` once and reports the answer as `
 That probe is a local read of the stored credentials: it costs nothing and calls no model. Until
 the login happens the drawer says `Judge is not logged in. Run claude /login once, then ask
 again.` and the proxy answers 503 `no_login`; a login that expires mid-session is caught on the
-next question and reported the same way.
+next question and reported the same way. A plan whose session window is spent is a different
+answer: the proxy replies 503 `limit` and the drawer prints when it resets, because there is
+nothing to fix and nothing to retry until then.
 
 ## Fan content notice
 

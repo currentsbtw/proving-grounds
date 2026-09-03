@@ -4,6 +4,7 @@
  *   npm run eval:build                 all three steps
  *   npm run eval:build -- --refresh    ignore the caches and redo everything
  *   npm run eval:build -- --limit 5    generate only N questions (smoke run)
+ *   npm run eval:build -- --dry-run    say what each model step would generate
  *
  * Three steps, deliberately separated so the expensive ones are optional:
  *
@@ -27,7 +28,9 @@
  * Caching: step 1 skips cards already in `eval/rulings.json`, step 2 skips rulings
  * already in `eval/questions.json` or already judged unusable in
  * `eval/questions-skipped.json`, both keyed on the item id (`<oracle_id>#<n>`) so a
- * reworded ruling is still recognised. Step 3 keeps every false variant already in
+ * reworded ruling is still recognised. One cached question is not skipped: one
+ * whose text carries a self-correction, which `eval-run` will not grade, is
+ * rewritten and the new one replaces it. Step 3 keeps every false variant already in
  * `eval/cr-examples.json` whose rule is still in the sample, keyed on the rule id,
  * and generates only the ones missing. Every cache is written through a temp file
  * and renamed, and the entries a partial run never reached are merged back in, so
@@ -46,18 +49,20 @@ import { existsSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 import { loadCorpus } from '../server/judge/corpus.ts';
-import { ModelAuthError } from '../server/judge/model.ts';
+import { ModelAuthError, ModelLimitError } from '../server/judge/model.ts';
 import { createRng, shuffleInPlace } from '../src/domain/rng.ts';
 import {
   CARDS_PATH,
   CR_EXAMPLES_PATH,
   QUESTIONS_PATH,
   RULINGS_PATH,
+  SELF_CORRECTION,
   SKIPPED_PATH,
   flagValue,
   pool,
   readJson,
-  reportAuthFailure,
+  reportStop,
+  requireFlagValues,
   resolveModel,
   writeJsonAtomic,
 } from './eval/lib.ts';
@@ -117,7 +122,10 @@ export interface CrExample {
 }
 
 const args = process.argv.slice(2);
+requireFlagValues(args, ['--limit', '--driver', '--model']);
 const REFRESH = args.includes('--refresh');
+/** Resolve the caches, print what each model step would generate, call nothing. */
+const DRY_RUN = args.includes('--dry-run');
 const LIMIT = (() => {
   const raw = flagValue(args, '--limit');
   const n = Number(raw);
@@ -291,13 +299,17 @@ The ruling is the expert answer. Your job is to write the question whose correct
 
 Write it as a player would ask at a table: one self-contained question, a two or three sentence scenario is fine. Name the card. Name every other card the ruling depends on. State every fact needed to answer, so a judge who has never seen the ruling can still answer from the rules. Do not hint at the answer and do not quote the ruling in the question.
 
+Write ONE clean scenario. The question text is the finished question, not your working: no self-corrections, no restarts, no rewrites, nothing like "wait, let me redo that" or "scratch that" or a second version of the scenario after a first. If the scenario you started does not work, write the whole question again from the beginning and return only that.
+
 answerKey restates the ruling as the direct answer to your question. Restating it verbatim is fine when it already reads as an answer.
+
+Set usable to false with reason "question contains a self-correction" if the only question you can write for this ruling would need one.
 
 Set usable to false, and say why in reason, when the ruling is any of these: an errata or wording-change note, flavour or design commentary, a restatement of the card's own reminder text, a format legality or banning note, a note about which printings exist, or a ruling that only makes sense with an unnamed card you would have to invent. When usable is false, leave question and answerKey empty.
 
 needsOtherCard lists the other cards you named, if any.`;
 
-/** `stopped` is an item the auth stop signal reached before it was ever asked. */
+/** `stopped` is an item the stop signal reached before it was ever asked. */
 type GenOutcome = { result: z.infer<typeof Generated> } | { error: string } | { stopped: true };
 
 async function generateOne(
@@ -321,13 +333,13 @@ async function generateOne(
     return { result: parsed };
   } catch (err) {
     // A refusal or an unparseable answer is this item's problem and is cached as
-    // such. No login is the whole run's problem, so it goes up.
-    if (err instanceof ModelAuthError) throw err;
+    // such. No login, and no usage left, are the whole run's problem: they go up.
+    if (err instanceof ModelAuthError || err instanceof ModelLimitError) throw err;
     return { error: (err as Error).message };
   }
 }
 
-/** `stopped` means the driver has no usable login and the run must not continue. */
+/** `stopped` means the driver cannot answer any more calls and the run must not continue. */
 async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean }> {
   console.log('step 2: questions from rulings');
   if (!hasCredentials()) {
@@ -338,9 +350,20 @@ async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean 
 
   const cachedQuestions = REFRESH ? [] : readJson<EvalQuestion[]>(QUESTIONS_PATH, []);
   const cachedSkips = REFRESH ? [] : readJson<SkippedQuestion[]>(SKIPPED_PATH, []);
+  // A cached question the eval will not grade is not done. `eval-run` refuses to
+  // ask a question that carries a self-correction, so one sitting in the cache is
+  // an item permanently missing from the set unless this step asks for it again.
+  const rewrite = new Set(
+    cachedQuestions.filter((q) => SELF_CORRECTION.test(q.question)).map((q) => q.id),
+  );
+  if (rewrite.size > 0) {
+    console.log(`  ${rewrite.size} cached question${rewrite.size === 1 ? '' : 's'} to rewrite: the text contains a self-correction`);
+  }
   // Keyed on the item id, not the ruling text: the id is what results are keyed
   // on downstream, and Wizards does reword a ruling without changing what it says.
-  const done = new Set([...cachedQuestions.map((q) => q.id), ...cachedSkips.map((s) => s.id)]);
+  const done = new Set(
+    [...cachedQuestions.map((q) => q.id), ...cachedSkips.map((s) => s.id)].filter((id) => !rewrite.has(id)),
+  );
 
   const jobs: { card: CardRulings; ruling: RulingEntry; id: string }[] = [];
   for (const card of cards) {
@@ -354,6 +377,10 @@ async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean 
   console.log(
     `  ${cachedQuestions.length} cached, ${cachedSkips.length} previously unusable, ${todo.length} to generate (of ${jobs.length} ungenerated)`,
   );
+  if (DRY_RUN) {
+    console.log(`  --dry-run: ${todo.length} model calls would be made here; nothing was called or written.`);
+    return { stopped: false };
+  }
 
   const skips = new Map<string, number>();
   let errors = 0;
@@ -361,19 +388,20 @@ async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean 
   const fresh: EvalQuestion[] = [];
   const freshSkips: SkippedQuestion[] = [];
 
-  // A login that turns out to be unusable is caught per item rather than thrown
-  // out of the pool. Thrown, it would abandon every sibling call still in flight
-  // and every answer already paid for; caught, it becomes a stop signal: nothing
-  // new is started, the calls already running are allowed to land, and the whole
-  // batch is written before the run says why it stopped.
-  let authError: ModelAuthError | null = null;
+  // A login that turns out to be unusable, or a plan window that runs out
+  // mid-batch, is caught per item rather than thrown out of the pool. Thrown, it
+  // would abandon every sibling call still in flight and every answer already
+  // paid for; caught, it becomes a stop signal: nothing new is started, the calls
+  // already running are allowed to land, and the whole batch is written before
+  // the run says why it stopped.
+  let stopError: ModelAuthError | ModelLimitError | null = null;
   const results = await pool<(typeof todo)[number], GenOutcome>(todo, GEN.concurrency, async (job) => {
-    if (authError !== null) return { stopped: true };
+    if (stopError !== null) return { stopped: true };
     try {
       return await generateOne(job.card, job.ruling);
     } catch (err) {
-      if (err instanceof ModelAuthError) {
-        authError ??= err;
+      if (err instanceof ModelAuthError || err instanceof ModelLimitError) {
+        stopError ??= err;
         return { stopped: true };
       }
       throw err;
@@ -416,7 +444,14 @@ async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean 
     });
   });
 
-  const all = [...cachedQuestions, ...fresh].sort((a, b) => a.id.localeCompare(b.id));
+  // A rewritten question replaces the cached one it was asked for rather than
+  // sitting beside it under the same id, and a rewrite that came back unusable
+  // takes the cached one out too: it is in the skip file now, so the next run
+  // reads it as done instead of paying to rewrite it again every time.
+  const resolved = new Set([...fresh.map((q) => q.id), ...freshSkips.map((s) => s.id)]);
+  const all = [...cachedQuestions.filter((q) => !resolved.has(q.id)), ...fresh].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  );
   const allSkips = [...cachedSkips, ...freshSkips].sort((a, b) => a.id.localeCompare(b.id));
   writeJsonAtomic(QUESTIONS_PATH, all);
   writeJsonAtomic(SKIPPED_PATH, allSkips);
@@ -432,8 +467,8 @@ async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean 
 
   // Said last, after the work is safely on disk: the sentence is what to do next,
   // and it is only honest once nothing this step finished has been thrown away.
-  if (authError !== null) {
-    reportAuthFailure(GEN.driver, authError);
+  if (stopError !== null) {
+    reportStop(GEN.driver, stopError);
     return { stopped: true };
   }
   return { stopped: false };
@@ -470,7 +505,7 @@ async function generateFalse(
     });
     return { result: parsed };
   } catch (err) {
-    if (err instanceof ModelAuthError) throw err;
+    if (err instanceof ModelAuthError || err instanceof ModelLimitError) throw err;
     return { error: (err as Error).message };
   }
 }
@@ -543,8 +578,12 @@ async function step3CrExamples() {
 
   let results: ({ result: z.infer<typeof FalseVariant> } | { error: string } | { stopped: true })[] | null =
     null;
-  let authError: ModelAuthError | null = null;
+  let stopError: ModelAuthError | ModelLimitError | null = null;
 
+  if (DRY_RUN) {
+    console.log(`  --dry-run: ${todo.length} false variants would be generated; nothing was called or written.`);
+    return;
+  }
   if (todo.length === 0) {
     console.log(`  0 false variants to generate (${items.filter((i) => i.variant === 'false').length} already present)`);
   } else if (!hasCredentials()) {
@@ -556,15 +595,15 @@ async function step3CrExamples() {
       `  false variants skipped: ${GEN.missingHint}, so all ${items.length} items are true statements.`,
     );
   } else {
-    // Same stop signal as step 2: an unusable login must not cost the variants
-    // this run already generated.
+    // Same stop signal as step 2: an unusable login, or a spent plan window,
+    // must not cost the variants this run already generated.
     results = await pool(todo, GEN.concurrency, async (i) => {
-      if (authError !== null) return { stopped: true } as const;
+      if (stopError !== null) return { stopped: true } as const;
       try {
         return await generateFalse(items[i]);
       } catch (err) {
-        if (err instanceof ModelAuthError) {
-          authError ??= err;
+        if (err instanceof ModelAuthError || err instanceof ModelLimitError) {
+          stopError ??= err;
           return { stopped: true } as const;
         }
         throw err;
@@ -598,16 +637,16 @@ async function step3CrExamples() {
     console.log(`  ${made} false variants generated, ${errors} errored (left as true statements)`);
   }
 
-  if (authError !== null && wouldLoseFalseVariants) {
+  if (stopError !== null && wouldLoseFalseVariants) {
     console.log(`  kept the existing ${CR_EXAMPLES_PATH} unchanged.`);
-    reportAuthFailure(GEN.driver, authError);
+    reportStop(GEN.driver, stopError);
     return;
   }
 
   writeJsonAtomic(CR_EXAMPLES_PATH, items);
   const falseCount = items.filter((item) => item.variant === 'false').length;
   console.log(`  wrote ${CR_EXAMPLES_PATH} (${items.length - falseCount} true, ${falseCount} false)`);
-  if (authError !== null) reportAuthFailure(GEN.driver, authError);
+  if (stopError !== null) reportStop(GEN.driver, stopError);
 }
 
 async function main() {

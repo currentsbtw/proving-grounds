@@ -32,6 +32,7 @@ const MESSAGES: Record<JudgeErrorCode, string> = {
   offline: 'Judge offline. Start it with npm run judge.',
   no_key: 'Judge has no API key. Set ANTHROPIC_API_KEY where npm run judge runs.',
   no_login: 'Judge is not logged in. Run claude /login once, then ask again.',
+  limit: 'Judge is out of usage for now. Ask again later.',
   no_corpus: 'Judge has no rules text. Run npm run judge:corpus.',
   upstream: 'The judge could not answer. Ask again.',
   bad_request: 'The judge could not read that question.',
@@ -146,7 +147,10 @@ export async function askJudge(req: JudgeRequest): Promise<JudgeResponse> {
     // The proxy's own wording wins where it can say something the code cannot,
     // and the fixed sentence stands everywhere the player has an action to take.
     const detail = isRecord(body) && typeof body.error === 'string' ? body.error : '';
-    const useDetail = detail !== '' && (code === 'upstream' || code === 'bad_request');
+    // `limit` joins them: the proxy knows when the limit lifts and the fixed
+    // sentence cannot, so its wording is strictly the more useful one.
+    const useDetail =
+      detail !== '' && (code === 'upstream' || code === 'bad_request' || code === 'limit');
     throw new JudgeServiceError(code, useDetail ? detail : undefined);
   }
 

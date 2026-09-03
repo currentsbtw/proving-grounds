@@ -39,7 +39,10 @@ import { z } from 'zod';
 
 import {
   ModelAuthError,
+  ModelLimitError,
   ModelUpstreamError,
+  isLimitMessage,
+  parseResetsAt,
   toJudgeUsage,
   type JudgeModel,
   type ModelRequest,
@@ -233,8 +236,11 @@ const CliResult = z.object({
  *
  * A failed run is still a well-formed result on stdout: `is_error` is true while
  * `subtype` stays `"success"` and the process exits 0, so the failure has to be
- * read out of the body. "Not logged in" is the one failure the player can fix,
- * and it is the whole reason `no_login` exists as a separate code.
+ * read out of the body. Two sentences in that body mean something other than
+ * "this call failed": "Not logged in" is the failure the player can fix, and a
+ * spent plan window ("You've hit your session limit, resets ...") is the failure
+ * nobody can fix until the stated time. Both get their own error type because a
+ * caller batching calls has to stop on either.
  */
 export function parseCliResult<T>(stdout: string, schema: z.ZodType<T>, requestedModel: string): ModelResult<T> {
   let envelope: z.infer<typeof CliResult>;
@@ -251,6 +257,12 @@ export function parseCliResult<T>(stdout: string, schema: z.ZodType<T>, requeste
     // It is a fallback: `probeClaudeCode` normally catches a missing login at
     // startup, and this catches the login that expired mid-session.
     if (/not logged in/i.test(resultText)) throw new ModelAuthError(resultText.trim());
+    // A spent plan window reads the same way: prose in `result`, nothing else.
+    // It is not an upstream failure and not a login problem, and a caller that
+    // reads it as either keeps dispatching calls that cannot be answered.
+    if (isLimitMessage(resultText)) {
+      throw new ModelLimitError(resultText.trim(), parseResetsAt(resultText));
+    }
     throw new ModelUpstreamError(resultText.trim() || 'Claude Code reported an error with no message.');
   }
 
@@ -275,6 +287,22 @@ export function parseCliResult<T>(stdout: string, schema: z.ZodType<T>, requeste
     ) ?? requestedModel;
 
   return { parsed: parsed.data, model: answered, usage: toJudgeUsage(envelope.usage) };
+}
+
+/**
+ * The failure for a run that printed no JSON at all.
+ *
+ * A spent plan window does not always reach stdout: the CLI can refuse before it
+ * has an envelope to print and say so on stderr, and reading that as an ordinary
+ * upstream failure is the same mistake as reading the in-band sentence that way.
+ * Exported so the harness can check both halves without spawning a CLI.
+ */
+export function noOutputError(code: number | null, stderr: string): ModelUpstreamError | ModelLimitError {
+  const why = stderr.trim();
+  if (isLimitMessage(why)) return new ModelLimitError(why.slice(0, 200), parseResetsAt(why));
+  return new ModelUpstreamError(
+    `Claude Code exited ${code ?? 'with no code'} and printed nothing${why ? `: ${why.slice(0, 200)}` : '.'}`,
+  );
 }
 
 interface RunOutcome {
@@ -408,10 +436,7 @@ export function createClaudeCodeModel(opts?: { bin?: string; model?: string }): 
           throw new ModelUpstreamError(`Claude Code did not answer within ${CALL_TIMEOUT_MS / 1000}s.`);
         }
         if (outcome.stdout.trim() === '') {
-          const why = outcome.stderr.trim().slice(0, 200);
-          throw new ModelUpstreamError(
-            `Claude Code exited ${outcome.code ?? 'with no code'} and printed nothing${why ? `: ${why}` : '.'}`,
-          );
+          throw noOutputError(outcome.code, outcome.stderr);
         }
         return parseCliResult(outcome.stdout, req.schema, model);
       } finally {

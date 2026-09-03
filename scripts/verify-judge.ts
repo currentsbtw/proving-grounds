@@ -16,17 +16,28 @@
  * that `retrieval` really does read an order of magnitude less. It drives the
  * real api driver, so a drift there shows up here.
  */
+import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
+
 import type { JudgeTableContext } from '../src/domain/judge.ts';
 import { CORPUS_PATH, corpusExists, loadCorpus, resolveRule } from '../server/judge/corpus.ts';
 import { askJudge, buildSystemBlocks, renderTableContext } from '../server/judge/core.ts';
 import { createApiModel } from '../server/judge/drivers/api.ts';
-import { scrubbedEnv } from '../server/judge/drivers/claudeCode.ts';
+import { noOutputError, parseCliResult, scrubbedEnv } from '../server/judge/drivers/claudeCode.ts';
 import type { JudgeModel, ModelRequest, ModelResult, SystemBlock } from '../server/judge/model.ts';
-import { ModelUpstreamError } from '../server/judge/model.ts';
+import {
+  classifyModelFailure,
+  ModelAuthError,
+  ModelLimitError,
+  ModelUpstreamError,
+} from '../server/judge/model.ts';
 import { buildExcerpt } from '../server/judge/retrieval.ts';
 
 const failures: string[] = [];
 let checks = 0;
+
+/** Any schema does for the CLI parser's failure paths: they throw before it is used. */
+const JudgeOutputShape = z.object({ answer: z.string() });
 
 function check(label: string, ok: boolean, detail = '') {
   checks++;
@@ -258,6 +269,153 @@ async function offline() {
   else process.env.ANTHROPIC_API_KEY = before.key;
   if (before.token === undefined) delete process.env.ANTHROPIC_AUTH_TOKEN;
   else process.env.ANTHROPIC_AUTH_TOKEN = before.token;
+
+  // The CLI reports a spent plan window the way it reports everything else: a
+  // successful-looking envelope with `is_error` true and one sentence in
+  // `result`. The sentence below is verbatim from the run that stopped 119 items
+  // in on 2026-09-03, and reading it as an ordinary upstream failure is what let
+  // that run keep dispatching calls no plan could answer.
+  const limitEnvelope = JSON.stringify({
+    type: 'result',
+    subtype: 'success',
+    is_error: true,
+    result: "You've hit your session limit · resets 11:20pm (America/Los_Angeles)",
+  });
+  let limitErr: unknown;
+  try {
+    parseCliResult(limitEnvelope, JudgeOutputShape, 'claude-opus-5');
+  } catch (err) {
+    limitErr = err;
+  }
+  check('a session limit is a ModelLimitError', limitErr instanceof ModelLimitError);
+  check(
+    'and carries the reset time verbatim',
+    limitErr instanceof ModelLimitError && limitErr.resetsAt === '11:20pm (America/Los_Angeles)',
+    limitErr instanceof ModelLimitError ? String(limitErr.resetsAt) : 'not a limit error',
+  );
+  let authErr: unknown;
+  try {
+    parseCliResult(
+      JSON.stringify({ is_error: true, result: 'Not logged in. Run /login.' }),
+      JudgeOutputShape,
+      'claude-opus-5',
+    );
+  } catch (err) {
+    authErr = err;
+  }
+  check('a missing login is still a ModelAuthError', authErr instanceof ModelAuthError);
+  let otherErr: unknown;
+  try {
+    parseCliResult(
+      JSON.stringify({ is_error: true, result: 'Model overloaded, try again.' }),
+      JudgeOutputShape,
+      'claude-opus-5',
+    );
+  } catch (err) {
+    otherErr = err;
+  }
+  check(
+    'any other failure is still upstream',
+    otherErr instanceof ModelUpstreamError && !(otherErr instanceof ModelLimitError),
+  );
+  // A weekly limit words the reset as a date. The check is on "limit" or a
+  // "resets" clause rather than on the sentences we have happened to see.
+  let weeklyErr: unknown;
+  try {
+    parseCliResult(
+      JSON.stringify({ is_error: true, result: 'Weekly usage exhausted, resets Nov 5' }),
+      JudgeOutputShape,
+      'claude-opus-5',
+    );
+  } catch (err) {
+    weeklyErr = err;
+  }
+  check(
+    'a weekly "resets Nov 5" wording is a limit too',
+    weeklyErr instanceof ModelLimitError && weeklyErr.resetsAt === 'Nov 5',
+    weeklyErr instanceof ModelLimitError ? String(weeklyErr.resetsAt) : 'not a limit error',
+  );
+  // The CLI can refuse before it has an envelope to print, and say so on stderr.
+  // That path threw a plain upstream error, which a batch caller keeps dispatching past.
+  const stderrLimit = noOutputError(1, "You've hit your session limit · resets 11:20pm (America/Los_Angeles)");
+  check(
+    'a limit on stderr with no stdout is a ModelLimitError',
+    stderrLimit instanceof ModelLimitError &&
+      stderrLimit.resetsAt === '11:20pm (America/Los_Angeles)',
+    stderrLimit instanceof ModelLimitError ? String(stderrLimit.resetsAt) : stderrLimit.message,
+  );
+  check(
+    'an ordinary silent exit is still upstream',
+    noOutputError(1, 'spawn failed') instanceof ModelUpstreamError,
+  );
+
+  console.log('api driver');
+  // The SDK's own 429. It reaches the proxy and the eval as the same error the
+  // CLI's session limit does, so one stop rule covers both drivers.
+  const rateLimited = new Anthropic.RateLimitError(
+    429,
+    { error: { message: 'rate limit exceeded' } },
+    'Rate limited; resets in a minute',
+    new Headers(),
+  );
+  const rateLimitedClient = {
+    messages: {
+      parse: () => {
+        throw rateLimited;
+      },
+    },
+  } as unknown as Anthropic;
+  let apiErr: unknown;
+  try {
+    await createApiModel({ client: rateLimitedClient }).complete({
+      system: [{ text: 'x' }],
+      user: 'x',
+      schema: JudgeOutputShape,
+      effort: 'low',
+      maxTokens: 16,
+    });
+  } catch (err) {
+    apiErr = err;
+  }
+  check('a 429 becomes a ModelLimitError', apiErr instanceof ModelLimitError, String((apiErr as Error)?.message));
+  check(
+    'and the proxy answers 503 limit for it',
+    classifyModelFailure(apiErr, 'api')?.code === 'limit',
+  );
+
+  console.log('proxy error codes');
+  const limitFailure = classifyModelFailure(
+    new ModelLimitError('session limit', '11:20pm (America/Los_Angeles)'),
+    'claude-code',
+  );
+  check(
+    'a limit answers 503 limit',
+    limitFailure?.status === 503 && limitFailure.code === 'limit',
+    `${limitFailure?.status} ${limitFailure?.code}`,
+  );
+  check(
+    'and names the reset time',
+    limitFailure?.error === 'Judge is out of plan usage until 11:20pm (America/Los_Angeles).',
+    limitFailure?.error ?? 'no message',
+  );
+  check(
+    'a limit with no reset time says try again',
+    classifyModelFailure(new ModelLimitError('rate limited'), 'api')?.error ===
+      'Judge is rate limited. Try again in a minute.',
+  );
+  check(
+    'no login still answers 503 no_login on claude-code',
+    classifyModelFailure(new ModelAuthError('x'), 'claude-code')?.code === 'no_login',
+  );
+  check(
+    'no key still answers 503 no_key on api',
+    classifyModelFailure(new ModelAuthError('x'), 'api')?.code === 'no_key',
+  );
+  check(
+    'an upstream failure still answers 502 upstream',
+    classifyModelFailure(new ModelUpstreamError('x'), 'api')?.status === 502,
+  );
+  check('anything else is not the driver seam’s to classify', classifyModelFailure(new Error('x'), 'api') === null);
 
   console.log('system prompt');
   const blocks = buildSystemBlocks(corpus, 'full');
