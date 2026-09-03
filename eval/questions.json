@@ -212,15 +212,17 @@
   {
     "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#4",
     "card": "Krosan Grip",
-    "question": "I attack with Etali, Primal Storm, and its attack trigger goes on the stack. In response, my opponent casts Krosan Grip targeting my Signet. When Etali's trigger resolves and exiles the top card of each library, can I cast one of those exiled cards for free while Krosan Grip is still on the stack?",
-    "answerKey": "No. If the resolution of a triggered ability involves casting a spell, that spell can't be cast while a spell with split second is on the stack.",
+    "question": "I control Sunbird's Invocation, which says \"Whenever you cast a spell from your hand, reveal the top X cards of your library, where X is that spell's mana value. You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost. Put the rest on the bottom of your library in a random order.\" I cast Krosan Grip from my hand targeting an opponent's Sol Ring, so Sunbird's Invocation triggers and its ability goes on the stack above Krosan Grip. The trigger resolves first and reveals Nature's Claim, a one-mana instant. Can I cast Nature's Claim from among the revealed cards?",
+    "answerKey": "No. Krosan Grip is still on the stack when the trigger resolves, and split second stops the trigger's resolution from casting a spell. If the resolution of a triggered ability involves casting a spell, that spell can't be cast while a spell with split second is on the stack.",
     "ruling": "If the resolution of a triggered ability involves casting a spell, that spell can't be cast if a spell with split second is on the stack.",
     "publishedAt": "2021-03-19",
     "source": "wotc",
     "otherCards": [
-      "Etali, Primal Storm",
-      "Signet"
-    ]
+      "Sunbird's Invocation",
+      "Sol Ring",
+      "Nature's Claim"
+    ],
+    "handEdited": true
   },
   {
     "id": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e#5",
@@ -690,14 +692,15 @@
     "id": "981b0e21-e5e6-4a1e-bfde-679d56623f7f#1",
     "card": "Ad Nauseam",
     "question": "I cast Ad Nauseam and choose to repeat the process twice. The first card revealed is Fireball (mana cost {X}{R}) and the second is Blue Sun's Zenith (mana cost {X}{U}{U}{U}). How much life do I lose in total from those two cards?",
-    "answerKey": "You lose 5 life. For a card in a library (or anywhere outside the stack), X in a mana cost is 0, so Fireball's mana value is 1 and Blue Sun's Zenith's is 4 — 1 + 4 = 5.",
+    "answerKey": "You lose 4 life. For a card in a library (or anywhere outside the stack), X in a mana cost is 0, so Fireball's mana value is 1 and Blue Sun's Zenith's is 3 — 1 + 3 = 4.",
     "ruling": "If a card in a player's library has {X} in its mana cost, X is 0 for the purpose of determining its mana value.",
     "publishedAt": "2026-03-20",
     "source": "wotc",
     "otherCards": [
       "Fireball",
       "Blue Sun's Zenith"
-    ]
+    ],
+    "handEdited": true
   },
   {
     "id": "981b0e21-e5e6-4a1e-bfde-679d56623f7f#2",

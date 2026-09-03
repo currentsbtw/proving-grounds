@@ -116,15 +116,20 @@ const PRICE = { input: 5, cacheRead: 0.5, cacheWrite: 10, output: 25 };
 const REQUEST_SHAPE_VERSION = 2;
 
 /**
- * Two questions whose excerpts are sensitive to the retrieval settings that
+ * Three questions whose excerpts are sensitive to the retrieval settings that
  * decide what a judge reads. The commander one comes in far under the ceiling, so
  * it moves with the relative score floor and the 903 boost; the hexproof one
  * saturates the ceiling and pulls in glossary entries, so it moves with the
- * character budget and the glossary caps.
+ * character budget and the glossary caps; the delayed-trigger one carries a cue
+ * phrase in its question text, so it moves with the cue table and with the floor
+ * a cue lifts its family to. Without the third, editing a cue would leave the
+ * fingerprint unchanged and a stopped run would resume onto verdicts earned from
+ * a different excerpt.
  */
 const FINGERPRINT_PROBES = [
   'If my commander dies, can I put it back in the command zone?',
   'Does hexproof stop a board wipe that destroys all creatures?',
+  'My token says sacrifice it at the beginning of the next end step. Does it still get sacrificed if it stopped being a creature?',
 ];
 
 /**
@@ -140,9 +145,10 @@ const FINGERPRINT_PROBES = [
  *
  * Retrieval is fingerprinted by what it does rather than by its constants: the
  * numbers themselves (the score floor, the character ceiling, the glossary caps,
- * the 903 boost) are private to `server/judge/retrieval.ts`, and running the two
- * probes above through it catches a change to any of them, and to the selection
- * code around them, which reading four constants would not.
+ * the 903 boost, the cue table and its floor) are private to
+ * `server/judge/retrieval.ts`, and running the three probes above through it
+ * catches a change to any of them, and to the selection code around them, which
+ * reading five constants would not.
  */
 function harnessFingerprint(corpus: Corpus): string {
   const policy = buildSystemBlocks(corpus, 'retrieval', '')[0].text;
@@ -275,6 +281,8 @@ interface StoredQuestion {
   answerKey: string;
   /** Other cards the ruling depends on; their text is sent too when we have it. */
   otherCards?: string[];
+  /** Corrected by hand; `eval-build` keeps it as written. Read the same as any other. */
+  handEdited?: true;
 }
 interface StoredCardRulings {
   card: string;
@@ -367,10 +375,16 @@ function loadItems(): {
     if (!cards.has(front)) cards.set(front, entry);
   }
 
-  const usable = questions.filter((q) => !SELF_CORRECTION.test(q.question));
-  if (usable.length < questions.length) {
+  // A self-correction in a generated question means the generator talked itself
+  // out of its own text, so the item is dropped and `eval-build` rewrites it. A
+  // hand-edited one is exempt: a person wrote those words on purpose, `eval-build`
+  // will not regenerate it, and dropping it here would leave the item permanently
+  // out of the set with no way to get it back.
+  const usable = questions.filter((q) => q.handEdited === true || !SELF_CORRECTION.test(q.question));
+  const skipped = questions.length - usable.length;
+  if (skipped > 0) {
     console.log(
-      `${questions.length - usable.length} questions skipped: the question text contains a self-correction (regenerate with eval:build)`,
+      `${skipped} generated question${skipped === 1 ? '' : 's'} skipped: the question text contains a self-correction (regenerate with eval:build; hand-edited questions are kept as written)`,
     );
   }
 

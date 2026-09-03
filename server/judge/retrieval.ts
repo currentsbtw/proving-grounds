@@ -66,6 +66,58 @@ const COMMANDER_MULTIPLIER = 1.6;
 const COMMANDER_FLOOR = 1;
 
 /**
+ * Cues that name a mechanic whose settling rule the words of the question do not
+ * contain. BM25 can only rank text that shares tokens with the query, so a
+ * question about a card that says "sacrifice it at the beginning of the next end
+ * step" ranks the rules that repeat those words and never reaches 603.7, which
+ * calls the thing a "delayed triggered ability" and says "end step" nowhere near
+ * the top. That is what let a live eval item about two Kiki-Jiki tokens decline:
+ * the judge named 603.7 itself, and it was not in front of it.
+ *
+ * Deliberately tiny, and it stays that way. This is not a synonym system: an
+ * entry earns its place only when the vocabulary gap is structural, the target
+ * rule is the one that settles the whole class of question, and the cue cannot
+ * plausibly fire on questions the rule has nothing to do with. Everything else
+ * BM25 already handles, and every entry here spends budget on every matching
+ * question whether it helped or not.
+ */
+const CUE_BOOSTS: { cues: RegExp; rule: string }[] = [
+  // Delayed triggered abilities. Cards write them as a second sentence naming a
+  // later moment ("Sacrifice it at the beginning of the next end step"), so the
+  // cues are the card's words and the target is the rule that governs them. The
+  // "next" in every phrase is what keeps an ordinary end-step trigger out.
+  {
+    cues: /\bdelayed\b|\bnext end step\b|\bat the beginning of the next\b|\bsacrifice (?:it|them|that \w+) at\b/i,
+    rule: '603.7',
+  },
+];
+/**
+ * A cue lifts its family to this share of the best hit and does nothing else.
+ *
+ * Unlike `COMMANDER_FLOOR`, the floor is a share rather than an absolute,
+ * because that is what "reliably present" costs: selection stops at
+ * `RELATIVE_SCORE_FLOOR` of the top score, so an absolute floor of 1 leaves a
+ * cued rule below the cut on any question that scores in the tens.
+ *
+ * It is a floor and never a multiplier, because the cut is measured against the
+ * top score: `buildExcerpt` reads its floor off `ranked[0].score`, so a cue that
+ * could push its family past the true best hit would raise the cut for every
+ * other rule from 0.4 of that best to 0.64 of it and quietly evict the rules the
+ * question was literally about. Measured on the 603.7c eval item, a 1.6x
+ * multiplier cost 22 rules and 10,183 characters of excerpt, 603.6a-603.6e among
+ * them. Above the relative floor and below the top, always.
+ *
+ * The share is high because a floor sets rank as well as survival, and on a
+ * question that saturates the character budget rank is what decides. At 0.5 the
+ * cued family sorted into the tail and the Kiki-Jiki item -- the item the cue was
+ * written for -- reached the ceiling with only 603.7 and 603.7b, both of them
+ * ordinary BM25 hits. 0.7 through 0.95 all bring the whole 603.7 family and leave
+ * the 603.7c excerpt untouched, so the value sits in the middle of that band,
+ * near the top hit and never level with it.
+ */
+const CUE_FLOOR_SHARE = 0.8;
+
+/**
  * Cap on how many ids one decline may fetch on the second pass. It counts
  * fetches, not rules: asking for `704.5` brings its whole subrule family and
  * still spends one of the eight.
@@ -258,6 +310,8 @@ interface Query {
   question: string;
   /** True when the question says "commander" or the table shows one. */
   commander: boolean;
+  /** Rule ids whose family a cue asked for; see `CUE_BOOSTS`. */
+  cueRules: string[];
 }
 
 /**
@@ -272,6 +326,10 @@ function buildQuery(req: JudgeRequest): Query {
   for (const token of tokenize(question)) terms.set(token, QUESTION_WEIGHT);
 
   const context: string[] = [];
+  // What a cue is allowed to read, kept apart from the scoring context on
+  // purpose; see `cueText` below for why it is a subset of it.
+  const cueParts: string[] = [question];
+  const asked = question.toLowerCase();
   let commander = /\bcommanders?\b/i.test(question);
   const table = req.table;
   if (table) {
@@ -279,17 +337,26 @@ function buildQuery(req: JudgeRequest): Query {
       if (card.isCommander) commander = true;
       context.push(card.name);
       if (card.typeLine) context.push(card.typeLine);
-      if (card.oracleText) context.push(card.oracleText);
+      if (card.oracleText) {
+        context.push(card.oracleText);
+        if (card.name && asked.includes(card.name.toLowerCase())) cueParts.push(card.oracleText);
+      }
     }
     for (const item of table.stack ?? []) {
       context.push(item.label);
+      cueParts.push(item.label);
       if (item.typeLine) context.push(item.typeLine);
-      if (item.oracleText) context.push(item.oracleText);
+      if (item.oracleText) {
+        context.push(item.oracleText);
+        cueParts.push(item.oracleText);
+      }
     }
     if (table.activeEvent) {
       context.push(table.activeEvent.prompt);
+      cueParts.push(table.activeEvent.prompt);
       if (table.activeEvent.card) {
         context.push(table.activeEvent.card.name, table.activeEvent.card.effect);
+        cueParts.push(table.activeEvent.card.effect);
       }
     }
   }
@@ -297,7 +364,24 @@ function buildQuery(req: JudgeRequest): Query {
     if (!terms.has(token)) terms.set(token, CONTEXT_WEIGHT);
   }
 
-  return { terms, question, commander };
+  // Cues are read off the raw text, not the token stream: they are phrases. What
+  // counts as that text is narrower than the scoring context, because a cue is a
+  // claim about what the question is about and the battlefield is not. A card
+  // that says "sacrifice it at the beginning of the next end step" sitting in
+  // some zone, or in a graveyard, would otherwise spend 7.5 KB of every
+  // unrelated question's budget on 603.7 -- measured on a trample question with
+  // Kiki-Jiki on the table, which lost 701.14a-c to pay for it.
+  //
+  // So: the question itself; the oracle text of a table card the question names,
+  // because the card that says the words is usually on the battlefield rather
+  // than in the question, and naming it is how the player says which one; and
+  // the stack tray and the active event, which are what is happening right now
+  // whether the question spells them out or not. The eval sends the card's words
+  // appended to the question, so both request shapes reach the same rules.
+  const cueText = cueParts.join(' ');
+  const cueRules = CUE_BOOSTS.filter((boost) => boost.cues.test(cueText)).map((boost) => boost.rule);
+
+  return { terms, question, commander, cueRules };
 }
 
 function scoreRules(index: CorpusIndex, query: Query): Float64Array {
@@ -317,6 +401,21 @@ function scoreRules(index: CorpusIndex, query: Query): Float64Array {
     for (let i = 0; i < n; i++) {
       if (index.rules[i].section !== COMMANDER_SECTION) continue;
       scores[i] = scores[i] * COMMANDER_MULTIPLIER + COMMANDER_FLOOR;
+    }
+  }
+  if (query.cueRules.length > 0) {
+    const cued = new Set<string>();
+    for (const id of query.cueRules) for (const member of fetchFamily(index, id)) cued.add(member);
+    // The floor is read after the Commander boost so it is a share of the score
+    // that selection will actually measure the cut against. Raising a cued rule
+    // to the floor can never move `best`, which is what keeps the cue from
+    // tightening the cut on everything else.
+    let best = 0;
+    for (let i = 0; i < n; i++) if (scores[i] > best) best = scores[i];
+    const floor = best * CUE_FLOOR_SHARE;
+    for (let i = 0; i < n; i++) {
+      if (!cued.has(index.rules[i].rule.id)) continue;
+      scores[i] = Math.max(scores[i], floor);
     }
   }
   return scores;
@@ -413,7 +512,10 @@ function renderExcerpt(
  * id, a section number) goes in first, because an explicit ask beats a score.
  * Then BM25 hits are taken in rank order, each with its parent and, when the
  * whole neighbourhood fits, its siblings: a subrule read without the sentence
- * that introduces it is how a judge misreads it. Whatever is chosen is printed
+ * that introduces it is how a judge misreads it. Scoring is where the two thumbs
+ * on the scale live, the Commander section and `CUE_BOOSTS`, so a promoted rule
+ * still arrives as a ranked hit with its family rather than as a special case.
+ * Whatever is chosen is printed
  * back in Comprehensive Rules order, never in score order, so the model reads
  * the document rather than a ranking.
  */
@@ -532,6 +634,20 @@ export function mergeExcerpt(corpus: Corpus, excerpt: Excerpt, extra: Excerpt, n
 }
 
 /**
+ * Whether the excerpt already carries what a judge naming this id was asking
+ * for. A subrule is one line and the line is the answer. A top-level id is not:
+ * `fetchFamily` reads "603.7" as a request for 603.7a and its siblings, because
+ * the introducing sentence on its own is the least useful line in the family,
+ * and an excerpt that dragged that sentence in as some other subrule's parent
+ * must not read as an excerpt that answered the ask.
+ */
+function familyCarried(index: CorpusIndex, present: Set<string>, id: string): boolean {
+  if (!present.has(id)) return false;
+  if (!isTopLevelRuleId(id)) return true;
+  return fetchFamily(index, id).every((member) => present.has(member));
+}
+
+/**
  * Rule ids the judge named in a decline that the corpus knows and the excerpt
  * did not carry. This is the signal that retrieval missed, and the only thing
  * that earns a second model call.
@@ -541,13 +657,14 @@ export function mergeExcerpt(corpus: Corpus, excerpt: Excerpt, extra: Excerpt, n
  * than being read as naming no rule at all.
  */
 export function missingRuleIds(corpus: Corpus, excerpt: Excerpt, texts: string[]): string[] {
+  const index = getIndex(corpus);
   const present = new Set(excerpt.ruleIds);
   const out: string[] = [];
   const seen = new Set<string>();
   for (const text of texts) {
     for (const match of (text ?? '').matchAll(ruleMentionScanner())) {
       const id = resolveRule(corpus, match[0])?.id;
-      if (id === undefined || seen.has(id) || present.has(id)) continue;
+      if (id === undefined || seen.has(id) || familyCarried(index, present, id)) continue;
       seen.add(id);
       out.push(id);
       if (out.length >= MAX_SECOND_PASS_RULES) return out;

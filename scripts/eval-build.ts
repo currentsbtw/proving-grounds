@@ -41,6 +41,9 @@
  * `--limit` caps how many model calls each of the two model steps makes, so a
  * smoke run costs two calls rather than a few hundred.
  *
+ * A question in `eval/questions.json` marked `"handEdited": true` was corrected by
+ * hand and is kept exactly as written: never regenerated, not even under `--refresh`.
+ *
  * Nothing here sends anything about a player or a deck. Card names, oracle text
  * and public rulings only.
  */
@@ -99,6 +102,11 @@ export interface EvalQuestion {
   publishedAt: string;
   source: 'wotc';
   otherCards: string[];
+  /**
+   * Corrected by hand because the generator got this one wrong. Set on an item,
+   * it is kept as written and never regenerated, `--refresh` included.
+   */
+  handEdited?: true;
 }
 
 /** A ruling the generator called unusable. Recorded so it is not paid for twice. */
@@ -285,9 +293,15 @@ async function step1Rulings(): Promise<CardRulings[]> {
   return out;
 }
 
+/**
+ * `precondition` is the generator's working, not part of the item: it is asked
+ * for before the question so the state check happens before the question is
+ * written, and it is dropped rather than stored.
+ */
 const Generated = z.object({
   usable: z.boolean(),
   reason: z.string(),
+  precondition: z.string(),
   question: z.string(),
   answerKey: z.string(),
   needsOtherCard: z.array(z.string()),
@@ -299,9 +313,13 @@ The ruling is the expert answer. Your job is to write the question whose correct
 
 Write it as a player would ask at a table: one self-contained question, a two or three sentence scenario is fine. Name the card. Name every other card the ruling depends on. State every fact needed to answer, so a judge who has never seen the ruling can still answer from the rules. Do not hint at the answer and do not quote the ruling in the question.
 
+The scenario must put the game in the state the ruling is about, not merely mention the same cards. Before you write the question, fill in precondition: one sentence saying what state the ruling's premise requires — stack order, zones, timing, who controls what — and confirming your scenario has it. A scenario that misses it asks something the ruling never answers: a ruling about a triggered ability resolving while a spell is still on the stack needs that trigger ABOVE that spell, and a scenario where the spell resolves first is a different question with a different answer. precondition is your working and is not stored; write "n/a" when usable is false.
+
 Write ONE clean scenario. The question text is the finished question, not your working: no self-corrections, no restarts, no rewrites, nothing like "wait, let me redo that" or "scratch that" or a second version of the scenario after a first. If the scenario you started does not work, write the whole question again from the beginning and return only that.
 
 answerKey restates the ruling as the direct answer to your question. Restating it verbatim is fine when it already reads as an answer.
+
+When the answer turns on a number worked out from your scenario — a mana value, a life total, a count — work it out again term by term before you answer, and show that working in the answerKey, like "1 + 3 = 4". X in a mana cost is 0 anywhere except on the stack, so a card in a library, a hand or a graveyard has mana value counted with X as 0.
 
 Set usable to false with reason "question contains a self-correction" if the only question you can write for this ruling would need one.
 
@@ -348,13 +366,29 @@ async function step2Questions(cards: CardRulings[]): Promise<{ stopped: boolean 
   }
   if (GEN.note) console.log(`  ${GEN.note}`);
 
-  const cachedQuestions = REFRESH ? [] : readJson<EvalQuestion[]>(QUESTIONS_PATH, []);
+  const onDiskQuestions = readJson<EvalQuestion[]>(QUESTIONS_PATH, []);
+  // A hand-edited item survives everything this step does. It says what it says
+  // because a person read the ruling and found the generated question wrong
+  // about it, so regenerating it — because of `--refresh`, or because its text
+  // trips the self-correction check — would only put the defect back.
+  const handEdited = onDiskQuestions.filter((q) => q.handEdited === true);
+  const cachedQuestions = REFRESH ? handEdited : onDiskQuestions;
   const cachedSkips = REFRESH ? [] : readJson<SkippedQuestion[]>(SKIPPED_PATH, []);
+  if (handEdited.length > 0) {
+    console.log(
+      `  ${handEdited.length} hand-edited question${handEdited.length === 1 ? '' : 's'} kept as written, not regenerated: ${handEdited.map((q) => q.id).join(', ')}`,
+    );
+  }
   // A cached question the eval will not grade is not done. `eval-run` refuses to
-  // ask a question that carries a self-correction, so one sitting in the cache is
-  // an item permanently missing from the set unless this step asks for it again.
+  // ask a generated question that carries a self-correction, so one sitting in the
+  // cache is an item permanently missing from the set unless this step asks for it
+  // again. Hand-edited questions are exempt from the rewrite here and `eval-run`
+  // mirrors that exemption at load, so a person's wording is never dropped by one
+  // step that the other will not put back.
   const rewrite = new Set(
-    cachedQuestions.filter((q) => SELF_CORRECTION.test(q.question)).map((q) => q.id),
+    cachedQuestions
+      .filter((q) => q.handEdited !== true && SELF_CORRECTION.test(q.question))
+      .map((q) => q.id),
   );
   if (rewrite.size > 0) {
     console.log(`  ${rewrite.size} cached question${rewrite.size === 1 ? '' : 's'} to rewrite: the text contains a self-correction`);

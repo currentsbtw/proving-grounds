@@ -31,7 +31,7 @@ import {
   ModelLimitError,
   ModelUpstreamError,
 } from '../server/judge/model.ts';
-import { buildExcerpt } from '../server/judge/retrieval.ts';
+import { buildExcerpt, missingRuleIds } from '../server/judge/retrieval.ts';
 
 const failures: string[] = [];
 let checks = 0;
@@ -428,6 +428,17 @@ async function offline() {
     'no date in the cached prefix',
     !blocks[0].text.includes(corpus.effectiveDate) && !/\b20\d\d\b/.test(blocks[0].text),
   );
+  // Half the eval asks "Is that right? Confirm it or correct it." On a verbatim,
+  // true CR example about colour identity the judge answered "Close, but ...",
+  // restated the same rule in its own words and was graded disagree. Every fact
+  // was right; the verdict framing was not. The fake driver cannot exercise the
+  // model, so what is checked here is that the instruction is in the prompt.
+  check(
+    'policy prompt carries confirm-or-correct guidance',
+    blocks[0].text.includes('asked to confirm or correct a statement') &&
+      blocks[0].text.includes('confirm it plainly') &&
+      blocks[0].text.includes('wrong outcome at the table'),
+  );
 
   console.log('askJudge');
   const mixed = await askJudge(
@@ -564,11 +575,121 @@ async function offline() {
       hexproofExcerpt.text.includes((corpus.glossary.get('Hexproof') ?? 'missing').slice(0, 40)),
   );
 
+  // Delayed triggered abilities, from the live eval item that declined on them.
+  // The card's words are "sacrifice it at the beginning of the next end step";
+  // the rule that settles it, 603.7, says "delayed triggered ability" and shares
+  // almost no vocabulary with the question, so BM25 alone never reached it and
+  // the judge declined naming 603.7 itself. The cue table is what puts it in.
+  const kikiOracle =
+    "Kiki-Jiki, Mirror Breaker | Legendary Creature — Goblin Shaman | Haste / {T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.";
+  const kikiQ =
+    'I control Kiki-Jiki, Mirror Breaker, a Doubling Season, and a nonlegendary Llanowar Elves. I tap Kiki-Jiki targeting the Llanowar Elves, and because of Doubling Season I end up with two hasty token copies instead of one. At the beginning of the next end step, what happens to those tokens?';
+  // The eval appends reference card text to the question; the client sends the
+  // same words as oracle text on a table card. Both shapes are checked, because
+  // the cue is read off the question and the table together.
+  const delayedExcerpt = buildExcerpt(corpus, {
+    question: `${kikiQ}\n\nCard text for reference:\n- ${kikiOracle}`,
+  });
+  note('delayed-trigger excerpt', `${delayedExcerpt.text.length} chars, ${delayedExcerpt.ruleIds.length} rules`);
+  check(
+    'a delayed-trigger question carries 603.7 and its subrules',
+    delayedExcerpt.ruleIds.includes('603.7') && delayedExcerpt.ruleIds.includes('603.7a'),
+    delayedExcerpt.ruleIds.filter((id) => id.startsWith('603.7')).join(', ') || 'no 603.7 family',
+  );
+  // The table path, and its two controls. A cue may read a table card's oracle
+  // text only when the question names that card, so all three cases below use a
+  // question that carries no cue phrase of its own and differ only in the table:
+  // the cue firing or not is then the single thing under test.
+  const kikiCard = {
+    name: 'Kiki-Jiki, Mirror Breaker',
+    zone: 'battlefield' as const,
+    typeLine: 'Legendary Creature — Goblin Shaman',
+    oracleText: kikiOracle.split(' | ').slice(2).join(' '),
+  };
+  const namedQ =
+    'I copy Llanowar Elves with Kiki-Jiki, Mirror Breaker. What happens to the copy later in the turn?';
+  const namedWithCard = buildExcerpt(corpus, {
+    question: namedQ,
+    table: { ...FIXTURE, cards: [kikiCard], stack: [], activeEvent: undefined },
+  });
+  check(
+    'the cue is read off the oracle text of a card the question names',
+    namedWithCard.ruleIds.includes('603.7') && namedWithCard.ruleIds.includes('603.7a'),
+    namedWithCard.ruleIds.filter((id) => id.startsWith('603.7')).join(', ') || 'no 603.7 family',
+  );
+  // Same words, no table. If this one carried 603.7 as well, the check above
+  // would be testing the question text rather than the table path.
+  const namedNoTable = buildExcerpt(corpus, {
+    question: namedQ,
+    table: { ...FIXTURE, cards: [], stack: [], activeEvent: undefined },
+  });
+  check(
+    'the same question with no table does not reach 603.7 on its own',
+    !namedNoTable.ruleIds.some((id) => id.startsWith('603.7')),
+    namedNoTable.ruleIds.filter((id) => id.startsWith('603.7')).join(', ') || 'no 603.7 family',
+  );
+  // The control that costs real budget. Kiki-Jiki is on the battlefield and its
+  // text carries the cue, but the question is about trample and never names the
+  // card, so the excerpt must not spend several kilobytes on delayed triggers.
+  const trampleQ = 'How does trample assign combat damage to a blocking creature?';
+  const trampleWithKiki = buildExcerpt(corpus, {
+    question: trampleQ,
+    table: { ...FIXTURE, cards: [kikiCard], stack: [], activeEvent: undefined },
+  });
+  check(
+    'a card on the battlefield the question never names does not fire the cue',
+    !trampleWithKiki.ruleIds.some((id) => id.startsWith('603.7')),
+    trampleWithKiki.ruleIds.filter((id) => id.startsWith('603.7')).join(', ') || 'no 603.7 family',
+  );
+  check(
+    'a question with no delayed-trigger cue does not pull 603.7 in',
+    !buildExcerpt(corpus, { question: trampleQ }).ruleIds.some((id) => id.startsWith('603.7')),
+  );
+
+  // A cue is a floor and must never be a promotion past the top hit: selection
+  // measures its cut against the best score, so a cue that outranked the real
+  // best would raise the cut for everything else and evict the rules the question
+  // is literally about. Asked as the eval asks it, cr:603.7c is the case that
+  // caught it: 603.7 is named outright so both spellings below select the same
+  // family, and the only thing that can differ is what the cue did to the cut.
+  const crStatement = (corpus.rules.get('603.7c')?.examples[0] ?? '')
+    .replace(/^Example:\s*/, '')
+    .trim();
+  const crQ = `Under rule 603.7c: ${crStatement} Is that right? Confirm it or correct it.`;
+  // The cue phrases broken with a double space. The tokenizer collapses runs of
+  // non-alphanumerics, so the BM25 stream is byte-for-byte the same query and the
+  // cue is the only variable.
+  const crNoCue = crQ.replace(/\bthe next end step\b/gi, 'the  next  end step');
+  const cued = buildExcerpt(corpus, { question: crQ });
+  const uncued = buildExcerpt(corpus, { question: crNoCue });
+  note(
+    'cr:603.7c excerpt',
+    `cue on ${cued.ruleIds.length} rules / ${cued.text.length} chars, cue off ${uncued.ruleIds.length} / ${uncued.text.length}`,
+  );
+  check(
+    'a cue does not shrink the excerpt it fires on',
+    cued.ruleIds.length >= uncued.ruleIds.length,
+    `${cued.ruleIds.length} vs ${uncued.ruleIds.length} rules`,
+  );
+  check(
+    'the neighbourhood a raised cut used to evict is still there',
+    cued.ruleIds.includes('603.6a'),
+    cued.ruleIds.filter((id) => id.startsWith('603.6')).join(', ') || 'no 603.6 family',
+  );
+  // Same selection either way is the strongest form of "the cue did not move the
+  // cut": it means the top-ranked rule, and so the floor read off it, is unchanged.
+  check(
+    'the cue leaves the rest of the selection untouched',
+    cued.ruleIds.join(',') === uncued.ruleIds.join(','),
+    uncued.ruleIds.filter((id) => !cued.ruleIds.includes(id)).join(', ') || 'identical',
+  );
+
   const sizes: [string, number][] = [
     ['commander', commanderExcerpt.text.length],
     ['explicit-id', explicitExcerpt.text.length],
     ['rhystic', rhysticExcerpt.text.length],
     ['hexproof', hexproofExcerpt.text.length],
+    ['delayed-trigger', delayedExcerpt.text.length],
   ];
   note('excerpt sizes', sizes.map(([label, chars]) => `${label} ${chars}`).join(', ') + ' chars');
   check(
@@ -682,6 +803,31 @@ async function offline() {
     'topic pass leaves its caveat',
     topical.caveats.includes('Second pass: fetched more rules on the topic named in the decline.'),
     topical.caveats.join(' / '),
+  );
+
+  // A named top-level id is a request for the subrules under it, not for the
+  // sentence that introduces them: `fetchFamily` already reads it that way. An
+  // excerpt that dragged 603.7 in as some subrule's parent used to count as
+  // carrying it, so a decline asking for "603.7 and its subrules" found nothing
+  // missing and fell through to the weaker topic pass.
+  const namesTheParent = ['Rule 603.7 and its subrules would settle this.'];
+  const stillMissing = missingRuleIds(corpus, { text: '', ruleIds: ['603.7', '603.7c'] }, namesTheParent);
+  check(
+    'a named top-level id is missing while its subrules are absent',
+    stillMissing.includes('603.7'),
+    stillMissing.join(', ') || 'none',
+  );
+  const wholeFamily = {
+    text: '',
+    ruleIds: ['603.7', ...[...corpus.rules.keys()].filter((id) => /^603\.7[a-z]{1,2}$/.test(id))],
+  };
+  check(
+    'and is not missing once the whole family is there',
+    missingRuleIds(corpus, wholeFamily, ['Rule 603.7 would settle this.']).length === 0,
+  );
+  check(
+    'a named subrule that is present is still not missing',
+    missingRuleIds(corpus, { text: '', ruleIds: ['603.7c'] }, ['Rule 603.7c settles it.']).length === 0,
   );
 
   const onePass = stubModel({ status: 'decline', answer: '?', rules: [], confidence: 'low', caveats: [] });
