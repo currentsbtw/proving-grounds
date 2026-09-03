@@ -13,6 +13,7 @@ export type ActionId =
   | 'resolveTop'
   | 'pushAbility'
   | 'focusNote'
+  | 'judge'
   | 'respondOne'
   | 'respondTwo'
   | 'help';
@@ -58,6 +59,12 @@ export const HOTKEY_ACTIONS: readonly HotkeyAction[] = [
   },
   { id: 'pushAbility', label: 'Add an ability to the stack', defaultKey: 'a' },
   { id: 'focusNote', label: 'Log a note', defaultKey: 'n' },
+  {
+    id: 'judge',
+    label: 'Ask the judge',
+    note: "opens the readout's Judge drawer",
+    defaultKey: 'j',
+  },
   {
     id: 'respondOne',
     label: 'Event: answer it',

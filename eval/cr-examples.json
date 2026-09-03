@@ -1,0 +1,482 @@
+[
+  {
+    "ruleId": "110.5c",
+    "example": "Example: Dimir Doppelganger says “{1}{U}{B}: Exile target creature card from a graveyard. This creature becomes a copy of that card, except it has this ability.” It becomes a copy of Jushi Apprentice, a flip card. Through use of Jushi Apprentice’s ability, this creature flips, making it a copy of Tomoya the Revealer with the Dimir Doppelganger ability. If this permanent then becomes a copy of Runeclaw Bear, it will retain its flipped status even though that has no relevance to Runeclaw Bear. If its copy ability is activated again, this time targeting a Nezumi Shortfang card (another flip card), this permanent’s flipped status means it will have the characteristics of Stabwhisker the Odious (the flipped version of Nezumi Shortfang) with the Dimir Doppelganger ability.",
+    "rule": "110.5c A permanent retains its status until a spell, ability, or turn-based action changes it, even if that status is not relevant to it.",
+    "variant": "true",
+    "statement": "Dimir Doppelganger says “{1}{U}{B}: Exile target creature card from a graveyard. This creature becomes a copy of that card, except it has this ability.” It becomes a copy of Jushi Apprentice, a flip card. Through use of Jushi Apprentice’s ability, this creature flips, making it a copy of Tomoya the Revealer with the Dimir Doppelganger ability. If this permanent then becomes a copy of Runeclaw Bear, it will retain its flipped status even though that has no relevance to Runeclaw Bear. If its copy ability is activated again, this time targeting a Nezumi Shortfang card (another flip card), this permanent’s flipped status means it will have the characteristics of Stabwhisker the Odious (the flipped version of Nezumi Shortfang) with the Dimir Doppelganger ability.",
+    "answerKey": "Dimir Doppelganger says “{1}{U}{B}: Exile target creature card from a graveyard. This creature becomes a copy of that card, except it has this ability.” It becomes a copy of Jushi Apprentice, a flip card. Through use of Jushi Apprentice’s ability, this creature flips, making it a copy of Tomoya the Revealer with the Dimir Doppelganger ability. If this permanent then becomes a copy of Runeclaw Bear, it will retain its flipped status even though that has no relevance to Runeclaw Bear. If its copy ability is activated again, this time targeting a Nezumi Shortfang card (another flip card), this permanent’s flipped status means it will have the characteristics of Stabwhisker the Odious (the flipped version of Nezumi Shortfang) with the Dimir Doppelganger ability."
+  },
+  {
+    "ruleId": "111.11",
+    "example": "Example: Disa the Restless has the ability “Whenever one or more creatures you control deal combat damage to a player, create a Tarmogoyf token.” As that ability resolves, its controller creates a token with the same characteristics as the card named Tarmogoyf, as determined by the Oracle card reference.",
+    "rule": "111.11. If an effect instructs a player to create a token by name, doesn’t define any other characteristics for that token, and the name is not one of the types in the list of predefined tokens above, that player uses the card with that name in the Oracle card reference to determine the characteristics of that token.",
+    "variant": "true",
+    "statement": "Disa the Restless has the ability “Whenever one or more creatures you control deal combat damage to a player, create a Tarmogoyf token.” As that ability resolves, its controller creates a token with the same characteristics as the card named Tarmogoyf, as determined by the Oracle card reference.",
+    "answerKey": "Disa the Restless has the ability “Whenever one or more creatures you control deal combat damage to a player, create a Tarmogoyf token.” As that ability resolves, its controller creates a token with the same characteristics as the card named Tarmogoyf, as determined by the Oracle card reference."
+  },
+  {
+    "ruleId": "115.1a",
+    "example": "Example: A sorcery card has the ability “When you cycle this card, target creature gets -1/-1 until end of turn.” This triggered ability is targeted, but that doesn’t make the card it’s on targeted.",
+    "rule": "115.1a An instant or sorcery spell is targeted if its spell ability identifies something it will affect by using the phrase “target [something],” where the “something” is a phrase that describes an object and/or player. The target(s) are chosen as the spell is cast; see rule 601.2c. (If an activated or triggered ability of an instant or sorcery uses the word target, that ability is targeted, but the spell is not.)",
+    "variant": "true",
+    "statement": "A sorcery card has the ability “When you cycle this card, target creature gets -1/-1 until end of turn.” This triggered ability is targeted, but that doesn’t make the card it’s on targeted.",
+    "answerKey": "A sorcery card has the ability “When you cycle this card, target creature gets -1/-1 until end of turn.” This triggered ability is targeted, but that doesn’t make the card it’s on targeted."
+  },
+  {
+    "ruleId": "118.12",
+    "example": "Example: You control Standstill, an enchantment that says “When a player casts a spell, sacrifice this enchantment. If you do, each of that player’s opponents draws three cards.” A spell is cast, causing Standstill’s ability to trigger. Then an ability is activated that exiles Standstill. When Standstill’s ability resolves, you’re unable to pay the “sacrifice Standstill” cost. No player will draw cards.",
+    "rule": "118.12. Some spells, activated abilities, and triggered abilities read, “[Do something]. If [a player] [does, doesn’t, or can’t], [effect].” Or “[A player] may [do something]. If [that player] [does, doesn’t, or can’t], [effect].” The action [do something] is a cost, paid when the spell or ability resolves. The “If [a player] [does, doesn’t, or can’t]” clause checks whether the player chose to pay an optional cost or started to pay a mandatory cost, regardless of what events actually occurred.",
+    "variant": "true",
+    "statement": "You control Standstill, an enchantment that says “When a player casts a spell, sacrifice this enchantment. If you do, each of that player’s opponents draws three cards.” A spell is cast, causing Standstill’s ability to trigger. Then an ability is activated that exiles Standstill. When Standstill’s ability resolves, you’re unable to pay the “sacrifice Standstill” cost. No player will draw cards.",
+    "answerKey": "You control Standstill, an enchantment that says “When a player casts a spell, sacrifice this enchantment. If you do, each of that player’s opponents draws three cards.” A spell is cast, causing Standstill’s ability to trigger. Then an ability is activated that exiles Standstill. When Standstill’s ability resolves, you’re unable to pay the “sacrifice Standstill” cost. No player will draw cards."
+  },
+  {
+    "ruleId": "201.4a",
+    "example": "Example: Dispossess reads, in part, “Choose an artifact card name.” The player can choose the name of any artifact card, even one that’s not legal in the format of the current game. The player can’t choose Island, even if an Island on the battlefield has been turned into artifact by some effect.",
+    "rule": "201.4a If a player is instructed to choose a card name with certain characteristics, the player must choose the name of a card whose Oracle text matches those characteristics. (See rule 108.1.)",
+    "variant": "true",
+    "statement": "Dispossess reads, in part, “Choose an artifact card name.” The player can choose the name of any artifact card, even one that’s not legal in the format of the current game. The player can’t choose Island, even if an Island on the battlefield has been turned into artifact by some effect.",
+    "answerKey": "Dispossess reads, in part, “Choose an artifact card name.” The player can choose the name of any artifact card, even one that’s not legal in the format of the current game. The player can’t choose Island, even if an Island on the battlefield has been turned into artifact by some effect."
+  },
+  {
+    "ruleId": "201.5b",
+    "example": "Example: Quicksilver Elemental says, in part, “{U}: This creature gains all activated abilities of target creature until end of turn.” If it gains an ability that says “{BB}: Regenerate Skithiryx,” activating that ability will regenerate Quicksilver Elemental, not the Skithiryx, the Blight Dragon it gained the ability from.",
+    "rule": "201.5b If an ability of an object refers to that object by name, and an object with a different name gains that ability, each instance of the first name in the gained ability that refers to the first object by name should be treated as the second name.",
+    "variant": "true",
+    "statement": "Quicksilver Elemental says, in part, “{U}: This creature gains all activated abilities of target creature until end of turn.” If it gains an ability that says “{BB}: Regenerate Skithiryx,” activating that ability will regenerate Quicksilver Elemental, not the Skithiryx, the Blight Dragon it gained the ability from.",
+    "answerKey": "Quicksilver Elemental says, in part, “{U}: This creature gains all activated abilities of target creature until end of turn.” If it gains an ability that says “{BB}: Regenerate Skithiryx,” activating that ability will regenerate Quicksilver Elemental, not the Skithiryx, the Blight Dragon it gained the ability from."
+  },
+  {
+    "ruleId": "202.2a",
+    "example": "Example: An object with a mana cost of {2}{W} is white, an object with a mana cost of {2} is colorless, and one with a mana cost of {2}{W}{B} is both white and black.",
+    "rule": "202.2a The five colors are white, blue, black, red, and green. The white mana symbol is represented by {W}, blue by {U}, black by {B}, red by {R}, and green by {G}.",
+    "variant": "true",
+    "statement": "An object with a mana cost of {2}{W} is white, an object with a mana cost of {2} is colorless, and one with a mana cost of {2}{W}{B} is both white and black.",
+    "answerKey": "An object with a mana cost of {2}{W} is white, an object with a mana cost of {2} is colorless, and one with a mana cost of {2}{W}{B} is both white and black."
+  },
+  {
+    "ruleId": "202.3",
+    "example": "Example: A mana cost of {3}{U}{U} translates to a mana value of 5.",
+    "rule": "202.3. The mana value of an object is a number equal to the total amount of mana in its mana cost, regardless of color.",
+    "variant": "true",
+    "statement": "A mana cost of {3}{U}{U} translates to a mana value of 5.",
+    "answerKey": "A mana cost of {3}{U}{U} translates to a mana value of 5."
+  },
+  {
+    "ruleId": "205.1b",
+    "example": "Example: An ability reads, “All lands are 1/1 creatures that are still lands.” The affected lands now have two card types: creature and land. If there were any lands that were also artifacts before the ability’s effect applied to them, those lands would become “artifact land creatures,” not just “creatures,” or “land creatures.” The effect allows them to retain both the artifact and land card types. In addition, each land affected by the ability retains any land types and supertypes it had before the ability took effect.",
+    "rule": "205.1b Some effects change an object’s card type, supertype, or subtype but specify that the object retains a prior card type, supertype, or subtype. In such cases, all the object’s prior card types, supertypes, and subtypes are retained. This rule applies to effects that use phrases such as “in addition to its other types” or that state that something is “still a [type, supertype, or subtype].” Some effects state that an object becomes an “artifact creature”; these effects also allow the object to retain all of its prior card types and subtypes. Some effects state that an object becomes a “[creature type or types] artifact creature”; these effects also allow the object to retain all of its prior card types and subtypes other than creature types, but replace any existing creature types.",
+    "variant": "true",
+    "statement": "An ability reads, “All lands are 1/1 creatures that are still lands.” The affected lands now have two card types: creature and land. If there were any lands that were also artifacts before the ability’s effect applied to them, those lands would become “artifact land creatures,” not just “creatures,” or “land creatures.” The effect allows them to retain both the artifact and land card types. In addition, each land affected by the ability retains any land types and supertypes it had before the ability took effect.",
+    "answerKey": "An ability reads, “All lands are 1/1 creatures that are still lands.” The affected lands now have two card types: creature and land. If there were any lands that were also artifacts before the ability’s effect applied to them, those lands would become “artifact land creatures,” not just “creatures,” or “land creatures.” The effect allows them to retain both the artifact and land card types. In addition, each land affected by the ability retains any land types and supertypes it had before the ability took effect."
+  },
+  {
+    "ruleId": "208.2a",
+    "example": "Example: Lost Order of Jarkeld has power and toughness each equal to 1+*. It has the abilities “As this creature enters, choose an opponent” and “Lost Order of Jarkeld’s power and toughness are each equal to 1 plus the number of creatures the chosen player controls.” While Lost Order of Jarkeld isn’t on the battlefield, there won’t be a chosen player. Its power and toughness will each be equal to 1 plus 0, so it’s 1/1.",
+    "rule": "208.2a The card may have a characteristic-defining ability that sets its power and/or toughness according to some stated condition. (See rule 604.3.) Such an ability is worded “[This creature’s] [power or toughness] is equal to . . .” or “[This creature’s] power and toughness are each equal to . . .” This ability functions everywhere, even outside the game. If the ability needs to use a number that can’t be determined, including inside a calculation, use 0 instead of that number.",
+    "variant": "true",
+    "statement": "Lost Order of Jarkeld has power and toughness each equal to 1+*. It has the abilities “As this creature enters, choose an opponent” and “Lost Order of Jarkeld’s power and toughness are each equal to 1 plus the number of creatures the chosen player controls.” While Lost Order of Jarkeld isn’t on the battlefield, there won’t be a chosen player. Its power and toughness will each be equal to 1 plus 0, so it’s 1/1.",
+    "answerKey": "Lost Order of Jarkeld has power and toughness each equal to 1+*. It has the abilities “As this creature enters, choose an opponent” and “Lost Order of Jarkeld’s power and toughness are each equal to 1 plus the number of creatures the chosen player controls.” While Lost Order of Jarkeld isn’t on the battlefield, there won’t be a chosen player. Its power and toughness will each be equal to 1 plus 0, so it’s 1/1."
+  },
+  {
+    "ruleId": "302.3",
+    "example": "Example: “Creature — Goblin Wizard” means the card is a creature with the subtypes Goblin and Wizard.",
+    "rule": "302.3. Creature subtypes are usually a single word long and are listed after a long dash: “Creature — Human Soldier,” “Artifact Creature — Golem,” and so on. Creature subtypes are also called creature types. Creatures may have multiple subtypes. See rule 205.3m for the complete list of creature types.",
+    "variant": "true",
+    "statement": "“Creature — Goblin Wizard” means the card is a creature with the subtypes Goblin and Wizard.",
+    "answerKey": "“Creature — Goblin Wizard” means the card is a creature with the subtypes Goblin and Wizard."
+  },
+  {
+    "ruleId": "509.3f",
+    "example": "Example: A creature has the ability “Whenever this creature becomes blocked by a white creature, destroy that creature at end of combat.” If the creature becomes blocked by a black creature that is later turned white, the ability will not trigger.",
+    "rule": "509.3f If an ability triggers when a creature with certain characteristics blocks, it will trigger only if the creature has those characteristics at the point blockers are declared, or at the point an effect causes it to block. If an ability triggers when a creature with certain characteristics becomes blocked, it will trigger only if the creature has those characteristics at the point it becomes a blocked creature. If an ability triggers when a creature becomes blocked by a creature with certain characteristics, it will trigger only if the latter creature has those characteristics at the point it becomes a blocking creature. None of those abilities will trigger if the relevant creature’s characteristics change to match the ability’s trigger condition later on.",
+    "variant": "true",
+    "statement": "A creature has the ability “Whenever this creature becomes blocked by a white creature, destroy that creature at end of combat.” If the creature becomes blocked by a black creature that is later turned white, the ability will not trigger.",
+    "answerKey": "A creature has the ability “Whenever this creature becomes blocked by a white creature, destroy that creature at end of combat.” If the creature becomes blocked by a black creature that is later turned white, the ability will not trigger."
+  },
+  {
+    "ruleId": "510.1c",
+    "example": "Example: An attacking Elvish Regrower (a 4/3 creature) is blocked by Vampire Spawn (a 2/3 creature) and Helpful Hunter (a 1/1 creature). Elvish Regrower’s controller can assign all 4 damage to the Hunter, 1 damage to the Spawn and 3 damage to the Hunter, 2 damage to each creature, 3 damage to the Spawn and 1 damage to the Hunter, or all 4 damage to the Spawn.",
+    "rule": "510.1c A blocked creature assigns its combat damage to the creatures blocking it. If no creatures are currently blocking it (if, for example, they were destroyed or removed from combat), it assigns no combat damage. If exactly one creature is blocking it, it assigns all its combat damage to that creature. If two or more creatures are blocking it, it assigns its combat damage to those creatures divided as its controller chooses among them.",
+    "variant": "true",
+    "statement": "An attacking Elvish Regrower (a 4/3 creature) is blocked by Vampire Spawn (a 2/3 creature) and Helpful Hunter (a 1/1 creature). Elvish Regrower’s controller can assign all 4 damage to the Hunter, 1 damage to the Spawn and 3 damage to the Hunter, 2 damage to each creature, 3 damage to the Spawn and 1 damage to the Hunter, or all 4 damage to the Spawn.",
+    "answerKey": "An attacking Elvish Regrower (a 4/3 creature) is blocked by Vampire Spawn (a 2/3 creature) and Helpful Hunter (a 1/1 creature). Elvish Regrower’s controller can assign all 4 damage to the Hunter, 1 damage to the Spawn and 3 damage to the Hunter, 2 damage to each creature, 3 damage to the Spawn and 1 damage to the Hunter, or all 4 damage to the Spawn."
+  },
+  {
+    "ruleId": "601.3e",
+    "example": "Example: Garruk’s Horde says, in part, “You may cast creature spells from the top of your library.” If you control Garruk’s Horde and the top card of your library is a noncreature card with morph, you may cast it using its morph ability.",
+    "rule": "601.3e Some rules and effects state that an alternative set of characteristics or a subset of characteristics are considered to determine if a card or copy of a card is legal to cast. These alternative characteristics replace the object’s characteristics for this determination. Continuous effects that would apply to that object once it has those characteristics are also considered.",
+    "variant": "true",
+    "statement": "Garruk’s Horde says, in part, “You may cast creature spells from the top of your library.” If you control Garruk’s Horde and the top card of your library is a noncreature card with morph, you may cast it using its morph ability.",
+    "answerKey": "Garruk’s Horde says, in part, “You may cast creature spells from the top of your library.” If you control Garruk’s Horde and the top card of your library is a noncreature card with morph, you may cast it using its morph ability."
+  },
+  {
+    "ruleId": "602.1a",
+    "example": "Example: The activation cost of an ability that reads “{2}, {T}: You gain 1 life” is two mana of any type plus tapping the permanent that has the ability.",
+    "rule": "602.1a The activation cost is everything before the colon (:). An ability’s activation cost must be paid by the player who is activating it.",
+    "variant": "true",
+    "statement": "The activation cost of an ability that reads “{2}, {T}: You gain 1 life” is two mana of any type plus tapping the permanent that has the ability.",
+    "answerKey": "The activation cost of an ability that reads “{2}, {T}: You gain 1 life” is two mana of any type plus tapping the permanent that has the ability."
+  },
+  {
+    "ruleId": "603.10a",
+    "example": "Example: Two creatures are on the battlefield along with an artifact that has the ability “Whenever a creature dies, you gain 1 life.” Someone casts a spell that destroys all artifacts, creatures, and enchantments. The artifact’s ability triggers twice, even though the artifact goes to its owner’s graveyard at the same time as the creatures.",
+    "rule": "603.10a Some zone-change triggers look back in time. These are leaves-the-battlefield abilities, abilities that trigger when a player sacrifices a permanent, abilities that trigger when a card leaves a graveyard, and abilities that trigger when an object that all players can see is put into a hand or library.",
+    "variant": "true",
+    "statement": "Two creatures are on the battlefield along with an artifact that has the ability “Whenever a creature dies, you gain 1 life.” Someone casts a spell that destroys all artifacts, creatures, and enchantments. The artifact’s ability triggers twice, even though the artifact goes to its owner’s graveyard at the same time as the creatures.",
+    "answerKey": "Two creatures are on the battlefield along with an artifact that has the ability “Whenever a creature dies, you gain 1 life.” Someone casts a spell that destroys all artifacts, creatures, and enchantments. The artifact’s ability triggers twice, even though the artifact goes to its owner’s graveyard at the same time as the creatures."
+  },
+  {
+    "ruleId": "603.7c",
+    "example": "Example: An ability that reads “Exile this creature at the beginning of the next end step” will exile the permanent even if it’s no longer a creature during the next end step. However, it won’t do anything if the permanent left the battlefield before then.",
+    "rule": "603.7c A delayed triggered ability that refers to a particular object still affects it even if the object changes characteristics. However, if that object is no longer in the zone it’s expected to be in at the time the delayed triggered ability resolves, the ability won’t affect it. (Note that if that object left that zone and then returned, it’s a new object and thus won’t be affected. See rule 400.7.)",
+    "variant": "true",
+    "statement": "An ability that reads “Exile this creature at the beginning of the next end step” will exile the permanent even if it’s no longer a creature during the next end step. However, it won’t do anything if the permanent left the battlefield before then.",
+    "answerKey": "An ability that reads “Exile this creature at the beginning of the next end step” will exile the permanent even if it’s no longer a creature during the next end step. However, it won’t do anything if the permanent left the battlefield before then."
+  },
+  {
+    "ruleId": "603.8",
+    "example": "Example: A permanent’s ability reads, “Whenever you have no cards in hand, draw a card.” If its controller plays the last card from their hand, the ability will trigger once and won’t trigger again until it has left the stack. If its controller casts a spell that reads “Discard your hand, then draw that many cards,” the ability will trigger during the spell’s resolution because the player’s hand was momentarily empty.",
+    "rule": "603.8. Some triggered abilities trigger when a game state (such as a player controlling no permanents of a particular card type) is true, rather than triggering when an event occurs. These abilities trigger as soon as the game state matches the condition. They’ll go onto the stack at the next available opportunity. These are called state triggers. (Note that state triggers aren’t the same as state-based actions.) A state-triggered ability doesn’t trigger again until the ability has resolved, has been countered, or has otherwise left the stack. Then, if the object with the ability is still in the same zone and the game state still matches its trigger condition, the ability will trigger again.",
+    "variant": "true",
+    "statement": "A permanent’s ability reads, “Whenever you have no cards in hand, draw a card.” If its controller plays the last card from their hand, the ability will trigger once and won’t trigger again until it has left the stack. If its controller casts a spell that reads “Discard your hand, then draw that many cards,” the ability will trigger during the spell’s resolution because the player’s hand was momentarily empty.",
+    "answerKey": "A permanent’s ability reads, “Whenever you have no cards in hand, draw a card.” If its controller plays the last card from their hand, the ability will trigger once and won’t trigger again until it has left the stack. If its controller casts a spell that reads “Discard your hand, then draw that many cards,” the ability will trigger during the spell’s resolution because the player’s hand was momentarily empty."
+  },
+  {
+    "ruleId": "605.4a",
+    "example": "Example: An enchantment reads, “Whenever a player taps a land for mana, that player adds one mana of any type that land produced.” If a player taps lands for mana while casting a spell, the additional mana is added immediately and can be used to pay for the spell.",
+    "rule": "605.4a A triggered mana ability doesn’t go on the stack, so it can’t be targeted, countered, or otherwise responded to. Rather, it resolves immediately after the mana ability that triggered it, without waiting for priority.",
+    "variant": "true",
+    "statement": "An enchantment reads, “Whenever a player taps a land for mana, that player adds one mana of any type that land produced.” If a player taps lands for mana while casting a spell, the additional mana is added immediately and can be used to pay for the spell.",
+    "answerKey": "An enchantment reads, “Whenever a player taps a land for mana, that player adds one mana of any type that land produced.” If a player taps lands for mana while casting a spell, the additional mana is added immediately and can be used to pay for the spell."
+  },
+  {
+    "ruleId": "607.2i",
+    "example": "Example: Stormscape Battlemage has “Kicker {W} and/or {2}{B}” and two abilities that may trigger when it enters the battlefield. The first triggers if it was kicked with its {W} kicker, and the second triggers if it was kicked with its {2}{B} kicker. Each of those triggered abilities is linked to its kicker ability.",
+    "rule": "607.2i If an object has an ability printed on it that allows an additional cost to be paid and an ability printed on it that refers to whether that cost was paid, those abilities are linked. The second refers only to whether the intent to pay the additional cost listed in the first was declared as the object was cast as a spell. If an ability lists multiple such costs, it may have multiple abilities linked to it. Each of those abilities will specify which cost it refers to.",
+    "variant": "true",
+    "statement": "Stormscape Battlemage has “Kicker {W} and/or {2}{B}” and two abilities that may trigger when it enters the battlefield. The first triggers if it was kicked with its {W} kicker, and the second triggers if it was kicked with its {2}{B} kicker. Each of those triggered abilities is linked to its kicker ability.",
+    "answerKey": "Stormscape Battlemage has “Kicker {W} and/or {2}{B}” and two abilities that may trigger when it enters the battlefield. The first triggers if it was kicked with its {W} kicker, and the second triggers if it was kicked with its {2}{B} kicker. Each of those triggered abilities is linked to its kicker ability."
+  },
+  {
+    "ruleId": "607.5",
+    "example": "Example: Arc-Slogger has the ability “{R}, Exile the top ten cards of your library: This creature deals 2 damage to any target.” Sisters of Stone Death has the ability “{B}{G}: Exile target creature blocking or blocked by Sisters of Stone Death” and the ability “{2}{B}: Put a creature card exiled with Sisters of Stone Death onto the battlefield under your control.” Quicksilver Elemental has the ability “{U}: This creature gains all activated abilities of target creature until end of turn.” If a player has Quicksilver Elemental gain Arc-Slogger’s ability, activates it, then has Quicksilver Elemental gain Sisters of Stone Death’s abilities, activates the exile ability, and then activates the return-to-the-battlefield ability, only the creature card Quicksilver Elemental exiled with Sisters of Stone Death’s ability can be returned to the battlefield. Creature cards Quicksilver Elemental exiled with Arc-Slogger’s ability can’t be returned.",
+    "rule": "607.5. If an object acquires a pair of linked abilities as part of the same effect, the abilities will be similarly linked to one another on that object even though they weren’t printed on that object. They can’t be linked to any other ability, regardless of what other abilities the object may currently have or may have had in the past.",
+    "variant": "true",
+    "statement": "Arc-Slogger has the ability “{R}, Exile the top ten cards of your library: This creature deals 2 damage to any target.” Sisters of Stone Death has the ability “{B}{G}: Exile target creature blocking or blocked by Sisters of Stone Death” and the ability “{2}{B}: Put a creature card exiled with Sisters of Stone Death onto the battlefield under your control.” Quicksilver Elemental has the ability “{U}: This creature gains all activated abilities of target creature until end of turn.” If a player has Quicksilver Elemental gain Arc-Slogger’s ability, activates it, then has Quicksilver Elemental gain Sisters of Stone Death’s abilities, activates the exile ability, and then activates the return-to-the-battlefield ability, only the creature card Quicksilver Elemental exiled with Sisters of Stone Death’s ability can be returned to the battlefield. Creature cards Quicksilver Elemental exiled with Arc-Slogger’s ability can’t be returned.",
+    "answerKey": "Arc-Slogger has the ability “{R}, Exile the top ten cards of your library: This creature deals 2 damage to any target.” Sisters of Stone Death has the ability “{B}{G}: Exile target creature blocking or blocked by Sisters of Stone Death” and the ability “{2}{B}: Put a creature card exiled with Sisters of Stone Death onto the battlefield under your control.” Quicksilver Elemental has the ability “{U}: This creature gains all activated abilities of target creature until end of turn.” If a player has Quicksilver Elemental gain Arc-Slogger’s ability, activates it, then has Quicksilver Elemental gain Sisters of Stone Death’s abilities, activates the exile ability, and then activates the return-to-the-battlefield ability, only the creature card Quicksilver Elemental exiled with Sisters of Stone Death’s ability can be returned to the battlefield. Creature cards Quicksilver Elemental exiled with Arc-Slogger’s ability can’t be returned."
+  },
+  {
+    "ruleId": "608.2b",
+    "example": "Example: Sorin’s Thirst is a black instant that reads, “Sorin’s Thirst deals 2 damage to target creature and you gain 2 life.” If the creature isn’t a legal target during the resolution of Sorin’s Thirst (say, if the creature has gained protection from black or left the battlefield), then Sorin’s Thirst doesn’t resolve. Its controller doesn’t gain any life.",
+    "rule": "608.2b If the spell or ability specifies targets, it checks whether the targets are still legal. A target that’s no longer in the zone it was in when it was targeted is illegal. Other changes to the game state may cause a target to no longer be legal; for example, its characteristics may have changed or an effect may have changed the text of the spell. If the source of an ability has left the zone it was in, its last known information is used during this process. If all its targets, for every instance of the word “target,” are now illegal, the spell or ability doesn’t resolve. It’s removed from the stack and, if it’s a spell, put into its owner’s graveyard. Otherwise, the spell or ability will resolve normally. Illegal targets, if any, won’t be affected by parts of a resolving spell’s effect for which they’re illegal. Other parts of the effect for which those targets are not illegal may still affect them. If the spell or ability creates any continuous effects that affect game rules (see rule 613.11), those effects don’t apply to illegal targets. If part of the effect requires information about an illegal target, it fails to determine any such information. Any part of the effect that requires that information won’t happen.",
+    "variant": "true",
+    "statement": "Sorin’s Thirst is a black instant that reads, “Sorin’s Thirst deals 2 damage to target creature and you gain 2 life.” If the creature isn’t a legal target during the resolution of Sorin’s Thirst (say, if the creature has gained protection from black or left the battlefield), then Sorin’s Thirst doesn’t resolve. Its controller doesn’t gain any life.",
+    "answerKey": "Sorin’s Thirst is a black instant that reads, “Sorin’s Thirst deals 2 damage to target creature and you gain 2 life.” If the creature isn’t a legal target during the resolution of Sorin’s Thirst (say, if the creature has gained protection from black or left the battlefield), then Sorin’s Thirst doesn’t resolve. Its controller doesn’t gain any life."
+  },
+  {
+    "ruleId": "609.4a",
+    "example": "Example: A player controls Vedalken Orrery, an artifact that says “You may cast spells as though they had flash.” That player casts Shaman’s Trance, an instant that says, in part, “You may play lands and cast spells from other players’ graveyards this turn as though those cards were in your graveyard.” The player may cast a sorcery with flashback from another player’s graveyard as though it were in that player’s graveyard and as though it had flash.",
+    "rule": "609.4a If two effects state that a player may (or a creature can) do the same thing “as though” different conditions were true, both conditions could apply. If one “as though” effect satisfies the requirements for another “as though” effect, then both effects will apply.",
+    "variant": "true",
+    "statement": "A player controls Vedalken Orrery, an artifact that says “You may cast spells as though they had flash.” That player casts Shaman’s Trance, an instant that says, in part, “You may play lands and cast spells from other players’ graveyards this turn as though those cards were in your graveyard.” The player may cast a sorcery with flashback from another player’s graveyard as though it were in that player’s graveyard and as though it had flash.",
+    "answerKey": "A player controls Vedalken Orrery, an artifact that says “You may cast spells as though they had flash.” That player casts Shaman’s Trance, an instant that says, in part, “You may play lands and cast spells from other players’ graveyards this turn as though those cards were in your graveyard.” The player may cast a sorcery with flashback from another player’s graveyard as though it were in that player’s graveyard and as though it had flash."
+  },
+  {
+    "ruleId": "610.3d",
+    "example": "Example: Two Banisher Priests have each exiled a card. All creatures are destroyed at the same time by Day of Judgment. The two exiled cards are returned to the battlefield at the same time.",
+    "rule": "610.3d If multiple one-shot effects are created this way immediately after one or more simultaneous events, those one-shot effects are also simultaneous.",
+    "variant": "true",
+    "statement": "Two Banisher Priests have each exiled a card. All creatures are destroyed at the same time by Day of Judgment. The two exiled cards are returned to the battlefield at the same time.",
+    "answerKey": "Two Banisher Priests have each exiled a card. All creatures are destroyed at the same time by Day of Judgment. The two exiled cards are returned to the battlefield at the same time."
+  },
+  {
+    "ruleId": "611.2b",
+    "example": "Example: Master Thief has the ability “When this creature enters, gain control of target artifact for as long as you control this creature.” If you lose control of Master Thief before the ability resolves, it does nothing, because its duration—as long as you control Master Thief—was over before the effect began.",
+    "rule": "611.2b Some continuous effects generated by the resolution of a spell or ability have durations worded “for as long as . . . .” If the “for as long as” duration never starts, the effect does nothing. Similarly, if that duration ends before the moment the effect would first be applied and doesn’t begin again during that spell or ability’s resolution, the effect does nothing. It doesn’t start and immediately stop again, and it doesn’t last forever.",
+    "variant": "true",
+    "statement": "Master Thief has the ability “When this creature enters, gain control of target artifact for as long as you control this creature.” If you lose control of Master Thief before the ability resolves, it does nothing, because its duration—as long as you control Master Thief—was over before the effect began.",
+    "answerKey": "Master Thief has the ability “When this creature enters, gain control of target artifact for as long as you control this creature.” If you lose control of Master Thief before the ability resolves, it does nothing, because its duration—as long as you control Master Thief—was over before the effect began."
+  },
+  {
+    "ruleId": "611.2e",
+    "example": "Example: Arbiter of the Ideal puts an artifact, creature, or land card onto the battlefield and says, in part, “That permanent is an enchantment in addition to its other types.” An ability that triggers whenever an enchantment enters the battlefield would trigger. The permanent doesn’t enter the battlefield and then become an enchantment.",
+    "rule": "611.2e If a resolving spell or ability both puts a nontoken permanent onto the battlefield and creates a continuous effect stating that the permanent “is [characteristic],” that it “has [characteristic],” or that it doesn’t have a particular characteristic, that continuous effect applies simultaneously with the permanent entering the battlefield. This characteristic is usually a color or a creature type. If the continuous effect says the permanent “becomes [characteristic]” or “gains [an ability],” that effect applies after the permanent is on the battlefield.",
+    "variant": "true",
+    "statement": "Arbiter of the Ideal puts an artifact, creature, or land card onto the battlefield and says, in part, “That permanent is an enchantment in addition to its other types.” An ability that triggers whenever an enchantment enters the battlefield would trigger. The permanent doesn’t enter the battlefield and then become an enchantment.",
+    "answerKey": "Arbiter of the Ideal puts an artifact, creature, or land card onto the battlefield and says, in part, “That permanent is an enchantment in addition to its other types.” An ability that triggers whenever an enchantment enters the battlefield would trigger. The permanent doesn’t enter the battlefield and then become an enchantment."
+  },
+  {
+    "ruleId": "613.5",
+    "example": "Example: Honor of the Pure is an enchantment that reads “White creatures you control get +1/+1.” Honor of the Pure and a 2/2 black creature are on the battlefield under your control. If an effect then turns the creature white (layer 5), it gets +1/+1 from Honor of the Pure (layer 7c), becoming 3/3. If the creature’s color is later changed to red (layer 5), Honor of the Pure’s effect stops applying to it, and it will return to being 2/2.",
+    "rule": "613.5. The application of continuous effects as described by the layer system is continually and automatically performed by the game. All resulting changes to an object’s characteristics are instantaneous.",
+    "variant": "true",
+    "statement": "Honor of the Pure is an enchantment that reads “White creatures you control get +1/+1.” Honor of the Pure and a 2/2 black creature are on the battlefield under your control. If an effect then turns the creature white (layer 5), it gets +1/+1 from Honor of the Pure (layer 7c), becoming 3/3. If the creature’s color is later changed to red (layer 5), Honor of the Pure’s effect stops applying to it, and it will return to being 2/2.",
+    "answerKey": "Honor of the Pure is an enchantment that reads “White creatures you control get +1/+1.” Honor of the Pure and a 2/2 black creature are on the battlefield under your control. If an effect then turns the creature white (layer 5), it gets +1/+1 from Honor of the Pure (layer 7c), becoming 3/3. If the creature’s color is later changed to red (layer 5), Honor of the Pure’s effect stops applying to it, and it will return to being 2/2."
+  },
+  {
+    "ruleId": "613.6",
+    "example": "Example: An effect that reads “This creature gets +1/+1 and becomes the color of your choice until end of turn” is both a power- and toughness-changing effect and a color-changing effect. The “becomes the color of your choice” part is applied in layer 5, and then the “gets +1/+1” part is applied in layer 7c.",
+    "rule": "613.6. If an effect should be applied in different layers and/or sublayers, the parts of the effect each apply in their appropriate ones. If an effect starts to apply in one layer and/or sublayer, it will continue to be applied to the same set of objects in each other applicable layer and/or sublayer, even if the ability generating the effect is removed during this process.",
+    "variant": "true",
+    "statement": "An effect that reads “This creature gets +1/+1 and becomes the color of your choice until end of turn” is both a power- and toughness-changing effect and a color-changing effect. The “becomes the color of your choice” part is applied in layer 5, and then the “gets +1/+1” part is applied in layer 7c.",
+    "answerKey": "An effect that reads “This creature gets +1/+1 and becomes the color of your choice until end of turn” is both a power- and toughness-changing effect and a color-changing effect. The “becomes the color of your choice” part is applied in layer 5, and then the “gets +1/+1” part is applied in layer 7c."
+  },
+  {
+    "ruleId": "613.7a",
+    "example": "Example: Rune of Flight is an Aura that grants enchanted Equipment “Equipped creature has flying.” A player attaches Rune of Flight to Colossus Hammer, an Equipment with “Equipped creature gets +10/+10 and loses flying.” The ability granted by Rune of Flight shares Rune of Flight’s timestamp because it is later than Colossus Hammer’s timestamp. If Colossus Hammer becomes attached to a creature, both of its abilities receive new timestamps (see rule 613.7e), but the relative order of those timestamps remains the same.",
+    "rule": "613.7a A continuous effect generated by a static ability has the same timestamp as the object the static ability is on, or the timestamp of the effect that created the ability, whichever is later. If the effect that created the ability has the later timestamp and the object the ability is on receives a new timestamp, each continuous effect generated by static abilities of that object receives a new timestamp as well, but the relative order of those timestamps remains the same.",
+    "variant": "true",
+    "statement": "Rune of Flight is an Aura that grants enchanted Equipment “Equipped creature has flying.” A player attaches Rune of Flight to Colossus Hammer, an Equipment with “Equipped creature gets +10/+10 and loses flying.” The ability granted by Rune of Flight shares Rune of Flight’s timestamp because it is later than Colossus Hammer’s timestamp. If Colossus Hammer becomes attached to a creature, both of its abilities receive new timestamps (see rule 613.7e), but the relative order of those timestamps remains the same.",
+    "answerKey": "Rune of Flight is an Aura that grants enchanted Equipment “Equipped creature has flying.” A player attaches Rune of Flight to Colossus Hammer, an Equipment with “Equipped creature gets +10/+10 and loses flying.” The ability granted by Rune of Flight shares Rune of Flight’s timestamp because it is later than Colossus Hammer’s timestamp. If Colossus Hammer becomes attached to a creature, both of its abilities receive new timestamps (see rule 613.7e), but the relative order of those timestamps remains the same."
+  },
+  {
+    "ruleId": "613.9",
+    "example": "Example: Two effects are affecting the same creature: one from an Aura that says “Enchanted creature has flying” and one from an Aura that says “Enchanted creature loses flying.” Neither of these depends on the other, since nothing changes what they affect or what they’re doing to it. Applying them in timestamp order means the one that was generated last “wins.” The same process would be followed, and the same result reached, if either of the effects had a duration (such as “Target creature loses flying until end of turn”) or came from a non-Aura source (such as “All creatures lose flying”).",
+    "rule": "613.9. One continuous effect can override another. Sometimes the results of one effect determine whether another effect applies or what another effect does.",
+    "variant": "true",
+    "statement": "Two effects are affecting the same creature: one from an Aura that says “Enchanted creature has flying” and one from an Aura that says “Enchanted creature loses flying.” Neither of these depends on the other, since nothing changes what they affect or what they’re doing to it. Applying them in timestamp order means the one that was generated last “wins.” The same process would be followed, and the same result reached, if either of the effects had a duration (such as “Target creature loses flying until end of turn”) or came from a non-Aura source (such as “All creatures lose flying”).",
+    "answerKey": "Two effects are affecting the same creature: one from an Aura that says “Enchanted creature has flying” and one from an Aura that says “Enchanted creature loses flying.” Neither of these depends on the other, since nothing changes what they affect or what they’re doing to it. Applying them in timestamp order means the one that was generated last “wins.” The same process would be followed, and the same result reached, if either of the effects had a duration (such as “Target creature loses flying until end of turn”) or came from a non-Aura source (such as “All creatures lose flying”)."
+  },
+  {
+    "ruleId": "614.13a",
+    "example": "Example: Sutured Ghoul says, in part, “As this creature enters, exile any number of creature cards from your graveyard.” If Sutured Ghoul and Runeclaw Bear enter the battlefield from your graveyard at the same time, you can’t choose to exile either of them when applying Sutured Ghoul’s replacement effect.",
+    "rule": "614.13a While applying an effect that modifies how a permanent enters the battlefield, you may have to choose a number of objects that will also change zones. You can’t choose the object that will become that permanent or any other object entering the battlefield at the same time as that object.",
+    "variant": "true",
+    "statement": "Sutured Ghoul says, in part, “As this creature enters, exile any number of creature cards from your graveyard.” If Sutured Ghoul and Runeclaw Bear enter the battlefield from your graveyard at the same time, you can’t choose to exile either of them when applying Sutured Ghoul’s replacement effect.",
+    "answerKey": "Sutured Ghoul says, in part, “As this creature enters, exile any number of creature cards from your graveyard.” If Sutured Ghoul and Runeclaw Bear enter the battlefield from your graveyard at the same time, you can’t choose to exile either of them when applying Sutured Ghoul’s replacement effect."
+  },
+  {
+    "ruleId": "616.1f",
+    "example": "Example: Two permanents are on the battlefield. One is an enchantment that reads “If a card would be put into a graveyard from anywhere, instead exile it,” and the other is a creature that reads “If this creature would die, instead shuffle it into its owner’s library.” If the creature is destroyed, its controller decides which replacement to apply first; the other does nothing.",
+    "rule": "616.1f Once the chosen effect has been applied, this process is repeated (taking into account only replacement or prevention effects that would now be applicable) until there are no more left to apply.",
+    "variant": "true",
+    "statement": "Two permanents are on the battlefield. One is an enchantment that reads “If a card would be put into a graveyard from anywhere, instead exile it,” and the other is a creature that reads “If this creature would die, instead shuffle it into its owner’s library.” If the creature is destroyed, its controller decides which replacement to apply first; the other does nothing.",
+    "answerKey": "Two permanents are on the battlefield. One is an enchantment that reads “If a card would be put into a graveyard from anywhere, instead exile it,” and the other is a creature that reads “If this creature would die, instead shuffle it into its owner’s library.” If the creature is destroyed, its controller decides which replacement to apply first; the other does nothing."
+  },
+  {
+    "ruleId": "616.2",
+    "example": "Example: One effect reads “If you would gain life, draw that many cards instead,” and another reads “If you would draw a card, return a card from your graveyard to your hand instead.” Both effects combine (regardless of the order they came into existence): Instead of gaining 1 life, the player puts a card from their graveyard into their hand.",
+    "rule": "616.2. A replacement or prevention effect can become applicable to an event as the result of another replacement or prevention effect that modifies the event.",
+    "variant": "true",
+    "statement": "One effect reads “If you would gain life, draw that many cards instead,” and another reads “If you would draw a card, return a card from your graveyard to your hand instead.” Both effects combine (regardless of the order they came into existence): Instead of gaining 1 life, the player puts a card from their graveyard into their hand.",
+    "answerKey": "One effect reads “If you would gain life, draw that many cards instead,” and another reads “If you would draw a card, return a card from your graveyard to your hand instead.” Both effects combine (regardless of the order they came into existence): Instead of gaining 1 life, the player puts a card from their graveyard into their hand."
+  },
+  {
+    "ruleId": "700.1",
+    "example": "Example: If an attacking creature is blocked by two creatures, this is one event for a triggered ability that reads “Whenever this creature becomes blocked” but two events for a triggered ability that reads “Whenever this creature becomes blocked by a creature.”",
+    "rule": "700.1. Anything that happens in a game is an event. Multiple events may take place during the resolution of a spell or ability. The text of triggered abilities and replacement effects defines the event they’re looking for. One “happening” may be treated as a single event by one ability and as multiple events by another.",
+    "variant": "true",
+    "statement": "If an attacking creature is blocked by two creatures, this is one event for a triggered ability that reads “Whenever this creature becomes blocked” but two events for a triggered ability that reads “Whenever this creature becomes blocked by a creature.”",
+    "answerKey": "If an attacking creature is blocked by two creatures, this is one event for a triggered ability that reads “Whenever this creature becomes blocked” but two events for a triggered ability that reads “Whenever this creature becomes blocked by a creature.”"
+  },
+  {
+    "ruleId": "700.14",
+    "example": "Example: A player casts Bark-Knuckle Boxer, which costs {1}{G} and reads “Whenever you expend 4, this creature gains indestructible until end of turn.” After it resolves, that player casts Divination, a spell that costs {2}{U}. Prior to paying the cost to cast Divination, that player has spent two mana to cast spells this turn. After paying the cost, they have spent five mana to cast spells this turn. Since they have now spent at least four mana to cast spells this turn, Bark-Knuckle Boxer’s ability triggers.",
+    "rule": "700.14. Some abilities trigger “Whenever you expend N.” A player expends N if they pay a cost to cast a spell and the amount of mana that player spent this turn to cast spells prior to paying that cost was less than N and became at least N after paying that cost.",
+    "variant": "true",
+    "statement": "A player casts Bark-Knuckle Boxer, which costs {1}{G} and reads “Whenever you expend 4, this creature gains indestructible until end of turn.” After it resolves, that player casts Divination, a spell that costs {2}{U}. Prior to paying the cost to cast Divination, that player has spent two mana to cast spells this turn. After paying the cost, they have spent five mana to cast spells this turn. Since they have now spent at least four mana to cast spells this turn, Bark-Knuckle Boxer’s ability triggers.",
+    "answerKey": "A player casts Bark-Knuckle Boxer, which costs {1}{G} and reads “Whenever you expend 4, this creature gains indestructible until end of turn.” After it resolves, that player casts Divination, a spell that costs {2}{U}. Prior to paying the cost to cast Divination, that player has spent two mana to cast spells this turn. After paying the cost, they have spent five mana to cast spells this turn. Since they have now spent at least four mana to cast spells this turn, Bark-Knuckle Boxer’s ability triggers."
+  },
+  {
+    "ruleId": "700.5a",
+    "example": "Example: Altar of the Pantheon is an artifact with no colored mana in its cost and an ability that says “Your devotion to each color and each combination of colors is increased by one.” Purphoros, God of the Forge is a permanent mana cost {3}{R} and an ability that says “As long as your devotion to red is less than five, Purphoros isn’t a creature.” If a player controls both of these permanents and another permanent that costs {R}{R}{R}, that player’s devotion to red is calculated to be five before Purphoros’s type-changing effect is applied, and Purphoros is a creature.",
+    "rule": "700.5a A player’s devotion to each color and combination of colors, taking into account any effects that modify devotion, is calculated after considering any copy, control, or text-changing effects but before any other effects that modify the characteristics of permanents. This is an exception to 613.10. See also rule 613, “Interaction of Continuous Effects.”",
+    "variant": "true",
+    "statement": "Altar of the Pantheon is an artifact with no colored mana in its cost and an ability that says “Your devotion to each color and each combination of colors is increased by one.” Purphoros, God of the Forge is a permanent mana cost {3}{R} and an ability that says “As long as your devotion to red is less than five, Purphoros isn’t a creature.” If a player controls both of these permanents and another permanent that costs {R}{R}{R}, that player’s devotion to red is calculated to be five before Purphoros’s type-changing effect is applied, and Purphoros is a creature.",
+    "answerKey": "Altar of the Pantheon is an artifact with no colored mana in its cost and an ability that says “Your devotion to each color and each combination of colors is increased by one.” Purphoros, God of the Forge is a permanent mana cost {3}{R} and an ability that says “As long as your devotion to red is less than five, Purphoros isn’t a creature.” If a player controls both of these permanents and another permanent that costs {R}{R}{R}, that player’s devotion to red is calculated to be five before Purphoros’s type-changing effect is applied, and Purphoros is a creature."
+  },
+  {
+    "ruleId": "701.24c",
+    "example": "Example: Guile says, in part, “When Guile is put into a graveyard from anywhere, shuffle it into its owner’s library.” It’s put into a graveyard and its ability triggers, then a player exiles it from that graveyard in response. When the ability resolves, the library is shuffled.",
+    "rule": "701.24c If an effect would cause a player to shuffle one or more specific objects into a library, that library is shuffled even if none of those objects are in the zone they’re expected to be in or an effect causes all of those objects to be moved to another zone or remain in their current zone.",
+    "variant": "true",
+    "statement": "Guile says, in part, “When Guile is put into a graveyard from anywhere, shuffle it into its owner’s library.” It’s put into a graveyard and its ability triggers, then a player exiles it from that graveyard in response. When the ability resolves, the library is shuffled.",
+    "answerKey": "Guile says, in part, “When Guile is put into a graveyard from anywhere, shuffle it into its owner’s library.” It’s put into a graveyard and its ability triggers, then a player exiles it from that graveyard in response. When the ability resolves, the library is shuffled."
+  },
+  {
+    "ruleId": "701.24d",
+    "example": "Example: Loaming Shaman says “When this creature enters, target player shuffles any number of target cards from their graveyard into their library.” It enters the battlefield, its ability triggers, and no cards are targeted. When the ability resolves, the targeted player will still have to shuffle their library.",
+    "rule": "701.24d If an effect would cause a player to shuffle a set of objects into a library, that library is shuffled even if there are no objects in that set.",
+    "variant": "true",
+    "statement": "Loaming Shaman says “When this creature enters, target player shuffles any number of target cards from their graveyard into their library.” It enters the battlefield, its ability triggers, and no cards are targeted. When the ability resolves, the targeted player will still have to shuffle their library.",
+    "answerKey": "Loaming Shaman says “When this creature enters, target player shuffles any number of target cards from their graveyard into their library.” It enters the battlefield, its ability triggers, and no cards are targeted. When the ability resolves, the targeted player will still have to shuffle their library."
+  },
+  {
+    "ruleId": "702.15e",
+    "example": "Example: A player controls Ajani’s Pridemate, which reads “Whenever you gain life, put a +1/+1 counter on this creature,” and two creatures with lifelink. The creatures with lifelink deal combat damage simultaneously. Ajani’s Pridemate’s ability triggers twice.",
+    "rule": "702.15e If multiple sources with lifelink deal damage at the same time, they cause separate life gain events (see rules 119.9–10).",
+    "variant": "true",
+    "statement": "A player controls Ajani’s Pridemate, which reads “Whenever you gain life, put a +1/+1 counter on this creature,” and two creatures with lifelink. The creatures with lifelink deal combat damage simultaneously. Ajani’s Pridemate’s ability triggers twice.",
+    "answerKey": "A player controls Ajani’s Pridemate, which reads “Whenever you gain life, put a +1/+1 counter on this creature,” and two creatures with lifelink. The creatures with lifelink deal combat damage simultaneously. Ajani’s Pridemate’s ability triggers twice."
+  },
+  {
+    "ruleId": "702.184c",
+    "example": "Example: Tapestry Warden has as ability that reads “Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power.”",
+    "rule": "702.184c Static abilities may modify the result of a station ability by causing it to use a characteristic other than the tapped creature’s power to determine the number of counters placed on the permanent with the station ability.",
+    "variant": "true",
+    "statement": "Tapestry Warden has as ability that reads “Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power.”",
+    "answerKey": "Tapestry Warden has as ability that reads “Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power.”"
+  },
+  {
+    "ruleId": "702.19c",
+    "example": "Example: A player controls a planeswalker with three loyalty counters that is being attacked by a 1/1 with no abilities and a 7/7 with trample over planeswalkers. The active player could assign 1 damage from the first attacker and 2 damage from the second to the planeswalker and 5 damage to the defending player from the creature with trample over planeswalkers.",
+    "rule": "702.19c Trample over planeswalkers is a variant of trample that modifies the rules for assigning combat damage to planeswalkers. The controller of a creature with trample over planeswalkers assigns that creature’s combat damage as described in rule 702.19b, with one exception. If that creature is attacking a planeswalker, after lethal damage is assigned to all blocking creatures and damage at least equal to the loyalty of the planeswalker the creature is attacking is assigned to that planeswalker, further excess damage may be assigned as the attacking creature’s controller chooses among those blocking creatures, that planeswalker, and that planeswalker’s controller. When checking for assigned damage equal to a planeswalker’s loyalty, take into account damage from other creatures that’s being assigned during the same combat damage step, but not any abilities or effects that might change the amount of damage that’s actually dealt.",
+    "variant": "true",
+    "statement": "A player controls a planeswalker with three loyalty counters that is being attacked by a 1/1 with no abilities and a 7/7 with trample over planeswalkers. The active player could assign 1 damage from the first attacker and 2 damage from the second to the planeswalker and 5 damage to the defending player from the creature with trample over planeswalkers.",
+    "answerKey": "A player controls a planeswalker with three loyalty counters that is being attacked by a 1/1 with no abilities and a 7/7 with trample over planeswalkers. The active player could assign 1 damage from the first attacker and 2 damage from the second to the planeswalker and 5 damage to the defending player from the creature with trample over planeswalkers."
+  },
+  {
+    "ruleId": "702.1b",
+    "example": "Example: Volcano Hellion has the ability “This creature has echo {X}, where X is your life total.” If your life total is 10 when Volcano Hellion’s echo ability triggers but 5 when it resolves, the echo cost to pay is {5}.",
+    "rule": "702.1b An effect that grants an object a keyword ability may define a variable in that ability based on characteristics of that object or other information about the game state. For these abilities, the value of that variable is constantly reevaluated.",
+    "variant": "true",
+    "statement": "Volcano Hellion has the ability “This creature has echo {X}, where X is your life total.” If your life total is 10 when Volcano Hellion’s echo ability triggers but 5 when it resolves, the echo cost to pay is {5}.",
+    "answerKey": "Volcano Hellion has the ability “This creature has echo {X}, where X is your life total.” If your life total is 10 when Volcano Hellion’s echo ability triggers but 5 when it resolves, the echo cost to pay is {5}."
+  },
+  {
+    "ruleId": "702.44c",
+    "example": "Example: The ability “Modular—Sunburst” means “This permanent enters with a +1/+1 counter on it for each color of mana spent to cast it” and “When this permanent is put into a graveyard from the battlefield, you may put a +1/+1 counter on target artifact creature for each +1/+1 counter on this permanent.”",
+    "rule": "702.44c Sunburst can also be used to set a variable number for another ability. If the keyword is used in this way, it doesn’t matter whether the ability is on a creature spell or on a noncreature spell.",
+    "variant": "true",
+    "statement": "The ability “Modular—Sunburst” means “This permanent enters with a +1/+1 counter on it for each color of mana spent to cast it” and “When this permanent is put into a graveyard from the battlefield, you may put a +1/+1 counter on target artifact creature for each +1/+1 counter on this permanent.”",
+    "answerKey": "The ability “Modular—Sunburst” means “This permanent enters with a +1/+1 counter on it for each color of mana spent to cast it” and “When this permanent is put into a graveyard from the battlefield, you may put a +1/+1 counter on target artifact creature for each +1/+1 counter on this permanent.”"
+  },
+  {
+    "ruleId": "702.65b",
+    "example": "Example: You activate the aura swap ability of an Aura. The only Aura card in your hand can’t enchant the permanent that’s enchanted by the Aura with aura swap. The ability has no effect.",
+    "rule": "702.65b If either half of the exchange can’t be completed, the ability has no effect.",
+    "variant": "true",
+    "statement": "You activate the aura swap ability of an Aura. The only Aura card in your hand can’t enchant the permanent that’s enchanted by the Aura with aura swap. The ability has no effect.",
+    "answerKey": "You activate the aura swap ability of an Aura. The only Aura card in your hand can’t enchant the permanent that’s enchanted by the Aura with aura swap. The ability has no effect."
+  },
+  {
+    "ruleId": "707.4",
+    "example": "Example: Unstable Shapeshifter reads, “Whenever another creature enters, this creature becomes a copy of that creature, except it has this ability.” It’s affected by Giant Growth, which reads “Target creature gets +3/+3 until end of turn.” If a creature enters the battlefield later this turn, Unstable Shapeshifter will become a copy of that creature, but it will still get +3/+3 from the Giant Growth.",
+    "rule": "707.4. Some effects cause a permanent that’s copying a permanent to copy a different object while remaining on the battlefield. The change doesn’t cause enters-the-battlefield or leaves-the-battlefield abilities to trigger. This also doesn’t change any noncopy effects presently affecting the permanent.",
+    "variant": "true",
+    "statement": "Unstable Shapeshifter reads, “Whenever another creature enters, this creature becomes a copy of that creature, except it has this ability.” It’s affected by Giant Growth, which reads “Target creature gets +3/+3 until end of turn.” If a creature enters the battlefield later this turn, Unstable Shapeshifter will become a copy of that creature, but it will still get +3/+3 from the Giant Growth.",
+    "answerKey": "Unstable Shapeshifter reads, “Whenever another creature enters, this creature becomes a copy of that creature, except it has this ability.” It’s affected by Giant Growth, which reads “Target creature gets +3/+3 until end of turn.” If a creature enters the battlefield later this turn, Unstable Shapeshifter will become a copy of that creature, but it will still get +3/+3 from the Giant Growth."
+  },
+  {
+    "ruleId": "707.5",
+    "example": "Example: Skyshroud Behemoth reads, “Fading 2 (This creature enters with two fade counters on it. At the beginning of your upkeep, remove a fade counter from it. If you can’t, sacrifice it.)” and “This creature enters tapped.” A Clone that enters the battlefield as a copy of a Skyshroud Behemoth will also enter the battlefield tapped with two fade counters on it.",
+    "rule": "707.5. An object that enters the battlefield “as a copy” or “that’s a copy” of another object becomes a copy as it enters the battlefield. It doesn’t enter the battlefield, and then become a copy of that permanent. If the text that’s being copied includes any abilities that replace the enters-the-battlefield event (such as “enters with” or “as [this] enters” abilities), those abilities will take effect. Also, any enters-the-battlefield triggered abilities of the copy will have a chance to trigger.",
+    "variant": "true",
+    "statement": "Skyshroud Behemoth reads, “Fading 2 (This creature enters with two fade counters on it. At the beginning of your upkeep, remove a fade counter from it. If you can’t, sacrifice it.)” and “This creature enters tapped.” A Clone that enters the battlefield as a copy of a Skyshroud Behemoth will also enter the battlefield tapped with two fade counters on it.",
+    "answerKey": "Skyshroud Behemoth reads, “Fading 2 (This creature enters with two fade counters on it. At the beginning of your upkeep, remove a fade counter from it. If you can’t, sacrifice it.)” and “This creature enters tapped.” A Clone that enters the battlefield as a copy of a Skyshroud Behemoth will also enter the battlefield tapped with two fade counters on it."
+  },
+  {
+    "ruleId": "709.4b",
+    "example": "Example: Assault//Battery’s mana cost is {3}{R}{G}. It’s a red and green card with a mana value of 5. If you cast Assault, the resulting spell is a red spell with a mana value of 1.",
+    "rule": "709.4b The mana cost of a split card is the combined mana costs of its two halves. A split card’s colors and mana value are determined from its combined mana cost. An effect that refers specifically to the symbols in a split card’s mana cost sees the separate symbols rather than the whole mana cost.",
+    "variant": "true",
+    "statement": "Assault//Battery’s mana cost is {3}{R}{G}. It’s a red and green card with a mana value of 5. If you cast Assault, the resulting spell is a red spell with a mana value of 1.",
+    "answerKey": "Assault//Battery’s mana cost is {3}{R}{G}. It’s a red and green card with a mana value of 5. If you cast Assault, the resulting spell is a red spell with a mana value of 1."
+  },
+  {
+    "ruleId": "712.21",
+    "example": "Example: Chittering Host, a melded permanent, dies. An ability that triggers “whenever a creature dies” triggers once. An ability that triggers “whenever a card is put into a graveyard from anywhere” triggers twice.",
+    "rule": "712.21. If a melded permanent leaves the battlefield, one permanent leaves the battlefield and two cards are put into the appropriate zone.",
+    "variant": "true",
+    "statement": "Chittering Host, a melded permanent, dies. An ability that triggers “whenever a creature dies” triggers once. An ability that triggers “whenever a card is put into a graveyard from anywhere” triggers twice.",
+    "answerKey": "Chittering Host, a melded permanent, dies. An ability that triggers “whenever a creature dies” triggers once. An ability that triggers “whenever a card is put into a graveyard from anywhere” triggers twice."
+  },
+  {
+    "ruleId": "712.21b",
+    "example": "Example: Duplicant is a card with the abilities “When Duplicant enters, you may exile target nontoken creature” and “As long as a card exiled with Duplicant is a creature card, Duplicant has the power, toughness, and creature types of the last creature card exiled with Duplicant. It’s still a Shapeshifter.” As Duplicant’s first ability exiles Chittering Host, a melded permanent, Duplicant’s controller chooses whether the last creature card exiled is Midnight Scavengers or Graf Rats.",
+    "rule": "712.21b If a player exiles a melded permanent, that player determines the relative timestamp order of the two cards at that time. This is an exception to the procedure described in rule 613.7m.",
+    "variant": "true",
+    "statement": "Duplicant is a card with the abilities “When Duplicant enters, you may exile target nontoken creature” and “As long as a card exiled with Duplicant is a creature card, Duplicant has the power, toughness, and creature types of the last creature card exiled with Duplicant. It’s still a Shapeshifter.” As Duplicant’s first ability exiles Chittering Host, a melded permanent, Duplicant’s controller chooses whether the last creature card exiled is Midnight Scavengers or Graf Rats.",
+    "answerKey": "Duplicant is a card with the abilities “When Duplicant enters, you may exile target nontoken creature” and “As long as a card exiled with Duplicant is a creature card, Duplicant has the power, toughness, and creature types of the last creature card exiled with Duplicant. It’s still a Shapeshifter.” As Duplicant’s first ability exiles Chittering Host, a melded permanent, Duplicant’s controller chooses whether the last creature card exiled is Midnight Scavengers or Graf Rats."
+  },
+  {
+    "ruleId": "712.21c",
+    "example": "Example: Otherworldly Journey is an instant that reads “Exile target creature. At the beginning of the next end step, return that card to the battlefield under its owner’s control with a +1/+1 counter on it.” A player casts Otherworldly Journey targeting Chittering Host, a melded permanent. Chittering Host is exiled. At the beginning of the next end step, Midnight Scavengers and Graf Rats are both returned to the battlefield, each with a +1/+1 counter on it.",
+    "rule": "712.21c If an effect can find the new object that a melded permanent becomes as it leaves the battlefield, it finds both cards. (See rule 400.7.) If that effect causes actions to be taken upon those cards, the same actions are taken upon each of them.",
+    "variant": "true",
+    "statement": "Otherworldly Journey is an instant that reads “Exile target creature. At the beginning of the next end step, return that card to the battlefield under its owner’s control with a +1/+1 counter on it.” A player casts Otherworldly Journey targeting Chittering Host, a melded permanent. Chittering Host is exiled. At the beginning of the next end step, Midnight Scavengers and Graf Rats are both returned to the battlefield, each with a +1/+1 counter on it.",
+    "answerKey": "Otherworldly Journey is an instant that reads “Exile target creature. At the beginning of the next end step, return that card to the battlefield under its owner’s control with a +1/+1 counter on it.” A player casts Otherworldly Journey targeting Chittering Host, a melded permanent. Chittering Host is exiled. At the beginning of the next end step, Midnight Scavengers and Graf Rats are both returned to the battlefield, each with a +1/+1 counter on it."
+  },
+  {
+    "ruleId": "723.4",
+    "example": "Example: The controller of a player can see that player’s hand and the face of any face-down creatures they control.",
+    "rule": "723.4. If information about an object in the game would be visible to the player being controlled, it’s visible to both that player and the controller of the player. If information about cards outside the game would be visible to the player being controlled, it’s visible only to that player, not the controller of the player.",
+    "variant": "true",
+    "statement": "The controller of a player can see that player’s hand and the face of any face-down creatures they control.",
+    "answerKey": "The controller of a player can see that player’s hand and the face of any face-down creatures they control."
+  },
+  {
+    "ruleId": "723.5",
+    "example": "Example: The controller of another player decides which spells that player casts and what those spells target, and makes any required decisions when those spells resolve.",
+    "rule": "723.5. While controlling another player, a player makes all choices and decisions the controlled player is allowed to make or is told to make by the rules or by any objects. This includes choices and decisions about what to play, and choices and decisions called for by spells and abilities.",
+    "variant": "true",
+    "statement": "The controller of another player decides which spells that player casts and what those spells target, and makes any required decisions when those spells resolve.",
+    "answerKey": "The controller of another player decides which spells that player casts and what those spells target, and makes any required decisions when those spells resolve."
+  },
+  {
+    "ruleId": "732.2a",
+    "example": "Example: A player controls a creature enchanted by Presence of Gond, which grants the creature the ability “{T}: Create a 1/1 green Elf Warrior creature token,” and another player controls Intruder Alarm, which reads, in part, “Whenever a creature enters, untap all creatures.” When the player has priority, they may suggest “I’ll create a million tokens,” indicating the sequence of activating the creature’s ability, all players passing priority, letting the creature’s ability resolve and create a token (which causes Intruder Alarm’s ability to trigger), Intruder Alarm’s controller putting that triggered ability on the stack, all players passing priority, Intruder Alarm’s triggered ability resolving, all players passing priority until the player proposing the shortcut has priority, and repeating that sequence 999,999 more times, ending just after the last token-creating ability resolves.",
+    "rule": "732.2a At any point in the game, the player with priority may suggest a shortcut by describing a sequence of game choices, for all players, that may be legally taken based on the current game state and the predictable results of the sequence of choices. This sequence may be a non-repetitive series of choices, a loop that repeats a specified number of times, multiple loops, or nested loops, and may even cross multiple turns. It can’t include conditional actions, where the outcome of a game event determines the next action a player takes. The ending point of this sequence must be a place where a player has priority, though it need not be the player proposing the shortcut.",
+    "variant": "true",
+    "statement": "A player controls a creature enchanted by Presence of Gond, which grants the creature the ability “{T}: Create a 1/1 green Elf Warrior creature token,” and another player controls Intruder Alarm, which reads, in part, “Whenever a creature enters, untap all creatures.” When the player has priority, they may suggest “I’ll create a million tokens,” indicating the sequence of activating the creature’s ability, all players passing priority, letting the creature’s ability resolve and create a token (which causes Intruder Alarm’s ability to trigger), Intruder Alarm’s controller putting that triggered ability on the stack, all players passing priority, Intruder Alarm’s triggered ability resolving, all players passing priority until the player proposing the shortcut has priority, and repeating that sequence 999,999 more times, ending just after the last token-creating ability resolves.",
+    "answerKey": "A player controls a creature enchanted by Presence of Gond, which grants the creature the ability “{T}: Create a 1/1 green Elf Warrior creature token,” and another player controls Intruder Alarm, which reads, in part, “Whenever a creature enters, untap all creatures.” When the player has priority, they may suggest “I’ll create a million tokens,” indicating the sequence of activating the creature’s ability, all players passing priority, letting the creature’s ability resolve and create a token (which causes Intruder Alarm’s ability to trigger), Intruder Alarm’s controller putting that triggered ability on the stack, all players passing priority, Intruder Alarm’s triggered ability resolving, all players passing priority until the player proposing the shortcut has priority, and repeating that sequence 999,999 more times, ending just after the last token-creating ability resolves."
+  },
+  {
+    "ruleId": "732.5",
+    "example": "Example: A player controls Seal of Cleansing, an enchantment that reads, “Sacrifice Seal of Cleansing: Destroy target artifact or enchantment.” A mandatory loop that involves an artifact begins. The player is not forced to sacrifice Seal of Cleansing to destroy the artifact and end the loop.",
+    "rule": "732.5. No player can be forced to perform an action that would end a loop other than actions called for by objects involved in the loop.",
+    "variant": "true",
+    "statement": "A player controls Seal of Cleansing, an enchantment that reads, “Sacrifice Seal of Cleansing: Destroy target artifact or enchantment.” A mandatory loop that involves an artifact begins. The player is not forced to sacrifice Seal of Cleansing to destroy the artifact and end the loop.",
+    "answerKey": "A player controls Seal of Cleansing, an enchantment that reads, “Sacrifice Seal of Cleansing: Destroy target artifact or enchantment.” A mandatory loop that involves an artifact begins. The player is not forced to sacrifice Seal of Cleansing to destroy the artifact and end the loop."
+  },
+  {
+    "ruleId": "801.2c",
+    "example": "Example: In a game with a range of influence of 1, Alex is seated to the left of Rob, and Carissa is seated to the right of Rob. Carissa is not in Alex’s range of influence. If Rob leaves the game, Carissa will enter Alex’s range of influence at the start of the next turn.",
+    "rule": "801.2c The particular players within each player’s range of influence are determined as each turn begins.",
+    "variant": "true",
+    "statement": "In a game with a range of influence of 1, Alex is seated to the left of Rob, and Carissa is seated to the right of Rob. Carissa is not in Alex’s range of influence. If Rob leaves the game, Carissa will enter Alex’s range of influence at the start of the next turn.",
+    "answerKey": "In a game with a range of influence of 1, Alex is seated to the left of Rob, and Carissa is seated to the right of Rob. Carissa is not in Alex’s range of influence. If Rob leaves the game, Carissa will enter Alex’s range of influence at the start of the next turn."
+  },
+  {
+    "ruleId": "801.7a",
+    "example": "Example: Carissa and Alex are outside each other’s range of influence. Carissa controls a Runeclaw Bear owned by Alex and they each control an Extractor Demon, a creature which reads, in part, “Whenever another creature leaves the battlefield, you may have target player mill two cards.” The Runeclaw Bear is destroyed and is put into Alex’s graveyard. The ability of Alex’s Extractor Demon doesn’t trigger because the leaves-the-battlefield event was outside Alex’s range of influence. The ability of Carissa’s Extractor Demon does trigger, even though the creature is going to a graveyard outside her range, because the leaves-the-battlefield event was within her range.",
+    "rule": "801.7a If a trigger event includes an object moving out of or into a player’s range of influence, use the game state before or after the event as appropriate to determine whether the triggered ability will trigger. See rules 603.6 and 603.10.",
+    "variant": "true",
+    "statement": "Carissa and Alex are outside each other’s range of influence. Carissa controls a Runeclaw Bear owned by Alex and they each control an Extractor Demon, a creature which reads, in part, “Whenever another creature leaves the battlefield, you may have target player mill two cards.” The Runeclaw Bear is destroyed and is put into Alex’s graveyard. The ability of Alex’s Extractor Demon doesn’t trigger because the leaves-the-battlefield event was outside Alex’s range of influence. The ability of Carissa’s Extractor Demon does trigger, even though the creature is going to a graveyard outside her range, because the leaves-the-battlefield event was within her range.",
+    "answerKey": "Carissa and Alex are outside each other’s range of influence. Carissa controls a Runeclaw Bear owned by Alex and they each control an Extractor Demon, a creature which reads, in part, “Whenever another creature leaves the battlefield, you may have target player mill two cards.” The Runeclaw Bear is destroyed and is put into Alex’s graveyard. The ability of Alex’s Extractor Demon doesn’t trigger because the leaves-the-battlefield event was outside Alex’s range of influence. The ability of Carissa’s Extractor Demon does trigger, even though the creature is going to a graveyard outside her range, because the leaves-the-battlefield event was within her range."
+  },
+  {
+    "ruleId": "810.9a",
+    "example": "Example: In a Two-Headed Giant game, a player on a team that has 17 life is targeted by Beacon of Immortality, which reads, in part, “Double target player’s life total.” That player gains 17 life, so the team winds up at 34 life.",
+    "rule": "810.9a If a cost or effect needs to know the value of an individual player’s life total, that cost or effect uses the team’s life total instead.",
+    "variant": "true",
+    "statement": "In a Two-Headed Giant game, a player on a team that has 17 life is targeted by Beacon of Immortality, which reads, in part, “Double target player’s life total.” That player gains 17 life, so the team winds up at 34 life.",
+    "answerKey": "In a Two-Headed Giant game, a player on a team that has 17 life is targeted by Beacon of Immortality, which reads, in part, “Double target player’s life total.” That player gains 17 life, so the team winds up at 34 life."
+  },
+  {
+    "ruleId": "903.4d",
+    "example": "Example: Civilized Scholar is the front face of a double-faced card with mana cost {2}{U}. Homicidal Brute is the back face of that double-faced card and has a red color indicator. The card’s color identity is blue and red.",
+    "rule": "903.4d The back face of a double-faced card (see rule 712) is included when determining a card’s color identity. This is an exception to rule 712.8a.",
+    "variant": "true",
+    "statement": "Civilized Scholar is the front face of a double-faced card with mana cost {2}{U}. Homicidal Brute is the back face of that double-faced card and has a red color indicator. The card’s color identity is blue and red.",
+    "answerKey": "Civilized Scholar is the front face of a double-faced card with mana cost {2}{U}. Homicidal Brute is the back face of that double-faced card and has a red color indicator. The card’s color identity is blue and red."
+  },
+  {
+    "ruleId": "903.5c",
+    "example": "Example: Wort, the Raidmother is a legendary creature with mana cost {4}{R/G}{R/G}. Wort’s color identity is red and green. Each card in a Wort Commander deck must be only red, only green, both red and green, or have no color. Each mana symbol in the mana cost or rules text of a card in this deck must be only red, only green, both red and green, or have no color.",
+    "rule": "903.5c A card can be included in a Commander deck only if every color in its color identity is also found in the color identity of the deck’s commander.",
+    "variant": "true",
+    "statement": "Wort, the Raidmother is a legendary creature with mana cost {4}{R/G}{R/G}. Wort’s color identity is red and green. Each card in a Wort Commander deck must be only red, only green, both red and green, or have no color. Each mana symbol in the mana cost or rules text of a card in this deck must be only red, only green, both red and green, or have no color.",
+    "answerKey": "Wort, the Raidmother is a legendary creature with mana cost {4}{R/G}{R/G}. Wort’s color identity is red and green. Each card in a Wort Commander deck must be only red, only green, both red and green, or have no color. Each mana symbol in the mana cost or rules text of a card in this deck must be only red, only green, both red and green, or have no color."
+  },
+  {
+    "ruleId": "903.5d",
+    "example": "Example: Wort, the Raidmother’s color identity is red and green. A Wort Commander deck may include land cards with the basic land types Mountain and/or Forest. It can’t include any land cards with the basic land types Plains, Island, or Swamp.",
+    "rule": "903.5d A card with a basic land type may be included in a Commander deck only if each color of mana it could produce is included in the commander’s color identity.",
+    "variant": "true",
+    "statement": "Wort, the Raidmother’s color identity is red and green. A Wort Commander deck may include land cards with the basic land types Mountain and/or Forest. It can’t include any land cards with the basic land types Plains, Island, or Swamp.",
+    "answerKey": "Wort, the Raidmother’s color identity is red and green. A Wort Commander deck may include land cards with the basic land types Mountain and/or Forest. It can’t include any land cards with the basic land types Plains, Island, or Swamp."
+  }
+]

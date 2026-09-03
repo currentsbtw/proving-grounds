@@ -1,0 +1,189 @@
+# Cards whose Wizards-authored Scryfall rulings seed the judge eval.
+# One exact card name per line. Blank lines and # comments are ignored.
+# npm run eval:build resolves each against Scryfall and prints any it drops.
+
+# From src/data/citations.ts (the pressure deck's own cards).
+Ad Nauseam
+Aetherflux Reservoir
+Anguished Unmaking
+Approach of the Second Sun
+Arcane Denial
+Beast Within
+Blasphemous Act
+Burglar Rat
+Chaos Warp
+Counterspell
+Craterhoof Behemoth
+Cyclonic Rift
+Damnation
+Day of Judgment
+Deadly Rollick
+Despark
+Devastation Tide
+Diabolic Edict
+Dockside Extortionist
+Esper Sentinel
+Essence Scatter
+Expropriate
+Exsanguinate
+Farewell
+Fateful Absence
+Fierce Guardianship
+Fleshbag Marauder
+Food Chain
+Force of Negation
+Force of Will
+Generous Gift
+Go for the Throat
+Hour of Revelation
+Infernal Grasp
+Innocent Blood
+Insurrection
+Kiki-Jiki, Mirror Breaker
+Krosan Grip
+Liliana of the Veil
+Mana Drain
+Mystic Remora
+Negate
+Overwhelming Stampede
+Pact of Negation
+Path to Exile
+Plaguecrafter
+Planar Cleansing
+Pongify
+Rewind
+Rhystic Study
+Ruinous Ultimatum
+Smothering Tithe
+Sunfall
+Swan Song
+Swords to Plowshares
+Syphon Mind
+Torment of Hailfire
+Toxic Deluge
+Triumph of the Hordes
+Underworld Breach
+Vanquish the Horde
+Vindicate
+Wrath of God
+
+# Commander staples picked for rules density.
+Sol Ring
+Arcane Signet
+Command Tower
+Teferi's Protection
+Thassa's Oracle
+Demonic Consultation
+Laboratory Maniac
+Jace, Wielder of Mysteries
+Blood Moon
+Winter Orb
+Thalia, Guardian of Thraben
+Grand Abolisher
+Deflecting Swat
+Flawless Maneuver
+Rest in Peace
+Torpor Orb
+Solemnity
+Humility
+Blood Artist
+Zulaport Cutthroat
+Viscera Seer
+Ashnod's Altar
+Phyrexian Altar
+Exquisite Blood
+Sanguine Bond
+Zealous Conscripts
+Splinter Twin
+Deceiver Exarch
+Squee, the Immortal
+Brain Freeze
+Lion's Eye Diamond
+Isochron Scepter
+Dramatic Reversal
+Bolas's Citadel
+Necropotence
+Angel's Grace
+Tainted Pact
+Heroic Intervention
+Teferi, Time Raveler
+Narset, Parter of Veils
+Opposition Agent
+Drannith Magistrate
+Rule of Law
+Deafening Silence
+Stasis
+Static Orb
+Sphere of Resistance
+Trinisphere
+The Gitrog Monster
+Dark Depths
+Thespian's Stage
+Vampire Hexmage
+Sakashima of a Thousand Faces
+Sakashima's Student
+Spark Double
+Helm of the Host
+Lightning Greaves
+Swiftfoot Boots
+Darksteel Plate
+Shielded by Faith
+Yawgmoth, Thran Physician
+Nim Deathmantle
+Reveillark
+Karmic Guide
+Kaalia of the Vast
+Edgar Markov
+Krenko, Mob Boss
+Atraxa, Praetors' Voice
+Ezuri, Claw of Progress
+Meren of Clan Nel Toth
+Muldrotha, the Gravetide
+Tergrid, God of Fright
+Korvold, Fae-Cursed King
+Prosper, Tome-Bound
+Yuriko, the Tiger's Shadow
+Tymna the Weaver
+Thrasios, Triton Hero
+Rograkh, Son of Rohgahh
+Kraum, Ludevic's Opus
+Najeela, the Blade-Blossom
+Derevi, Empyrial Tactician
+Golos, Tireless Pilgrim
+Leovold, Emissary of Trest
+Sen Triplets
+Hullbreacher
+Consecrated Sphinx
+Mana Crypt
+Mana Vault
+Jeweled Lotus
+Chrome Mox
+Mox Diamond
+Panoptic Mirror
+Time Warp
+Mass Hysteria
+Sunforger
+Dualcaster Mage
+Ghostly Flicker
+Ephemerate
+Eternal Witness
+Riftsweeper
+Hushbringer
+Sensei's Divining Top
+Mystic Forge
+Scroll Rack
+Land Tax
+Field of the Dead
+Cabal Coffers
+Urborg, Tomb of Yawgmoth
+Strip Mine
+Wasteland
+Glacial Chasm
+Maze of Ith
+Kor Haven
+Homeward Path
+Command Beacon
+Leyline of the Void
+Dauthi Voidwalker
+Bojuka Bog
+Scavenger Grounds

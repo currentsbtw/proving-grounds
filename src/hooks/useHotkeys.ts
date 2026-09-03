@@ -59,8 +59,21 @@ function blurActiveControl(): void {
   if (el.matches('button, [role="button"], a[href], summary, [tabindex]')) el.blur();
 }
 
-/** Fired by the note hotkey; the run log's note input focuses itself on it. */
-export const FOCUS_NOTE_EVENT = 'pg:focus-note';
+/**
+ * "Open this drawer, then put the cursor in the box it owns." Answered twice on
+ * the way in: the readout column opens the named drawer and re-fires, and the
+ * panel that drawer mounts focuses its own field. Two steps because the box the
+ * key is aimed at does not exist until the drawer is open.
+ *
+ * One event serves the note box and the judge's ask box; `detail.drawer` says
+ * which, so a new drawer with a field costs a map entry rather than a listener.
+ */
+export const FOCUS_DRAWER_EVENT = 'pg:focus-drawer';
+
+export type FocusDrawerDetail = { drawer: 'notes' | 'judge' };
+
+/** The name the run log listens on. Same event; notes are its only target. */
+export const FOCUS_NOTE_EVENT = FOCUS_DRAWER_EVENT;
 
 /**
  * Fired by the two response hotkeys. The active event card answers it, because
@@ -186,7 +199,12 @@ export function useHotkeys(): void {
           window.dispatchEvent(new CustomEvent(STACK_ABILITY_EVENT));
           break;
         case 'focusNote':
-          window.dispatchEvent(new CustomEvent(FOCUS_NOTE_EVENT));
+        case 'judge':
+          window.dispatchEvent(
+            new CustomEvent<FocusDrawerDetail>(FOCUS_DRAWER_EVENT, {
+              detail: { drawer: action === 'judge' ? 'judge' : 'notes' },
+            }),
+          );
           break;
         case 'respondOne':
         case 'respondTwo':

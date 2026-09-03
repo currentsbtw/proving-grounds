@@ -1,0 +1,25 @@
+[
+  {
+    "id": "981b0e21-e5e6-4a1e-bfde-679d56623f7f#0",
+    "card": "Ad Nauseam",
+    "question": "I cast Ad Nauseam at 22 life in my Commander game. When it starts resolving, do I have to announce up front how many cards I'm going to reveal and take, or can I keep deciding card by card as I go?",
+    "answerKey": "You don't decide in advance how many cards to put into your hand this way. Each time you put the revealed card into your hand and lose the appropriate amount of life, you then decide whether to continue by revealing another card.",
+    "ruling": "Each time you put the revealed card into your hand and lose the appropriate amount of life, you decide whether to continue by revealing another card. You don't decide in advance how many cards to put into your hand this way.",
+    "publishedAt": "2026-03-20",
+    "source": "wotc",
+    "otherCards": []
+  },
+  {
+    "id": "981b0e21-e5e6-4a1e-bfde-679d56623f7f#1",
+    "card": "Ad Nauseam",
+    "question": "I cast Ad Nauseam and choose to repeat the process twice. The first card revealed is Fireball (mana cost {X}{R}) and the second is Blue Sun's Zenith (mana cost {X}{U}{U}{U}). How much life do I lose in total from those two cards?",
+    "answerKey": "You lose 5 life. For a card in a library (or anywhere outside the stack), X in a mana cost is 0, so Fireball's mana value is 1 and Blue Sun's Zenith's is 4 — 1 + 4 = 5.",
+    "ruling": "If a card in a player's library has {X} in its mana cost, X is 0 for the purpose of determining its mana value.",
+    "publishedAt": "2026-03-20",
+    "source": "wotc",
+    "otherCards": [
+      "Fireball",
+      "Blue Sun's Zenith"
+    ]
+  }
+]

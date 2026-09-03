@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../state/gameStore';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
-import { FOCUS_NOTE_EVENT, isTypingTarget } from '../../hooks/useHotkeys';
+import { FOCUS_DRAWER_EVENT, isTypingTarget } from '../../hooks/useHotkeys';
+import type { FocusDrawerDetail } from '../../hooks/useHotkeys';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import JudgePanel from '../judge/JudgePanel';
 import EventDock from '../pressure/EventDock';
 import { seatLabel } from '../pressure/pressureUi';
 import EndRunControls from '../hud/components/EndRunControls';
@@ -15,7 +17,7 @@ import '../pressure/pressure.css';
 import './readout.css';
 
 /** The drawers behind the foot tabs. `keys` is the hotkey overlay, not a drawer. */
-type DrawerId = 'log' | 'notes' | 'tokens' | 'endrun';
+type DrawerId = 'log' | 'notes' | 'tokens' | 'judge' | 'endrun';
 
 /** Shown once after a wipe resolves; the board it swept is not the whole truth. */
 const WIPE_HINT = 'Drag back anything that survived: indestructible, regenerated, protected.';
@@ -28,8 +30,23 @@ const TAB_LABEL: Record<DrawerId, string> = {
   log: 'Log',
   notes: 'Notes',
   tokens: 'Tokens',
+  judge: 'Judge',
   endrun: 'End run',
 };
+
+/**
+ * The drawers whose panel owns a field worth aiming at. Opening one of these —
+ * by tab or by hotkey — puts the cursor in that field; the rest just open.
+ * Log is absent because the note box it holds is the Notes tab's business.
+ */
+const FOCUS_TARGET: Partial<Record<DrawerId, FocusDrawerDetail['drawer']>> = {
+  notes: 'notes',
+  judge: 'judge',
+};
+
+function focusDrawerEvent(drawer: FocusDrawerDetail['drawer']): CustomEvent<FocusDrawerDetail> {
+  return new CustomEvent<FocusDrawerDetail>(FOCUS_DRAWER_EVENT, { detail: { drawer } });
+}
 
 function DrawerBody({ id }: { id: DrawerId }) {
   const untapAll = useGameStore((s) => s.untapAll);
@@ -47,6 +64,8 @@ function DrawerBody({ id }: { id: DrawerId }) {
       </>
     );
   }
+
+  if (id === 'judge') return <JudgePanel />;
 
   if (id === 'endrun') return <EndRunControls />;
 
@@ -103,24 +122,31 @@ export default function ReadoutColumn() {
     return () => window.removeEventListener('keydown', onKey);
   }, [drawer]);
 
-  // The note hotkey has nowhere to land while the drawer is shut, so the column
-  // opens the notes drawer and re-fires the event once the box exists.
+  // A focus key has nowhere to land while the drawer is shut, so the column
+  // opens the named drawer and re-fires once the box inside it exists. The
+  // re-fire is heard here too and stops on the first line, the drawer being open
+  // by then; the panel takes it from there.
   useEffect(() => {
-    function onFocusNote(): void {
+    function onFocusDrawer(e: Event): void {
+      const want = (e as CustomEvent<FocusDrawerDetail>).detail?.drawer ?? 'notes';
       const open = drawerRef.current;
-      if (open === 'log' || open === 'notes') return;
-      setDrawer('notes');
-      window.setTimeout(() => window.dispatchEvent(new CustomEvent(FOCUS_NOTE_EVENT)), 0);
+      if (open === want) return;
+      // The note box lives in the log panel, so the Log tab is already holding it.
+      if (want === 'notes' && open === 'log') return;
+      setDrawer(want);
+      window.setTimeout(() => window.dispatchEvent(focusDrawerEvent(want)), 0);
     }
-    window.addEventListener(FOCUS_NOTE_EVENT, onFocusNote);
-    return () => window.removeEventListener(FOCUS_NOTE_EVENT, onFocusNote);
+    window.addEventListener(FOCUS_DRAWER_EVENT, onFocusDrawer);
+    return () => window.removeEventListener(FOCUS_DRAWER_EVENT, onFocusDrawer);
   }, []);
 
   function openTab(id: DrawerId): void {
     setDrawer((open) => (open === id ? null : id));
-    // The note box is the point of the Notes tab, so aim at it once it exists.
-    if (id === 'notes' && drawer !== 'notes') {
-      window.setTimeout(() => window.dispatchEvent(new CustomEvent(FOCUS_NOTE_EVENT)), 0);
+    // A drawer with a field is opened at that field, so the tab lands where the
+    // tab was for.
+    const target = FOCUS_TARGET[id];
+    if (target && drawer !== id) {
+      window.setTimeout(() => window.dispatchEvent(focusDrawerEvent(target)), 0);
     }
   }
 
@@ -172,7 +198,7 @@ export default function ReadoutColumn() {
       </div>
 
       <div className="rd-tabs" role="group" aria-label="On demand">
-        {(['log', 'notes', 'tokens'] as DrawerId[]).map((id) => (
+        {(['log', 'notes', 'tokens', 'judge'] as DrawerId[]).map((id) => (
           <button
             key={id}
             type="button"
