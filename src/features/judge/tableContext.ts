@@ -40,6 +40,16 @@ function typeLineOf(state: GameState, card: CardInstance): string {
   return '';
 }
 
+/**
+ * Printed mana cost from the card cache, in Scryfall's `{1}{U}` form. Tokens
+ * have none, and a land's is the empty string, which is left out rather than
+ * sent as a blank field.
+ */
+function manaCostOf(state: GameState, card: CardInstance): string {
+  if (card.isToken || !card.scryfallId) return '';
+  return state.cardData[card.scryfallId]?.manaCost ?? '';
+}
+
 /** Oracle text from the card cache. Tokens have none. */
 function oracleOf(state: GameState, card: CardInstance): string {
   if (card.isToken || !card.scryfallId) return '';
@@ -72,6 +82,8 @@ function toCardContext(
 
   const typeLine = typeLineOf(state, card);
   if (typeLine) entry.typeLine = typeLine;
+  const manaCost = manaCostOf(state, card);
+  if (manaCost) entry.manaCost = manaCost;
 
   if (WITH_ORACLE.has(zone)) {
     const oracle = oracleOf(state, card);
@@ -144,6 +156,8 @@ export function buildTableContext(state: GameState): JudgeTableContext {
       if (card) {
         const typeLine = typeLineOf(state, card);
         if (typeLine) out.typeLine = typeLine;
+        const manaCost = manaCostOf(state, card);
+        if (manaCost) out.manaCost = manaCost;
         const oracle = oracleOf(state, card);
         if (oracle) out.oracleText = oracle;
         if (card.isCommander) out.isCommander = true;

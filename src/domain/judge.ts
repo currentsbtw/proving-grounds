@@ -19,6 +19,14 @@ export interface JudgeCardContext {
   isCommander?: boolean;
   isToken?: boolean;
   typeLine?: string;
+  /**
+   * Printed mana cost in Scryfall's form, such as `{1}{U}`. Sent wherever the
+   * type line is, because a question about what a spell costs -- the tax, a cost
+   * increase, a colour requirement -- cannot be answered from the type line and
+   * the oracle text, and a judge given neither will reconstruct the cost from
+   * memory and get it wrong. Absent on lands and tokens, which have no cost.
+   */
+  manaCost?: string;
   /** Sent for battlefield, hand and command cards; omitted for graveyard and exile. A cast spell travels as a stack item instead. */
   oracleText?: string;
 }
@@ -46,6 +54,13 @@ export interface JudgeTableContext {
     kind: string;
     label: string;
     typeLine?: string;
+    /**
+     * Printed mana cost, same form and same reason as `JudgeCardContext.manaCost`.
+     * A cast spell only ever travels here, so without it the one object whose
+     * cost a question is most likely to be about is the one object that carries
+     * none. Absent on abilities and triggers, which have no printed cost.
+     */
+    manaCost?: string;
     oracleText?: string;
     isCommander?: boolean;
     tapped?: boolean;

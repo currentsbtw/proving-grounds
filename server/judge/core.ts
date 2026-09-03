@@ -132,6 +132,10 @@ function statusParts(object: {
 function describeCard(card: JudgeCardContext): string {
   const parts = [card.name];
   if (card.typeLine) parts.push(card.typeLine);
+  // After the type line and before the status words, so a card reads the way it
+  // is printed: name, type, cost, text. Empty for a land or a token, and an
+  // empty field would read as a cost of nothing rather than as no cost at all.
+  if (card.manaCost) parts.push(card.manaCost);
   parts.push(...statusParts(card));
   if (card.oracleText) parts.push(card.oracleText.replace(/\n+/g, ' / '));
   return `- ${parts.join(' | ')}`;
@@ -181,6 +185,9 @@ export function renderTableContext(table: JudgeTableContext): string {
       // object only, and prints as `kind: label`.
       const parts = [item.label];
       if (item.typeLine) parts.push(item.typeLine);
+      // Same place as in `describeCard`: name, type, cost, text. An ability or a
+      // trigger has no printed cost and prints no field for one.
+      if (item.manaCost) parts.push(item.manaCost);
       parts.push(...statusParts(item));
       if (item.oracleText) parts.push(item.oracleText.replace(/\n+/g, ' / '));
       const body = parts.length > 1 ? parts.join(' | ') : `${item.kind}: ${item.label}`;

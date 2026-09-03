@@ -26,12 +26,18 @@ import { createApiModel } from '../server/judge/drivers/api.ts';
 import { noOutputError, parseCliResult, scrubbedEnv } from '../server/judge/drivers/claudeCode.ts';
 import type { JudgeModel, ModelRequest, ModelResult, SystemBlock } from '../server/judge/model.ts';
 import {
+  CANCELLED_MESSAGE,
   classifyModelFailure,
+  jitteredDelay,
   ModelAuthError,
   ModelLimitError,
+  ModelTransientError,
   ModelUpstreamError,
+  TRANSIENT_STOP_CODE,
+  withTransientRetry,
 } from '../server/judge/model.ts';
 import { buildExcerpt, missingRuleIds } from '../server/judge/retrieval.ts';
+import { isTransientStop, stopReasonLine } from './eval/lib.ts';
 
 const failures: string[] = [];
 let checks = 0;
@@ -64,6 +70,7 @@ const FIXTURE: JudgeTableContext = {
       zone: 'battlefield',
       tapped: true,
       typeLine: 'Artifact',
+      manaCost: '{1}',
       oracleText: '{T}: Add {C}{C}.',
     },
     {
@@ -85,6 +92,7 @@ const FIXTURE: JudgeTableContext = {
       kind: 'spell',
       label: 'Cultivate',
       typeLine: 'Sorcery',
+      manaCost: '{2}{G}',
       oracleText:
         'Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle.',
     },
@@ -210,6 +218,34 @@ async function offline() {
     'tray spell carries its own text',
     rendered.includes('2. Cultivate | Sorcery |') && rendered.includes('Search your library for up to two basic land cards'),
   );
+  // A cast spell only ever travels as a tray item, so this is the one place the
+  // cost of the object the question is most likely about can be read at all.
+  const trayCost = renderTableContext({
+    ...FIXTURE,
+    stack: [
+      {
+        kind: 'trigger',
+        label: 'Rhystic Study trigger',
+      },
+      {
+        kind: 'spell',
+        label: 'Cyclonic Rift',
+        typeLine: 'Instant',
+        manaCost: '{1}{U}',
+        oracleText: 'Return target nonland permanent you do not control to its owner’s hand.',
+      },
+    ],
+  });
+  check(
+    'a tray spell carries its printed mana cost after the type line',
+    trayCost.includes('2. Cyclonic Rift | Instant | {1}{U} | Return target nonland permanent'),
+    trayCost.split('\n').find((line) => line.includes('Cyclonic Rift')) ?? 'no Cyclonic Rift line',
+  );
+  check(
+    'a tray item with no cost prints no blank field',
+    trayCost.includes('1. trigger: Rhystic Study trigger') && !/\|\s*\|/.test(trayCost),
+    trayCost.split('\n').find((line) => line.includes('Rhystic Study')) ?? 'no trigger line',
+  );
   check(
     'tray item carries commander, tapped and counters',
     renderTableContext({
@@ -233,6 +269,7 @@ async function offline() {
         name: 'Cyclonic Rift',
         zone: 'stack',
         typeLine: 'Instant',
+        manaCost: '{1}{U}',
         oracleText: 'Return target nonland permanent you do not control to its owner’s hand.',
       },
     ],
@@ -240,7 +277,22 @@ async function offline() {
   check(
     'a stack-zone card is rendered, not dropped',
     stackZone.includes('On the stack:') &&
-      stackZone.includes('- Cyclonic Rift | Instant | Return target nonland permanent'),
+      stackZone.includes('- Cyclonic Rift | Instant | {1}{U} | Return target nonland permanent'),
+  );
+  // The judge cannot read a printed cost off a type line or off oracle text. A
+  // live eval item was graded disagree for exactly this: asked what Cyclonic
+  // Rift costs to overload, the judge answered from memory of the card. The cost
+  // now travels with the card, and a card without one prints no empty field --
+  // a blank there reads as a cost of nothing rather than as no cost at all.
+  check(
+    'a card carries its printed mana cost after the type line',
+    rendered.includes('- Sol Ring | Artifact | {1} | tapped |'),
+    rendered.split('\n').find((line) => line.includes('Sol Ring')) ?? 'no Sol Ring line',
+  );
+  check(
+    'a card with no cost prints no blank field',
+    rendered.includes('- Swords to Plowshares | Instant | Exile target creature.'),
+    rendered.split('\n').find((line) => line.includes('Swords to Plowshares')) ?? 'no line',
   );
   check('marks the dead seat', rendered.includes('Seat C: eliminated'));
   // The guard is against a library *section*, not against the word: real oracle
@@ -348,6 +400,216 @@ async function offline() {
     'an ordinary silent exit is still upstream',
     noOutputError(1, 'spawn failed') instanceof ModelUpstreamError,
   );
+
+  // The one CLI failure that is not a failure. Every process on the machine
+  // shares one stored OAuth token, so a second Claude Code run renewing it makes
+  // this one refuse with the sentence below. The eval of 2026-09-03 read it as an
+  // ordinary per-item error and burned its first 18 items at nine seconds each,
+  // and because that run then finished, `--resume` had nothing to re-ask.
+  const refreshMessage =
+    'Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute...';
+  let refreshErr: unknown;
+  try {
+    parseCliResult(
+      JSON.stringify({ is_error: true, result: refreshMessage }),
+      JudgeOutputShape,
+      'claude-opus-5',
+    );
+  } catch (err) {
+    refreshErr = err;
+  }
+  check('an OAuth refresh collision is a ModelTransientError', refreshErr instanceof ModelTransientError);
+  check(
+    'and the same sentence on stderr with no stdout is one too',
+    noOutputError(1, refreshMessage) instanceof ModelTransientError,
+  );
+
+  const waits: number[] = [];
+  const noSleep = async (ms: number) => {
+    waits.push(ms);
+  };
+  /** No jitter, so the checks below can name the delays exactly. */
+  const noJitter = () => 0;
+  let tries = 0;
+  const recovered = await withTransientRetry(
+    async () => {
+      tries += 1;
+      if (tries === 1) throw new ModelTransientError(refreshMessage);
+      return 'answered';
+    },
+    { sleep: noSleep, random: noJitter },
+  );
+  check(
+    'a transient refresh error is retried and the second attempt stands',
+    recovered === 'answered' && tries === 2,
+    `${tries} attempts`,
+  );
+  check('and it waited before retrying', waits.join(',') === '5000', `${waits.join('/')} ms`);
+
+  waits.length = 0;
+  tries = 0;
+  let exhausted: unknown;
+  try {
+    await withTransientRetry(
+      async () => {
+        tries += 1;
+        throw new ModelTransientError(refreshMessage);
+      },
+      { sleep: noSleep, random: noJitter },
+    );
+  } catch (err) {
+    exhausted = err;
+  }
+  check(
+    'a refresh error that never clears becomes a ModelAuthError',
+    exhausted instanceof ModelAuthError,
+    exhausted instanceof Error ? exhausted.constructor.name : 'nothing thrown',
+  );
+  check(
+    'and carries the CLI sentence verbatim',
+    (exhausted as Error)?.message === refreshMessage,
+    ((exhausted as Error)?.message ?? '').slice(0, 60),
+  );
+  check(
+    'after three retries at 5s, 15s and 30s',
+    tries === 4 && waits.join(',') === '5000,15000,30000',
+    `${tries} attempts, waits ${waits.join('/')} ms`,
+  );
+  check(
+    'so the eval stops on auth rather than marking items errored',
+    classifyModelFailure(exhausted, 'claude-code')?.code === 'no_login',
+  );
+  // The stop is still an auth stop, but the login was never the problem, so the
+  // gate has to be able to say so rather than sending the player to re-login.
+  check(
+    'and is marked transient so the stop can be worded as one',
+    isTransientStop(exhausted) && (exhausted as ModelAuthError).code === TRANSIENT_STOP_CODE,
+    (exhausted as ModelAuthError)?.code ?? 'no code',
+  );
+  check(
+    'the eval summary says a rerun resumes rather than blaming the login',
+    stopReasonLine('auth', 4, { transient: true, retries: 3 }) ===
+      'run stopped: the CLI could not refresh its login after 3 retries (transient; rerun resumes), 4 items never asked' &&
+      stopReasonLine('auth', 1).includes('the driver could not authenticate') &&
+      stopReasonLine('limit', 1).includes('at the plan limit'),
+    stopReasonLine('auth', 4, { transient: true, retries: 3 }),
+  );
+
+  // Jitter. Three processes that collided over the same token would otherwise
+  // wait the same 5000ms and collide again on the same millisecond.
+  check(
+    'a delay is jittered into [base, 1.5 * base]',
+    [0, 0.25, 0.5, 0.75, 0.999999].every((r) => {
+      const d = jitteredDelay(5_000, () => r);
+      return d >= 5_000 && d <= 7_500;
+    }) &&
+      jitteredDelay(5_000, () => 0) === 5_000 &&
+      jitteredDelay(5_000, () => 0.5) === 6_250,
+    `${jitteredDelay(5_000, () => 0)}..${jitteredDelay(5_000, () => 0.999999)} ms`,
+  );
+
+  // One waiter at a time, process-wide: two callers that collided must not wake
+  // together. The fake sleeps below record when each wait opened and closed, and
+  // the second must not open before the first has closed.
+  const windows: { who: string; at: number; kind: 'start' | 'end' }[] = [];
+  let clock = 0;
+  const tracked = (who: string) => async () => {
+    windows.push({ who, at: clock++, kind: 'start' });
+    await Promise.resolve();
+    await Promise.resolve();
+    windows.push({ who, at: clock++, kind: 'end' });
+  };
+  const oneShot = (who: string) => {
+    let first = true;
+    return withTransientRetry(
+      async () => {
+        if (first) {
+          first = false;
+          throw new ModelTransientError(refreshMessage);
+        }
+        return who;
+      },
+      { sleep: tracked(who), random: noJitter },
+    );
+  };
+  await Promise.all([oneShot('a'), oneShot('b')]);
+  const firstWho = windows[0]?.who;
+  const order = windows.map((w) => `${w.who}:${w.kind}`).join(' ');
+  check(
+    'two concurrent retries wait one at a time',
+    windows.length === 4 &&
+      order === `${firstWho}:start ${firstWho}:end ${firstWho === 'a' ? 'b' : 'a'}:start ${firstWho === 'a' ? 'b' : 'a'}:end`,
+    order,
+  );
+
+  // A cancelled question must end inside the wait, not at the end of it: the
+  // last wait is thirty seconds, and nobody is listening for the answer.
+  const control = new AbortController();
+  /** Never resolves on its own; only the signal ends it. */
+  let inWait = false;
+  const abortOnly = (_ms: number, signal?: AbortSignal) =>
+    new Promise<void>((resolve) => {
+      inWait = true;
+      if (signal?.aborted) resolve();
+      else signal?.addEventListener('abort', () => resolve(), { once: true });
+    });
+  let settled = false;
+  let cancelled: unknown;
+  const waiting = withTransientRetry(
+    async () => {
+      throw new ModelTransientError(refreshMessage);
+    },
+    { sleep: abortOnly, random: noJitter, signal: control.signal },
+  ).catch((err) => {
+    settled = true;
+    cancelled = err;
+  });
+  // Let it get all the way into the wait, so the abort below is an abort during
+  // the wait and not one caught by the check that precedes it.
+  while (!inWait) await new Promise((resolve) => setImmediate(resolve));
+  check('the call is parked in the wait and has not settled', !settled);
+  control.abort();
+  await waiting;
+  check('an abort during the wait ends the call at once', settled);
+  check(
+    'and it reads as a cancelled call, not as a login failure',
+    cancelled instanceof ModelUpstreamError &&
+      !(cancelled instanceof ModelAuthError) &&
+      (cancelled as Error).message === CANCELLED_MESSAGE,
+    cancelled instanceof Error ? `${cancelled.constructor.name}: ${cancelled.message}` : 'nothing thrown',
+  );
+
+  tries = 0;
+  let plainAuth: unknown;
+  try {
+    await withTransientRetry(
+      async () => {
+        tries += 1;
+        throw new ModelAuthError('Not logged in. Run /login.');
+      },
+      { sleep: noSleep },
+    );
+  } catch (err) {
+    plainAuth = err;
+  }
+  check(
+    'a plain not-logged-in failure is not retried',
+    plainAuth instanceof ModelAuthError && tries === 1,
+    `${tries} attempt${tries === 1 ? '' : 's'}`,
+  );
+  tries = 0;
+  try {
+    await withTransientRetry(
+      async () => {
+        tries += 1;
+        throw new ModelLimitError('session limit', '11:20pm');
+      },
+      { sleep: noSleep },
+    );
+  } catch {
+    // Expected: a spent plan window is final and rethrown on the first attempt.
+  }
+  check('a spent plan window is not retried either', tries === 1, `${tries} attempt${tries === 1 ? '' : 's'}`);
 
   console.log('api driver');
   // The SDK's own 429. It reaches the proxy and the eval as the same error the

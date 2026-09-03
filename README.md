@@ -101,8 +101,12 @@ reached a verdict is written to `eval/results/`, and the last line says when the
 (`Stopped: out of plan usage until 11:20pm (America/Los_Angeles)`). Items that were never asked
 are simply absent from the results, not recorded as errors they did not commit. The exit code
 is 1 and the gate reports the stop, so a partial run can never read as a pass. A login that
-expires mid-run stops the same way. `npm run eval:build` behaves the same: finished work is on
-disk before it says why it stopped.
+expires mid-run stops the same way. Every process on the machine shares one stored OAuth token,
+so a `claude-code` call can also fail because another Claude Code process was renewing it at
+that moment; that one is retried three times, at about 5, 15 and 30 seconds, jittered and with
+one waiter at a time across the run, and only counts as a stop once all three are spent (the
+summary then says the CLI could not refresh its login, not that it could not authenticate).
+`npm run eval:build` behaves the same: finished work is on disk before it says why it stopped.
 
 Runs resume by default, so the next run picks up where the stopped one left off. Before
 dispatching anything, `eval:judge` looks for the newest results file that both stopped early and
@@ -111,19 +115,26 @@ measurement" is the corpus date, the driver, the model, the grounding, and a `ha
 fingerprint stored in each file: a short hash of the policy prompt, the eval's request shape and
 what retrieval selects. The fingerprint is the one that matters, because a verdict earned
 against a bare question says nothing about the same question asked with the card's oracle text
-under it; changing any of that invalidates every earlier file, deliberately. A completed run is
-never resumed from either, or the first good run would make every later one grade nothing and
-print PASS from old verdicts, and neither is a `--limit`, `--filter` or `--no-examples` run,
-which measured a chosen part of the set. A resumed run that grades everything still outstanding
-is a full run and can PASS. It prints `resumed N graded items from <file>`, marks those rows `~`
-in the table, and reports their tokens and cost separately from what this run spent.
+under it; changing any of that invalidates every earlier file, deliberately. An automatic resume
+also passes over a run that finished, or the first good run would make every later one grade
+nothing and print PASS from old verdicts, and over a `--limit`, `--filter` or `--no-examples`
+run, which measured a chosen part of the set. A resumed run that grades everything still
+outstanding is a full run and can PASS. It prints `resumed N graded items from <file>`, marks
+those rows `~` in the table, and reports their tokens and cost separately from what this run
+spent.
 
-Use `--resume <path>` to name a file (it says why and exits non-zero rather than quietly
-grading everything if that file is a different measurement or a complete run), `--no-resume` to
-grade everything again, `--show-request <id or card>` to print one item's question, card-text
-reference block and retrieved rules without calling anything, and `--mock --mock-limit-after
-<n>` to exercise the stop path offline. One known cost: an item whose judge call succeeded but
-whose grader call hit the limit is not written, so its answer is bought again next run.
+Use `--resume <path>` to name a file. An explicit resume is allowed to pick up a completed run
+as well, because a run can finish around a failure: it carries every graded verdict in the file
+and re-asks exactly the items that finished without one, whether they errored or were never
+asked. It still says why and exits non-zero rather than quietly grading everything if that file
+is a different measurement, if every item in it already has a verdict, or if it was a `--limit`,
+`--filter` or `--no-examples` subset whose handful of verdicts would leave the rest of the set
+looking like this run's own work. `--no-resume` grades everything again, `--show-request <id or
+card>` prints one item's question, card-text reference block and retrieved rules without calling
+anything, `--mock --mock-limit-after <n>` exercises the stop path offline, and `--mock
+--mock-error-at <n>` fails the nth call only, which exercises the errored-item path instead. One
+known cost: an item whose judge call succeeded but whose grader call hit the limit is not
+written, so its answer is bought again next run.
 
 **One-time login for the subscription path.** The CLI needs its own login once; after that the
 judge just works. On Windows the desktop app ships the CLI inside its MSIX package, so from

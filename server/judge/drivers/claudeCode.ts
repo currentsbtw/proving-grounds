@@ -28,6 +28,13 @@
  * The CLI reports a failed run as a normal result on stdout with `is_error`
  * true and exit code 0, so neither the exit code nor `subtype` can be trusted
  * alone. See `parseCliResult`.
+ *
+ * One of those failures is not a failure: when another Claude Code process is
+ * renewing the shared OAuth token, this one reports "Failed to refresh OAuth
+ * token ..." and exits. Every call here is therefore wrapped in
+ * `withTransientRetry`, which waits that out and, only if it never clears,
+ * raises it to `ModelAuthError` so a batch caller stops instead of recording a
+ * queue full of errors nine seconds apart.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,15 +45,20 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import {
+  cancelledError,
   ModelAuthError,
   ModelLimitError,
+  ModelTransientError,
   ModelUpstreamError,
   isLimitMessage,
+  isTransientAuthMessage,
   parseResetsAt,
   toJudgeUsage,
+  withTransientRetry,
   type JudgeModel,
   type ModelRequest,
   type ModelResult,
+  type TransientRetryOptions,
 } from '../model.ts';
 
 export const CLAUDE_CODE_DEFAULT_MODEL = 'claude-opus-5';
@@ -257,6 +269,12 @@ export function parseCliResult<T>(stdout: string, schema: z.ZodType<T>, requeste
     // It is a fallback: `probeClaudeCode` normally catches a missing login at
     // startup, and this catches the login that expired mid-session.
     if (/not logged in/i.test(resultText)) throw new ModelAuthError(resultText.trim());
+    // Asked before the two below, because the refresh collision is the one
+    // failure here that clears by itself: the login is good and the plan has
+    // usage left, another process on the machine was simply renewing the shared
+    // OAuth token at the same moment. Read as an ordinary upstream failure it
+    // costs one graded item per collision, nine seconds apart.
+    if (isTransientAuthMessage(resultText)) throw new ModelTransientError(resultText.trim());
     // A spent plan window reads the same way: prose in `result`, nothing else.
     // It is not an upstream failure and not a login problem, and a caller that
     // reads it as either keeps dispatching calls that cannot be answered.
@@ -295,10 +313,15 @@ export function parseCliResult<T>(stdout: string, schema: z.ZodType<T>, requeste
  * A spent plan window does not always reach stdout: the CLI can refuse before it
  * has an envelope to print and say so on stderr, and reading that as an ordinary
  * upstream failure is the same mistake as reading the in-band sentence that way.
- * Exported so the harness can check both halves without spawning a CLI.
+ * The credential-refresh collision can arrive the same way, and is read the same
+ * way. Exported so the harness can check both halves without spawning a CLI.
  */
-export function noOutputError(code: number | null, stderr: string): ModelUpstreamError | ModelLimitError {
+export function noOutputError(
+  code: number | null,
+  stderr: string,
+): ModelUpstreamError | ModelLimitError | ModelTransientError {
   const why = stderr.trim();
+  if (isTransientAuthMessage(why)) return new ModelTransientError(why.slice(0, 200));
   if (isLimitMessage(why)) return new ModelLimitError(why.slice(0, 200), parseResetsAt(why));
   return new ModelUpstreamError(
     `Claude Code exited ${code ?? 'with no code'} and printed nothing${why ? `: ${why.slice(0, 200)}` : '.'}`,
@@ -375,7 +398,12 @@ function runCli(
   });
 }
 
-export function createClaudeCodeModel(opts?: { bin?: string; model?: string }): JudgeModel {
+export function createClaudeCodeModel(opts?: {
+  bin?: string;
+  model?: string;
+  /** Overrides the transient-refresh waits. Tests pass no-op delays; nothing else should. */
+  retry?: Pick<TransientRetryOptions, 'delaysMs' | 'sleep' | 'random' | 'onRetry'>;
+}): JudgeModel {
   const defaultModel = opts?.model ?? CLAUDE_CODE_DEFAULT_MODEL;
 
   return {
@@ -397,7 +425,11 @@ export function createClaudeCodeModel(opts?: { bin?: string; model?: string }): 
       const systemFile = path.join(os.tmpdir(), `judge-system-${randomUUID()}.txt`);
       writeFileSync(systemFile, req.system.map((block) => block.text).join('\n\n'), 'utf8');
 
-      try {
+      // One spawn, start to parsed answer. Called again by `withTransientRetry`
+      // when the CLI collided with another process over the shared OAuth token;
+      // the system prompt file outlives every attempt, so a retry costs a spawn
+      // and nothing else.
+      const attempt = async (): Promise<ModelResult<T>> => {
         const outcome = await runCli(
           bin,
           [
@@ -430,7 +462,7 @@ export function createClaudeCodeModel(opts?: { bin?: string; model?: string }): 
         );
 
         if (outcome.aborted) {
-          throw new ModelUpstreamError('The question was cancelled before Claude Code answered.');
+          throw cancelledError();
         }
         if (outcome.timedOut) {
           throw new ModelUpstreamError(`Claude Code did not answer within ${CALL_TIMEOUT_MS / 1000}s.`);
@@ -439,6 +471,10 @@ export function createClaudeCodeModel(opts?: { bin?: string; model?: string }): 
           throw noOutputError(outcome.code, outcome.stderr);
         }
         return parseCliResult(outcome.stdout, req.schema, model);
+      };
+
+      try {
+        return await withTransientRetry(attempt, { ...opts?.retry, signal: req.signal });
       } finally {
         // The system prompt is a megabyte of rules text per call; leaving those
         // in the temp directory would be a slow leak on a long session.

@@ -9,6 +9,7 @@
  *   npm run eval:judge -- --no-resume       grade everything again
  *   npm run eval:judge -- --show-request <id>   print one item's request and exit
  *   npm run eval:judge -- --mock --mock-limit-after 6   exercise the stop path
+ *   npm run eval:judge -- --mock --mock-error-at 3      exercise the errored-item path
  *
  * A run resumes by default, from the newest results file that was the same
  * measurement and stopped early. Every item in it that reached a verdict is
@@ -19,11 +20,22 @@
  *
  * "The same measurement" is corpus, driver, model, grounding and the harness
  * fingerprint: the policy prompt, the request shape and what retrieval selects.
- * A completed run is never resumed from, or the first good run would make every
- * later one grade nothing and print PASS from old verdicts. Neither is a
- * `--limit`, `--filter` or `--no-examples` run, which graded a chosen part of
- * the set. An explicit `--resume` says why it refused rather than quietly
- * grading everything.
+ * An automatic resume additionally requires that the earlier run stopped early,
+ * or the first good run would make every later one grade nothing and print PASS
+ * from old verdicts, and that it was not a `--limit`, `--filter` or
+ * `--no-examples` run, which graded a chosen part of the set.
+ *
+ * An explicit `--resume <file>` will also take a run that finished, so long as it
+ * graded the whole set, and then it re-asks exactly the items that finished
+ * without a verdict: the ones recorded as `error`, and any the file never
+ * mentions. This is the hole the 2026-09-03 run fell into. Eighteen items failed
+ * on a transient CLI error, the run graded the rest and completed, and every
+ * later `--resume` answered "nothing left to grade", so those eighteen could
+ * never be re-asked without paying for the other two hundred again. A file whose
+ * every item already has a verdict is still refused: there is nothing to grade,
+ * and printing PASS off old verdicts is what the completed-run rule is for.
+ * An explicit `--resume` says why it refused rather than quietly grading
+ * everything.
  *
  * Those two failures stop the run rather than failing an item: nothing new is
  * dispatched, the calls in flight are allowed to land, everything graded is
@@ -76,11 +88,13 @@ import {
   RULINGS_PATH,
   SELF_CORRECTION,
   flagValue,
+  isTransientStop,
   pool,
   readJson,
   reportStop,
   requireFlagValues,
   resolveModel,
+  stopReasonLine,
   type StopKind,
 } from './eval/lib.ts';
 
@@ -107,13 +121,14 @@ const PRICE = { input: 5, cacheRead: 0.5, cacheWrite: 10, output: 25 };
  *
  * 1: the question alone.
  * 2: the question plus a "Card text for reference" block for the cards it names.
+ * 3: that block carries each card's printed mana cost between type line and text.
  *
  * Bump it whenever the request an item produces changes shape. It is part of the
  * harness fingerprint below, so a bump makes every earlier result unresumable,
  * which is the point: a verdict earned under a different request is not a verdict
  * about this one.
  */
-const REQUEST_SHAPE_VERSION = 2;
+const REQUEST_SHAPE_VERSION = 3;
 
 /**
  * Three questions whose excerpts are sensitive to the retrieval settings that
@@ -209,6 +224,7 @@ requireFlagValues(args, [
   '--resume',
   '--show-request',
   '--mock-limit-after',
+  '--mock-error-at',
 ]);
 const MOCK = args.includes('--mock');
 const NO_EXAMPLES = args.includes('--no-examples');
@@ -256,6 +272,28 @@ const MOCK_LIMIT_AFTER = (() => {
   }
   return n;
 })();
+/**
+ * Mock only: fail the nth mock judge call the way one item failing on its own
+ * account fails -- an ordinary error, not an auth or limit error, so the run
+ * records the item as `error` and carries on grading the rest. The complement of
+ * `--mock-limit-after`: that one exercises the stop path, this one exercises the
+ * errored item a completed run leaves behind for an explicit `--resume` to
+ * re-ask. 0 means never.
+ */
+const MOCK_ERROR_AT = (() => {
+  const raw = flagValue(args, '--mock-error-at');
+  if (raw === null) return 0;
+  if (!MOCK) {
+    console.error('--mock-error-at only means anything with --mock.');
+    process.exit(1);
+  }
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    console.error('--mock-error-at needs a whole number (0 for never).');
+    process.exit(1);
+  }
+  return n;
+})();
 /** How much rules text the judge reads per question. */
 const GROUNDING: JudgeGrounding = flagValue(args, '--grounding') === 'full' ? 'full' : 'retrieval';
 /**
@@ -287,6 +325,8 @@ interface StoredQuestion {
 interface StoredCardRulings {
   card: string;
   typeLine: string;
+  /** Printed cost, `{1}{U}`. Absent in a rulings file written before it was stored. */
+  manaCost?: string;
   oracleText: string;
 }
 interface StoredExample {
@@ -348,7 +388,16 @@ function referenceBlock(
     // than the judge not having it.
     if (!hit || seen.has(hit.card)) continue;
     seen.add(hit.card);
-    lines.push(`- ${hit.card} | ${hit.typeLine} | ${hit.oracleText.replace(/\n+/g, ' / ')}`);
+    // Name, type, cost, text: the order a card is printed in, and the same order
+    // `renderTableContext` writes a table card. The cost is left out when it is
+    // empty rather than sent as a blank field, which would read as a cost of
+    // nothing. Cyclonic Rift is why it is here at all: asked about overloading
+    // it, the judge answered with a cost it remembered, because nothing in the
+    // request carried one.
+    const parts = [hit.card, hit.typeLine];
+    if (hit.manaCost) parts.push(hit.manaCost);
+    parts.push(hit.oracleText.replace(/\n+/g, ' / '));
+    lines.push(`- ${parts.join(' | ')}`);
   }
   if (lines.length === 0) return { question: entry.question, names: [] };
   return {
@@ -480,6 +529,11 @@ const MOCK_LIMIT_MESSAGE = "You've hit your session limit · resets 11:20pm (Ame
  * way a spent plan window fails. That is the only way to exercise the stop path
  * without spending a real plan, and it exercises the real one: the same error
  * type the claude-code driver throws, thrown from where a driver throws it.
+ *
+ * `--mock-error-at n` fails the nth call only, with an ordinary error, which is
+ * how a single item errors while the run finishes around it. That is the state a
+ * completed results file can be left in and the one an explicit `--resume` has to
+ * be able to re-ask.
  */
 function mockDeps(corpus: Corpus) {
   let calls = 0;
@@ -487,6 +541,11 @@ function mockDeps(corpus: Corpus) {
     const n = calls++;
     if (MOCK_LIMIT_AFTER > 0 && n + 1 >= MOCK_LIMIT_AFTER) {
       throw new ModelLimitError(MOCK_LIMIT_MESSAGE, '11:20pm (America/Los_Angeles)');
+    }
+    // Not an auth or limit error on purpose: those stop the run, and what this
+    // flag exists to produce is one errored item in a run that goes on to finish.
+    if (MOCK_ERROR_AT > 0 && n + 1 === MOCK_ERROR_AT) {
+      throw new Error(`mock: item ${item.id} failed on its own account`);
     }
     const citation = item.source === 'cr-example' ? item.card : '903.9a';
     const hit = resolveRule(corpus, citation) ?? resolveRule(corpus, '903.9a');
@@ -592,9 +651,15 @@ function resultsFilesNewestFirst(): string[] {
  * question says nothing about the same question asked with the card's text under
  * it, and a changed policy prompt or retrieval setting moves the whole set.
  *
- * The earlier run must have stopped early. A completed run has nothing left to
- * contribute, and resuming from one turns every later invocation into a rerun of
- * old verdicts that prints PASS without asking anything.
+ * The earlier run must have stopped early, or, for an explicit `--resume` only,
+ * have finished with something still ungraded. An automatic resume from a
+ * completed run would turn every later invocation into a rerun of old verdicts
+ * that prints PASS without asking anything, which is why it stays refused. But a
+ * run that completed with items recorded as `error` has something outstanding
+ * that no other invocation can reach: without this, the only way to re-ask those
+ * items is to buy the whole set again. So an explicit `--resume` takes such a
+ * file, carries every verdict in it, and dispatches exactly the items that have
+ * none. When there are none, it refuses as before.
  *
  * And the item must be the same item: the question and the answer key both word
  * for word, because a regenerated question, or a reworded ruling behind the same
@@ -616,6 +681,8 @@ function loadResume(items: EvalItem[], corpus: Corpus, driver: string, modelId: 
 
   let file: string;
   let prior: StoredResults;
+  /** Explicit resume of a run that finished: it is here only for its ungraded items. */
+  let reasking = false;
   if (RESUME_PATH !== null) {
     file = RESUME_PATH;
     if (!existsSync(file)) return { kind: 'refused', message: `no results file at ${file}.` };
@@ -633,7 +700,18 @@ function loadResume(items: EvalItem[], corpus: Corpus, driver: string, modelId: 
       console.log(`--mock: resuming from ${file} anyway; skipped the match check (${mismatch.join(', ')}).`);
     }
     if (prior.stopped === undefined || prior.stopped === null) {
-      return { kind: 'refused', message: `nothing left to grade: ${file} was a complete run.` };
+      // A run that finished is still worth resuming when it finished around a
+      // failure. Only for the whole set, though: a `--limit`, `--filter` or
+      // `--no-examples` run that completed graded what it meant to grade, and
+      // pouring its handful of verdicts into a full run would leave the rest of
+      // the set looking like this run's own work.
+      if (isSubsetRun(prior)) {
+        return {
+          kind: 'refused',
+          message: `nothing left to grade: ${file} was a complete run over a chosen part of the set.`,
+        };
+      }
+      reasking = true;
     }
   } else {
     // A mock run never picks a file up on its own: the files here are usually real
@@ -694,6 +772,28 @@ function loadResume(items: EvalItem[], corpus: Corpus, driver: string, modelId: 
   }
   if (stale > 0) {
     console.log(`${stale} resumable items ignored: their question or answer key has changed since.`);
+  }
+  if (reasking) {
+    // What a completed file leaves outstanding is of two kinds, and both are
+    // named because they mean different things: an item it recorded as `error`
+    // was asked and the call failed, and an item it never mentions was added to
+    // the set afterwards or dropped before dispatch.
+    const outstanding = items.filter((item) => !carried.has(item.id));
+    if (outstanding.length === 0) {
+      return {
+        kind: 'refused',
+        message: `nothing left to grade: ${file} was a complete run and every item in it has a verdict.`,
+      };
+    }
+    const erroredIds = new Set(
+      (prior.items ?? []).filter((stored) => stored.verdict === 'error').map((stored) => stored.id),
+    );
+    const errored = outstanding.filter((item) => erroredIds.has(item.id)).length;
+    const never = outstanding.length - errored;
+    console.log(
+      `${file} completed but left ${outstanding.length} item${outstanding.length === 1 ? '' : 's'} ungraded ` +
+        `(${errored} errored, ${never} never asked); re-asking ${outstanding.length === 1 ? 'it' : 'them'}.`,
+    );
   }
   if (carried.size === 0) return { kind: 'none' };
   console.log(`resumed ${carried.size} graded items from ${file}`);
@@ -957,11 +1057,7 @@ async function main() {
 
   const reasons: string[] = [];
   if (stopped !== null) {
-    reasons.push(
-      stopped === 'limit'
-        ? `run stopped at the plan limit with ${undispatched} item${undispatched === 1 ? '' : 's'} never asked`
-        : `run stopped: the driver could not authenticate, ${undispatched} item${undispatched === 1 ? '' : 's'} never asked`,
-    );
+    reasons.push(stopReasonLine(stopped, undispatched, { transient: isTransientStop(stop.error) }));
   }
   if (errored > 0) reasons.push(`${errored} item${errored === 1 ? '' : 's'} errored`);
   if (smokeRun) reasons.push(`smoke run (${smokeWhy})`);

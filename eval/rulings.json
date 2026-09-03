@@ -3,6 +3,7 @@
     "card": "Ad Nauseam",
     "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
     "typeLine": "Instant",
+    "manaCost": "{3}{B}{B}",
     "oracleText": "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana value. You may repeat this process any number of times.",
     "rulings": [
       {
@@ -23,6 +24,7 @@
     "card": "Aetherflux Reservoir",
     "oracleId": "5f15125e-ae89-471e-b055-226a783bc7c1",
     "typeLine": "Artifact",
+    "manaCost": "{4}",
     "oracleText": "Whenever you cast a spell, you gain 1 life for each spell you've cast this turn.\nPay 50 life: This artifact deals 50 damage to any target.",
     "rulings": [
       {
@@ -47,6 +49,7 @@
     "card": "Anguished Unmaking",
     "oracleId": "ad09b3c3-c8e7-481c-8c45-e7f234935117",
     "typeLine": "Instant",
+    "manaCost": "{1}{W}{B}",
     "oracleText": "Exile target nonland permanent. You lose 3 life.",
     "rulings": [
       {
@@ -59,6 +62,7 @@
     "card": "Approach of the Second Sun",
     "oracleId": "e4125377-34c0-4b54-bdf8-4e88f5d24565",
     "typeLine": "Sorcery",
+    "manaCost": "{6}{W}",
     "oracleText": "If this spell was cast from your hand and you've cast another spell named Approach of the Second Sun this game, you win the game. Otherwise, put Approach of the Second Sun into its owner's library seventh from the top and you gain 7 life.",
     "rulings": [
       {
@@ -91,6 +95,7 @@
     "card": "Arcane Denial",
     "oracleId": "ab1cc360-b9de-48d9-9983-4dfe4a7d2a37",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}",
     "oracleText": "Counter target spell. Its controller may draw up to two cards at the beginning of the next turn's upkeep.\nYou draw a card at the beginning of the next turn's upkeep.",
     "rulings": [
       {
@@ -103,6 +108,7 @@
     "card": "Beast Within",
     "oracleId": "7735eeba-693b-47e2-bd51-414379cf1016",
     "typeLine": "Instant",
+    "manaCost": "{2}{G}",
     "oracleText": "Destroy target permanent. Its controller creates a 3/3 green Beast creature token.",
     "rulings": [
       {
@@ -115,6 +121,7 @@
     "card": "Blasphemous Act",
     "oracleId": "7a2484a9-04fd-41a0-8224-610c1c07ed10",
     "typeLine": "Sorcery",
+    "manaCost": "{8}{R}",
     "oracleText": "This spell costs {1} less to cast for each creature on the battlefield.\nBlasphemous Act deals 13 damage to each creature.",
     "rulings": [
       {
@@ -139,6 +146,7 @@
     "card": "Burglar Rat",
     "oracleId": "2f807301-37df-4724-871a-08e3512b07b3",
     "typeLine": "Creature — Rat",
+    "manaCost": "{1}{B}",
     "oracleText": "When this creature enters, each opponent discards a card.",
     "rulings": []
   },
@@ -146,6 +154,7 @@
     "card": "Chaos Warp",
     "oracleId": "07a0cba9-8768-4fd9-a3d5-b0f83b4bf8e8",
     "typeLine": "Instant",
+    "manaCost": "{2}{R}",
     "oracleText": "The owner of target permanent shuffles it into their library, then reveals the top card of their library. If it's a permanent card, they put it onto the battlefield.",
     "rulings": [
       {
@@ -174,6 +183,7 @@
     "card": "Counterspell",
     "oracleId": "cc187110-1148-4090-bbb8-e205694a39f5",
     "typeLine": "Instant",
+    "manaCost": "{U}{U}",
     "oracleText": "Counter target spell.",
     "rulings": []
   },
@@ -181,6 +191,7 @@
     "card": "Craterhoof Behemoth",
     "oracleId": "8c52bd39-0586-48ca-b263-17210cf9feb6",
     "typeLine": "Creature — Beast",
+    "manaCost": "{5}{G}{G}{G}",
     "oracleText": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
     "rulings": [
       {
@@ -197,6 +208,7 @@
     "card": "Cyclonic Rift",
     "oracleId": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}",
     "oracleText": "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")",
     "rulings": [
       {
@@ -221,6 +233,7 @@
     "card": "Damnation",
     "oracleId": "d57a8f0b-7989-4db5-8756-6f2690097252",
     "typeLine": "Sorcery",
+    "manaCost": "{2}{B}{B}",
     "oracleText": "Destroy all creatures. They can't be regenerated.",
     "rulings": []
   },
@@ -228,6 +241,7 @@
     "card": "Day of Judgment",
     "oracleId": "d057289d-5e28-43d5-8ff3-4a1bc723477d",
     "typeLine": "Sorcery",
+    "manaCost": "{2}{W}{W}",
     "oracleText": "Destroy all creatures.",
     "rulings": []
   },
@@ -235,6 +249,7 @@
     "card": "Deadly Rollick",
     "oracleId": "0456ec64-2c81-4763-a352-8ff64a4c3d6b",
     "typeLine": "Instant",
+    "manaCost": "{3}{B}",
     "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nExile target creature.",
     "rulings": [
       {
@@ -251,6 +266,7 @@
     "card": "Despark",
     "oracleId": "bd16434d-55ea-4c5a-a9ef-752971a4af16",
     "typeLine": "Instant",
+    "manaCost": "{W}{B}",
     "oracleText": "Exile target permanent with mana value 4 or greater.",
     "rulings": [
       {
@@ -263,6 +279,7 @@
     "card": "Devastation Tide",
     "oracleId": "4245ee98-2d4c-49d1-8d07-80760cae2bf9",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{U}{U}",
     "oracleText": "Return all nonland permanents to their owners' hands.\nMiracle {1}{U} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)",
     "rulings": [
       {
@@ -315,6 +332,7 @@
     "card": "Diabolic Edict",
     "oracleId": "058917c1-21ab-488a-9f9c-591c55f3c596",
     "typeLine": "Instant",
+    "manaCost": "{1}{B}",
     "oracleText": "Target player sacrifices a creature of their choice.",
     "rulings": []
   },
@@ -322,6 +340,7 @@
     "card": "Dockside Extortionist",
     "oracleId": "697bcfe1-ecbf-42a1-bfc7-0766d48ca56b",
     "typeLine": "Creature — Goblin Pirate",
+    "manaCost": "{1}{R}",
     "oracleText": "When this creature enters, create X Treasure tokens, where X is the number of artifacts and enchantments your opponents control. (Treasure tokens are artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
     "rulings": [
       {
@@ -334,6 +353,7 @@
     "card": "Esper Sentinel",
     "oracleId": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4",
     "typeLine": "Artifact Creature — Human Soldier",
+    "manaCost": "{W}",
     "oracleText": "Whenever an opponent casts their first noncreature spell each turn, draw a card unless that player pays {X}, where X is this creature's power.",
     "rulings": [
       {
@@ -354,6 +374,7 @@
     "card": "Essence Scatter",
     "oracleId": "46665089-aa3d-44c3-964d-6638dfbb5782",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}",
     "oracleText": "Counter target creature spell.",
     "rulings": [
       {
@@ -366,6 +387,7 @@
     "card": "Expropriate",
     "oracleId": "a69265b2-0e37-4d86-866e-e4a923233b4d",
     "typeLine": "Sorcery",
+    "manaCost": "{7}{U}{U}",
     "oracleText": "Council's dilemma — Starting with you, each player votes for time or money. For each time vote, take an extra turn after this one. For each money vote, choose a permanent owned by the voter and gain control of it. Exile Expropriate.",
     "rulings": [
       {
@@ -414,6 +436,7 @@
     "card": "Exsanguinate",
     "oracleId": "8164b1e8-3350-465e-8a17-75f57d326344",
     "typeLine": "Sorcery",
+    "manaCost": "{X}{B}{B}",
     "oracleText": "Each opponent loses X life. You gain life equal to the life lost this way.",
     "rulings": [
       {
@@ -426,6 +449,7 @@
     "card": "Farewell",
     "oracleId": "4eb813fd-2d5a-4b02-8193-662681ef4e7d",
     "typeLine": "Sorcery",
+    "manaCost": "{4}{W}{W}",
     "oracleText": "Choose one or more —\n• Exile all artifacts.\n• Exile all creatures.\n• Exile all enchantments.\n• Exile all graveyards.",
     "rulings": [
       {
@@ -438,6 +462,7 @@
     "card": "Fateful Absence",
     "oracleId": "35bba442-1aec-4d33-b502-4c580d61644b",
     "typeLine": "Instant",
+    "manaCost": "{1}{W}",
     "oracleText": "Destroy target creature or planeswalker. Its controller investigates. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
     "rulings": []
   },
@@ -445,6 +470,7 @@
     "card": "Fierce Guardianship",
     "oracleId": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9",
     "typeLine": "Instant",
+    "manaCost": "{2}{U}",
     "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell.",
     "rulings": [
       {
@@ -461,6 +487,7 @@
     "card": "Fleshbag Marauder",
     "oracleId": "4b1bf05e-753e-4350-a913-894cf3cecc0c",
     "typeLine": "Creature — Zombie Warrior",
+    "manaCost": "{2}{B}",
     "oracleText": "When this creature enters, each player sacrifices a creature of their choice.",
     "rulings": [
       {
@@ -477,6 +504,7 @@
     "card": "Food Chain",
     "oracleId": "5c8e5092-962e-49ef-ab82-8434e475e4e7",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{G}",
     "oracleText": "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.",
     "rulings": [
       {
@@ -493,6 +521,7 @@
     "card": "Force of Negation",
     "oracleId": "ac2173f9-f223-440a-9231-fd98762bdc6f",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}{U}",
     "oracleText": "If it's not your turn, you may exile a blue card from your hand rather than pay this spell's mana cost.\nCounter target noncreature spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard.",
     "rulings": []
   },
@@ -500,6 +529,7 @@
     "card": "Force of Will",
     "oracleId": "956381ba-6d37-4a8a-846c-bad79222dbee",
     "typeLine": "Instant",
+    "manaCost": "{3}{U}{U}",
     "oracleText": "You may pay 1 life and exile a blue card from your hand rather than pay this spell's mana cost.\nCounter target spell.",
     "rulings": [
       {
@@ -512,6 +542,7 @@
     "card": "Generous Gift",
     "oracleId": "fae37e28-e137-4177-b973-fa8b4dd8f409",
     "typeLine": "Instant",
+    "manaCost": "{2}{W}",
     "oracleText": "Destroy target permanent. Its controller creates a 3/3 green Elephant creature token.",
     "rulings": [
       {
@@ -524,6 +555,7 @@
     "card": "Go for the Throat",
     "oracleId": "2f092562-9e17-43cd-aeb8-d0567f99363e",
     "typeLine": "Instant",
+    "manaCost": "{1}{B}",
     "oracleText": "Destroy target nonartifact creature.",
     "rulings": [
       {
@@ -540,6 +572,7 @@
     "card": "Hour of Revelation",
     "oracleId": "920c1dd4-c3f6-4020-a6f0-2e8acad2c212",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{W}{W}{W}",
     "oracleText": "This spell costs {3} less to cast if there are ten or more nonland permanents on the battlefield.\nDestroy all nonland permanents.",
     "rulings": [
       {
@@ -556,6 +589,7 @@
     "card": "Infernal Grasp",
     "oracleId": "94f0a572-e91c-4b56-a5d1-6cbbeabd210d",
     "typeLine": "Instant",
+    "manaCost": "{1}{B}",
     "oracleText": "Destroy target creature. You lose 2 life.",
     "rulings": []
   },
@@ -563,6 +597,7 @@
     "card": "Innocent Blood",
     "oracleId": "6791ec3c-c397-4087-8c8c-84d3797df415",
     "typeLine": "Sorcery",
+    "manaCost": "{B}",
     "oracleText": "Each player sacrifices a creature of their choice.",
     "rulings": [
       {
@@ -575,6 +610,7 @@
     "card": "Insurrection",
     "oracleId": "7f7c204f-be1a-47e4-91c6-ba6f906d9012",
     "typeLine": "Sorcery",
+    "manaCost": "{5}{R}{R}{R}",
     "oracleText": "Untap all creatures and gain control of them until end of turn. They gain haste until end of turn.",
     "rulings": [
       {
@@ -587,6 +623,7 @@
     "card": "Kiki-Jiki, Mirror Breaker",
     "oracleId": "a34b7416-cfe3-4a1e-a8c1-a3056b747519",
     "typeLine": "Legendary Creature — Goblin Shaman",
+    "manaCost": "{2}{R}{R}{R}",
     "oracleText": "Haste\n{T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.",
     "rulings": [
       {
@@ -623,6 +660,7 @@
     "card": "Krosan Grip",
     "oracleId": "3e39224c-72ce-4ecc-aa17-12c071ea1f3e",
     "typeLine": "Instant",
+    "manaCost": "{2}{G}",
     "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nDestroy target artifact or enchantment.",
     "rulings": [
       {
@@ -655,6 +693,7 @@
     "card": "Liliana of the Veil",
     "oracleId": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261",
     "typeLine": "Legendary Planeswalker — Liliana",
+    "manaCost": "{1}{B}{B}",
     "oracleText": "+1: Each player discards a card.\n−2: Target player sacrifices a creature.\n−6: Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice.",
     "rulings": [
       {
@@ -679,6 +718,7 @@
     "card": "Mana Drain",
     "oracleId": "74d3277a-38e5-4732-afed-084a56148f20",
     "typeLine": "Instant",
+    "manaCost": "{U}{U}",
     "oracleText": "Counter target spell. At the beginning of your next main phase, add an amount of {C} equal to that spell's mana value.",
     "rulings": [
       {
@@ -695,6 +735,7 @@
     "card": "Mystic Remora",
     "oracleId": "8a52f3c0-2552-4425-b2e3-5496eb2232a7",
     "typeLine": "Enchantment",
+    "manaCost": "{U}",
     "oracleText": "Cumulative upkeep {1} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhenever an opponent casts a noncreature spell, you may draw a card unless that player pays {4}.",
     "rulings": [
       {
@@ -711,6 +752,7 @@
     "card": "Negate",
     "oracleId": "3407fe41-fdd3-4119-8f70-4bc4590a379f",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}",
     "oracleText": "Counter target noncreature spell.",
     "rulings": [
       {
@@ -727,6 +769,7 @@
     "card": "Overwhelming Stampede",
     "oracleId": "e1e96802-fd0c-41f1-aa21-3287d75a0e88",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{G}{G}",
     "oracleText": "Until end of turn, creatures you control gain trample and get +X/+X, where X is the greatest power among creatures you control.",
     "rulings": [
       {
@@ -739,6 +782,7 @@
     "card": "Pact of Negation",
     "oracleId": "f3e213a4-ba5a-468a-93b3-c0a34e1bd725",
     "typeLine": "Instant",
+    "manaCost": "{0}",
     "oracleText": "Counter target spell.\nAt the beginning of your next upkeep, pay {3}{U}{U}. If you don't, you lose the game.",
     "rulings": [
       {
@@ -759,6 +803,7 @@
     "card": "Path to Exile",
     "oracleId": "d683d985-9888-4d21-8b5f-69e69ce4a03b",
     "typeLine": "Instant",
+    "manaCost": "{W}",
     "oracleText": "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
     "rulings": [
       {
@@ -775,6 +820,7 @@
     "card": "Plaguecrafter",
     "oracleId": "2e3ee458-fa3f-4452-ab95-5a7fb5a0483b",
     "typeLine": "Creature — Human Shaman",
+    "manaCost": "{2}{B}",
     "oracleText": "When this creature enters, each player sacrifices a creature or planeswalker of their choice. Each player who can't discards a card.",
     "rulings": [
       {
@@ -795,6 +841,7 @@
     "card": "Planar Cleansing",
     "oracleId": "a98c2d81-4add-4292-bbdd-e1b69ff936d4",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{W}{W}{W}",
     "oracleText": "Destroy all nonland permanents.",
     "rulings": []
   },
@@ -802,6 +849,7 @@
     "card": "Pongify",
     "oracleId": "05849bd6-8f38-4031-be2b-e2aa03beb8cc",
     "typeLine": "Instant",
+    "manaCost": "{U}",
     "oracleText": "Destroy target creature. It can't be regenerated. Its controller creates a 3/3 green Ape creature token.",
     "rulings": [
       {
@@ -814,6 +862,7 @@
     "card": "Rewind",
     "oracleId": "bb27bfdf-fe8d-45bd-ad62-8118dce06eda",
     "typeLine": "Instant",
+    "manaCost": "{2}{U}{U}",
     "oracleText": "Counter target spell. Untap up to four lands.",
     "rulings": [
       {
@@ -834,6 +883,7 @@
     "card": "Rhystic Study",
     "oracleId": "53236dd7-845a-444c-96d5-f41ed7325d8f",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{U}",
     "oracleText": "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
     "rulings": [
       {
@@ -850,6 +900,7 @@
     "card": "Ruinous Ultimatum",
     "oracleId": "a6f38908-aa4f-4f99-a28e-85d11dab52e4",
     "typeLine": "Sorcery",
+    "manaCost": "{R}{R}{W}{W}{W}{B}{B}",
     "oracleText": "Destroy all nonland permanents your opponents control.",
     "rulings": []
   },
@@ -857,6 +908,7 @@
     "card": "Smothering Tithe",
     "oracleId": "153376c9-dffd-458c-8ce3-a4c8269bc4e9",
     "typeLine": "Enchantment",
+    "manaCost": "{3}{W}",
     "oracleText": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
     "rulings": [
       {
@@ -869,6 +921,7 @@
     "card": "Sunfall",
     "oracleId": "fb3f5097-0da0-458c-8508-60823567e2da",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{W}{W}",
     "oracleText": "Exile all creatures. Incubate X, where X is the number of creatures exiled this way. (Create an Incubator token with X +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)",
     "rulings": [
       {
@@ -881,6 +934,7 @@
     "card": "Swan Song",
     "oracleId": "8ddfc283-c9b4-41a5-af88-cf0068e986cc",
     "typeLine": "Instant",
+    "manaCost": "{U}",
     "oracleText": "Counter target enchantment, instant, or sorcery spell. Its controller creates a 2/2 blue Bird creature token with flying.",
     "rulings": [
       {
@@ -893,6 +947,7 @@
     "card": "Swords to Plowshares",
     "oracleId": "b1544f21-7e98-461b-aed5-e748b0168c52",
     "typeLine": "Instant",
+    "manaCost": "{W}",
     "oracleText": "Exile target creature. Its controller gains life equal to its power.",
     "rulings": [
       {
@@ -905,6 +960,7 @@
     "card": "Syphon Mind",
     "oracleId": "abc37d6c-6300-47b5-a679-9db5b83eb54f",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{B}",
     "oracleText": "Each other player discards a card. You draw a card for each card discarded this way.",
     "rulings": []
   },
@@ -912,6 +968,7 @@
     "card": "Torment of Hailfire",
     "oracleId": "30a0a6c2-1fbb-4784-ab96-22611d57e62c",
     "typeLine": "Sorcery",
+    "manaCost": "{X}{B}{B}",
     "oracleText": "Repeat the following process X times. Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a card.",
     "rulings": [
       {
@@ -944,6 +1001,7 @@
     "card": "Toxic Deluge",
     "oracleId": "afaef788-34d1-460b-b884-9d7ae6ddeb18",
     "typeLine": "Sorcery",
+    "manaCost": "{2}{B}",
     "oracleText": "As an additional cost to cast this spell, pay X life.\nAll creatures get -X/-X until end of turn.",
     "rulings": [
       {
@@ -960,6 +1018,7 @@
     "card": "Triumph of the Hordes",
     "oracleId": "3ded0c0c-40ce-4d14-a9a6-b023bc19ee0e",
     "typeLine": "Sorcery",
+    "manaCost": "{2}{G}{G}",
     "oracleText": "Until end of turn, creatures you control get +1/+1 and gain trample and infect. (Creatures with infect deal damage to creatures in the form of -1/-1 counters and to players in the form of poison counters.)",
     "rulings": [
       {
@@ -972,6 +1031,7 @@
     "card": "Underworld Breach",
     "oracleId": "27e0948b-9916-473b-8d8c-a51bdfbc7457",
     "typeLine": "Enchantment",
+    "manaCost": "{1}{R}",
     "oracleText": "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. (You may cast cards from your graveyard for their escape cost.)\nAt the beginning of the end step, sacrifice this enchantment.",
     "rulings": [
       {
@@ -1020,6 +1080,7 @@
     "card": "Vanquish the Horde",
     "oracleId": "a332e80a-dc51-4dc6-bc85-e114a1c6fdb8",
     "typeLine": "Sorcery",
+    "manaCost": "{6}{W}{W}",
     "oracleText": "This spell costs {1} less to cast for each creature on the battlefield.\nDestroy all creatures.",
     "rulings": []
   },
@@ -1027,6 +1088,7 @@
     "card": "Vindicate",
     "oracleId": "63c1ac21-e3d8-40c2-8c09-3f31c52992ef",
     "typeLine": "Sorcery",
+    "manaCost": "{1}{W}{B}",
     "oracleText": "Destroy target permanent.",
     "rulings": []
   },
@@ -1034,6 +1096,7 @@
     "card": "Wrath of God",
     "oracleId": "34515b16-c9a4-4f98-8c77-416a7a523407",
     "typeLine": "Sorcery",
+    "manaCost": "{2}{W}{W}",
     "oracleText": "Destroy all creatures. They can't be regenerated.",
     "rulings": []
   },
@@ -1041,6 +1104,7 @@
     "card": "Sol Ring",
     "oracleId": "6ad8011d-3471-4369-9d68-b264cc027487",
     "typeLine": "Artifact",
+    "manaCost": "{1}",
     "oracleText": "{T}: Add {C}{C}.",
     "rulings": []
   },
@@ -1048,6 +1112,7 @@
     "card": "Arcane Signet",
     "oracleId": "0bc7f093-bef0-4f1a-852c-4b75ebf54838",
     "typeLine": "Artifact",
+    "manaCost": "{2}",
     "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
     "rulings": [
       {
@@ -1068,6 +1133,7 @@
     "card": "Command Tower",
     "oracleId": "0895c9b7-ae7d-4bb3-af17-3b75deb50a25",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
     "rulings": [
       {
@@ -1088,6 +1154,7 @@
     "card": "Teferi's Protection",
     "oracleId": "0d4ecdb1-ec90-497f-a7a4-1c68092b8757",
     "typeLine": "Instant",
+    "manaCost": "{2}{W}",
     "oracleText": "Until your next turn, your life total can't change and you gain protection from everything. All permanents you control phase out. (While they're phased out, they're treated as though they don't exist. They phase in before you untap during your untap step.)\nExile Teferi's Protection.",
     "rulings": [
       {
@@ -1204,6 +1271,7 @@
     "card": "Thassa's Oracle",
     "oracleId": "1de1b591-a73f-4974-b507-8c63e07a0868",
     "typeLine": "Creature — Merfolk Wizard",
+    "manaCost": "{U}{U}",
     "oracleText": "When this creature enters, look at the top X cards of your library, where X is your devotion to blue. Put up to one of them on top of your library and the rest on the bottom of your library in a random order. If X is greater than or equal to the number of cards in your library, you win the game. (Each {U} in the mana costs of permanents you control counts toward your devotion to blue.)",
     "rulings": [
       {
@@ -1236,6 +1304,7 @@
     "card": "Demonic Consultation",
     "oracleId": "9a1412db-45ad-46ea-8f12-a85d203113d8",
     "typeLine": "Instant",
+    "manaCost": "{B}",
     "oracleText": "Choose a card name. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal a card with the chosen name. Put that card into your hand and exile all other cards revealed this way.",
     "rulings": [
       {
@@ -1260,6 +1329,7 @@
     "card": "Laboratory Maniac",
     "oracleId": "aa286dd5-aa19-446d-9003-684d81eb57ca",
     "typeLine": "Creature — Human Wizard",
+    "manaCost": "{2}{U}",
     "oracleText": "If you would draw a card while your library has no cards in it, you win the game instead.",
     "rulings": [
       {
@@ -1276,6 +1346,7 @@
     "card": "Jace, Wielder of Mysteries",
     "oracleId": "5277a68e-1ceb-4b40-8e10-3d0564f5d7be",
     "typeLine": "Legendary Planeswalker — Jace",
+    "manaCost": "{1}{U}{U}{U}",
     "oracleText": "If you would draw a card while your library has no cards in it, you win the game instead.\n+1: Target player mills two cards. Draw a card.\n−8: Draw seven cards. Then if your library has no cards in it, you win the game.",
     "rulings": [
       {
@@ -1304,6 +1375,7 @@
     "card": "Blood Moon",
     "oracleId": "94fac5fe-97d5-4c12-a80c-8efff9d853ae",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{R}",
     "oracleText": "Nonbasic lands are Mountains.",
     "rulings": [
       {
@@ -1328,6 +1400,7 @@
     "card": "Winter Orb",
     "oracleId": "1dcbd583-3388-4b34-a7cd-131648aa6abd",
     "typeLine": "Artifact",
+    "manaCost": "{2}",
     "oracleText": "As long as this artifact is untapped, players can't untap more than one land during their untap steps.",
     "rulings": [
       {
@@ -1344,6 +1417,7 @@
     "card": "Thalia, Guardian of Thraben",
     "oracleId": "9b7f1d05-707c-4ed3-9f0e-8ced1232c2ee",
     "typeLine": "Legendary Creature — Human Soldier",
+    "manaCost": "{1}{W}",
     "oracleText": "First strike\nNoncreature spells cost {1} more to cast.",
     "rulings": [
       {
@@ -1368,6 +1442,7 @@
     "card": "Grand Abolisher",
     "oracleId": "c749f23c-40c0-4159-b84c-a70cbb062c14",
     "typeLine": "Creature — Human Cleric",
+    "manaCost": "{W}{W}",
     "oracleText": "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.",
     "rulings": [
       {
@@ -1384,6 +1459,7 @@
     "card": "Deflecting Swat",
     "oracleId": "ae120613-97d6-4393-b39d-c3e6c076f5d6",
     "typeLine": "Instant",
+    "manaCost": "{2}{R}",
     "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nYou may choose new targets for target spell or ability.",
     "rulings": [
       {
@@ -1412,6 +1488,7 @@
     "card": "Flawless Maneuver",
     "oracleId": "4e183439-17d2-47ff-9d99-5e22821d91e3",
     "typeLine": "Instant",
+    "manaCost": "{2}{W}",
     "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nCreatures you control gain indestructible until end of turn.",
     "rulings": [
       {
@@ -1428,6 +1505,7 @@
     "card": "Rest in Peace",
     "oracleId": "087f9ad7-e74f-40e2-8102-1ed2925d0418",
     "typeLine": "Enchantment",
+    "manaCost": "{1}{W}",
     "oracleText": "When this enchantment enters, exile all graveyards.\nIf a card or token would be put into a graveyard from anywhere, exile it instead.",
     "rulings": [
       {
@@ -1448,6 +1526,7 @@
     "card": "Torpor Orb",
     "oracleId": "97326cad-b13c-4e52-82ce-850a39e5ff08",
     "typeLine": "Artifact",
+    "manaCost": "{2}",
     "oracleText": "Creatures entering don't cause abilities to trigger.",
     "rulings": [
       {
@@ -1484,6 +1563,7 @@
     "card": "Solemnity",
     "oracleId": "f0b4331b-ddd3-4f11-ba16-67c651c8954c",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{W}",
     "oracleText": "Players can't get counters.\nCounters can't be put on artifacts, creatures, enchantments, or lands.",
     "rulings": [
       {
@@ -1532,6 +1612,7 @@
     "card": "Humility",
     "oracleId": "ed7bdb3e-5c51-4547-9266-76a791e0b2b0",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{W}{W}",
     "oracleText": "All creatures lose all abilities and have base power and toughness 1/1.",
     "rulings": [
       {
@@ -1552,6 +1633,7 @@
     "card": "Blood Artist",
     "oracleId": "310f141c-7f37-4729-aed6-dd9c09db448d",
     "typeLine": "Creature — Vampire",
+    "manaCost": "{1}{B}",
     "oracleText": "Whenever this creature or another creature dies, target player loses 1 life and you gain 1 life.",
     "rulings": [
       {
@@ -1564,6 +1646,7 @@
     "card": "Zulaport Cutthroat",
     "oracleId": "76b003e0-15af-4f22-bdf2-1ade5430964a",
     "typeLine": "Creature — Human Rogue Ally",
+    "manaCost": "{1}{B}",
     "oracleText": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life.",
     "rulings": [
       {
@@ -1576,6 +1659,7 @@
     "card": "Viscera Seer",
     "oracleId": "f82a4e85-526d-4456-b700-7760043a31be",
     "typeLine": "Creature — Vampire Wizard",
+    "manaCost": "{B}",
     "oracleText": "Sacrifice a creature: Scry 1. (Look at the top card of your library. You may put that card on the bottom.)",
     "rulings": [
       {
@@ -1592,6 +1676,7 @@
     "card": "Ashnod's Altar",
     "oracleId": "4d18bcba-a346-445e-a182-6cc30b7e066d",
     "typeLine": "Artifact",
+    "manaCost": "{3}",
     "oracleText": "Sacrifice a creature: Add {C}{C}.",
     "rulings": []
   },
@@ -1599,6 +1684,7 @@
     "card": "Phyrexian Altar",
     "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",
     "typeLine": "Artifact",
+    "manaCost": "{3}",
     "oracleText": "Sacrifice a creature: Add one mana of any color.",
     "rulings": []
   },
@@ -1606,6 +1692,7 @@
     "card": "Exquisite Blood",
     "oracleId": "8f933fae-6c0c-42d7-a817-14760d8285cd",
     "typeLine": "Enchantment",
+    "manaCost": "{4}{B}",
     "oracleText": "Whenever an opponent loses life, you gain that much life.",
     "rulings": [
       {
@@ -1622,6 +1709,7 @@
     "card": "Sanguine Bond",
     "oracleId": "73089a39-a2f6-4aa2-a058-e6551475153d",
     "typeLine": "Enchantment",
+    "manaCost": "{3}{B}{B}",
     "oracleText": "Whenever you gain life, target opponent loses that much life.",
     "rulings": [
       {
@@ -1650,6 +1738,7 @@
     "card": "Zealous Conscripts",
     "oracleId": "1dae6f39-2cbd-485c-b190-017a26401fd4",
     "typeLine": "Creature — Human Warrior",
+    "manaCost": "{4}{R}",
     "oracleText": "Haste\nWhen this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.",
     "rulings": [
       {
@@ -1662,6 +1751,7 @@
     "card": "Splinter Twin",
     "oracleId": "2df3187b-4b91-4de9-9b26-d48a30700cec",
     "typeLine": "Enchantment — Aura",
+    "manaCost": "{2}{R}{R}",
     "oracleText": "Enchant creature\nEnchanted creature has \"{T}: Create a token that's a copy of this creature, except it has haste. Exile that token at the beginning of the next end step.\"",
     "rulings": [
       {
@@ -1718,6 +1808,7 @@
     "card": "Deceiver Exarch",
     "oracleId": "3c939ea6-68b7-4965-b1d3-af1d3dc79778",
     "typeLine": "Creature — Phyrexian Cleric",
+    "manaCost": "{2}{U}",
     "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nWhen this creature enters, choose one —\n• Untap target permanent you control.\n• Tap target permanent an opponent controls.",
     "rulings": []
   },
@@ -1725,6 +1816,7 @@
     "card": "Squee, the Immortal",
     "oracleId": "481fb71a-11b9-462e-a4da-ca35ffd1bd22",
     "typeLine": "Legendary Creature — Goblin",
+    "manaCost": "{1}{R}{R}",
     "oracleText": "You may cast this card from your graveyard or from exile.",
     "rulings": [
       {
@@ -1741,6 +1833,7 @@
     "card": "Brain Freeze",
     "oracleId": "464c0150-3dbc-403b-9ada-fef25ab1f29d",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}",
     "oracleText": "Target player mills three cards.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
     "rulings": [
       {
@@ -1769,6 +1862,7 @@
     "card": "Lion's Eye Diamond",
     "oracleId": "ee6099b0-fb1f-42f1-b862-7708c6e36d05",
     "typeLine": "Artifact",
+    "manaCost": "{0}",
     "oracleText": "Discard your hand, Sacrifice this artifact: Add three mana of any one color. Activate only as an instant.",
     "rulings": [
       {
@@ -1781,6 +1875,7 @@
     "card": "Isochron Scepter",
     "oracleId": "ddd649f4-dbaf-48ec-8ff7-95581257772d",
     "typeLine": "Artifact",
+    "manaCost": "{2}",
     "oracleText": "Imprint — When this artifact enters, you may exile an instant card with mana value 2 or less from your hand.\n{2}, {T}: You may copy the exiled card. If you do, you may cast the copy without paying its mana cost.",
     "rulings": [
       {
@@ -1809,6 +1904,7 @@
     "card": "Dramatic Reversal",
     "oracleId": "da46904c-8fb8-44c2-b2ab-775a1cc12ec3",
     "typeLine": "Instant",
+    "manaCost": "{1}{U}",
     "oracleText": "Untap all nonland permanents you control.",
     "rulings": []
   },
@@ -1816,6 +1912,7 @@
     "card": "Bolas's Citadel",
     "oracleId": "2bd111bb-ce02-414c-b5b7-e0e037d8d96b",
     "typeLine": "Legendary Artifact",
+    "manaCost": "{3}{B}{B}{B}",
     "oracleText": "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.\n{T}, Sacrifice ten nonland permanents: Each opponent loses 10 life.",
     "rulings": [
       {
@@ -1856,6 +1953,7 @@
     "card": "Necropotence",
     "oracleId": "94a844d2-0574-45a7-b347-e0e329767c42",
     "typeLine": "Enchantment",
+    "manaCost": "{B}{B}{B}",
     "oracleText": "Skip your draw step.\nWhenever you discard a card, exile that card from your graveyard.\nPay 1 life: Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step.",
     "rulings": [
       {
@@ -1880,6 +1978,7 @@
     "card": "Angel's Grace",
     "oracleId": "66ca8a60-e028-4a5f-8177-860b888cb9d1",
     "typeLine": "Instant",
+    "manaCost": "{W}",
     "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nYou can't lose the game this turn and your opponents can't win the game this turn. Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead.",
     "rulings": [
       {
@@ -1932,6 +2031,7 @@
     "card": "Tainted Pact",
     "oracleId": "1a85ba2b-ae10-4917-954a-7709b75a9740",
     "typeLine": "Instant",
+    "manaCost": "{1}{B}",
     "oracleText": "Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first.",
     "rulings": []
   },
@@ -1939,6 +2039,7 @@
     "card": "Heroic Intervention",
     "oracleId": "24882fa2-3fe9-4c1b-aa3d-0e6488b9db27",
     "typeLine": "Instant",
+    "manaCost": "{1}{G}",
     "oracleText": "Permanents you control gain hexproof and indestructible until end of turn.",
     "rulings": [
       {
@@ -1959,6 +2060,7 @@
     "card": "Teferi, Time Raveler",
     "oracleId": "ae7604bb-4818-45a3-960c-cf3d83f15964",
     "typeLine": "Legendary Planeswalker — Teferi",
+    "manaCost": "{1}{W}{U}",
     "oracleText": "Each opponent can cast spells only any time they could cast a sorcery.\n+1: Until your next turn, you may cast sorcery spells as though they had flash.\n−3: Return up to one target artifact, creature, or enchantment to its owner's hand. Draw a card.",
     "rulings": [
       {
@@ -1975,6 +2077,7 @@
     "card": "Narset, Parter of Veils",
     "oracleId": "ab26fbe2-e808-48b9-8d0d-3fbb6c3d554f",
     "typeLine": "Legendary Planeswalker — Narset",
+    "manaCost": "{1}{U}{U}",
     "oracleText": "Each opponent can't draw more than one card each turn.\n−2: Look at the top four cards of your library. You may reveal a noncreature, nonland card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.",
     "rulings": [
       {
@@ -1999,6 +2102,7 @@
     "card": "Opposition Agent",
     "oracleId": "1f438b8f-fe23-4f3b-ab2e-f6c33676c462",
     "typeLine": "Creature — Human Rogue",
+    "manaCost": "{2}{B}",
     "oracleText": "Flash\nYou control your opponents while they're searching their libraries.\nWhile an opponent is searching their library, they exile each card they find. You may play those cards for as long as they remain exiled, and you may spend mana as though it were mana of any color to cast them.",
     "rulings": [
       {
@@ -2047,6 +2151,7 @@
     "card": "Drannith Magistrate",
     "oracleId": "aadd10d0-6dd0-4bdc-8d93-ff08e29a5863",
     "typeLine": "Creature — Human Wizard",
+    "manaCost": "{1}{W}",
     "oracleText": "Your opponents can't cast spells from anywhere other than their hands.",
     "rulings": [
       {
@@ -2067,6 +2172,7 @@
     "card": "Rule of Law",
     "oracleId": "53e88e64-6f82-4154-a66e-6aeb0154b368",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{W}",
     "oracleText": "Each player can't cast more than one spell each turn.",
     "rulings": [
       {
@@ -2083,6 +2189,7 @@
     "card": "Deafening Silence",
     "oracleId": "6284ef01-d17d-4584-aecb-1b841ae638e5",
     "typeLine": "Enchantment",
+    "manaCost": "{W}",
     "oracleText": "Each player can't cast more than one noncreature spell each turn.",
     "rulings": [
       {
@@ -2103,6 +2210,7 @@
     "card": "Stasis",
     "oracleId": "a8cf1379-0195-4e11-b994-481ef1284245",
     "typeLine": "Enchantment",
+    "manaCost": "{1}{U}",
     "oracleText": "Players skip their untap steps.\nAt the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.",
     "rulings": [
       {
@@ -2119,6 +2227,7 @@
     "card": "Static Orb",
     "oracleId": "0004ebd0-dfd6-4276-b4a6-de0003e94237",
     "typeLine": "Artifact",
+    "manaCost": "{3}",
     "oracleText": "As long as this artifact is untapped, players can't untap more than two permanents during their untap steps.",
     "rulings": [
       {
@@ -2131,6 +2240,7 @@
     "card": "Sphere of Resistance",
     "oracleId": "09c96077-3804-4f12-a613-5bebc5e0413f",
     "typeLine": "Artifact",
+    "manaCost": "{2}",
     "oracleText": "Spells cost {1} more to cast.",
     "rulings": [
       {
@@ -2143,6 +2253,7 @@
     "card": "Trinisphere",
     "oracleId": "69d994f2-b8f6-425f-9655-977c2144d40c",
     "typeLine": "Artifact",
+    "manaCost": "{3}",
     "oracleText": "As long as this artifact is untapped, each spell that would cost less than three mana to cast costs three mana to cast. (Additional mana in the cost may be paid with any color of mana or colorless mana. For example, a spell that would cost {1}{B} to cast costs {2}{B} to cast instead.)",
     "rulings": [
       {
@@ -2159,6 +2270,7 @@
     "card": "The Gitrog Monster",
     "oracleId": "a5e54d2b-aad8-4ddd-af4b-13668913762b",
     "typeLine": "Legendary Creature — Frog Horror",
+    "manaCost": "{3}{B}{G}",
     "oracleText": "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.",
     "rulings": [
       {
@@ -2171,6 +2283,7 @@
     "card": "Dark Depths",
     "oracleId": "c9b82110-7dfd-4617-9399-9510be449043",
     "typeLine": "Legendary Snow Land",
+    "manaCost": "",
     "oracleText": "Dark Depths enters with ten ice counters on it.\n{3}: Remove an ice counter from Dark Depths.\nWhen Dark Depths has no ice counters on it, sacrifice it. If you do, create Marit Lage, a legendary 20/20 black Avatar creature token with flying and indestructible.",
     "rulings": [
       {
@@ -2191,6 +2304,7 @@
     "card": "Thespian's Stage",
     "oracleId": "b01e698b-608a-4fc7-8073-b01d044743ec",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{2}, {T}: This land becomes a copy of target land, except it has this ability.",
     "rulings": [
       {
@@ -2215,6 +2329,7 @@
     "card": "Vampire Hexmage",
     "oracleId": "fcb2a95b-cef0-4b29-8b2b-538f380aff2b",
     "typeLine": "Creature — Vampire Shaman",
+    "manaCost": "{B}{B}",
     "oracleText": "First strike\nSacrifice this creature: Remove all counters from target permanent.",
     "rulings": [
       {
@@ -2231,6 +2346,7 @@
     "card": "Sakashima of a Thousand Faces",
     "oracleId": "8ecdaf4b-4442-42da-9714-4257a83faf50",
     "typeLine": "Legendary Creature — Human Rogue",
+    "manaCost": "{3}{U}",
     "oracleText": "You may have Sakashima enter as a copy of another creature you control, except it has Sakashima's other abilities.\nThe \"legend rule\" doesn't apply to permanents you control.\nPartner (You can have two commanders if both have partner.)",
     "rulings": [
       {
@@ -2311,6 +2427,7 @@
     "card": "Sakashima's Student",
     "oracleId": "afcc68e2-3634-43ce-ae99-dd2ec735d146",
     "typeLine": "Creature — Human Ninja",
+    "manaCost": "{2}{U}{U}",
     "oracleText": "Ninjutsu {1}{U} ({1}{U}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nYou may have this creature enter as a copy of any creature on the battlefield, except it's a Ninja in addition to its other creature types.",
     "rulings": [
       {
@@ -2351,6 +2468,7 @@
     "card": "Spark Double",
     "oracleId": "8dcb35e5-ae44-455f-86e3-4a77d496ff34",
     "typeLine": "Creature — Illusion",
+    "manaCost": "{3}{U}",
     "oracleText": "You may have this creature enter as a copy of a creature or planeswalker you control, except it enters with an additional +1/+1 counter on it if it's a creature, it enters with an additional loyalty counter on it if it's a planeswalker, and it isn't legendary.",
     "rulings": [
       {
@@ -2395,6 +2513,7 @@
     "card": "Helm of the Host",
     "oracleId": "83b43aba-bf9c-4da2-967d-9daa632e97d2",
     "typeLine": "Legendary Artifact — Equipment",
+    "manaCost": "{4}",
     "oracleText": "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste.\nEquip {5}",
     "rulings": [
       {
@@ -2435,6 +2554,7 @@
     "card": "Lightning Greaves",
     "oracleId": "ca204b66-8d0c-431a-8d34-282f7c2d17da",
     "typeLine": "Artifact — Equipment",
+    "manaCost": "{2}",
     "oracleText": "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.)\nEquip {0}",
     "rulings": [
       {
@@ -2451,6 +2571,7 @@
     "card": "Swiftfoot Boots",
     "oracleId": "c8b143ad-43ec-4e0d-a440-e348daa31391",
     "typeLine": "Artifact — Equipment",
+    "manaCost": "{2}",
     "oracleText": "Equipped creature has hexproof and haste. (It can't be the target of spells or abilities your opponents control. It can attack and {T} no matter when it came under your control.)\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)",
     "rulings": [
       {
@@ -2463,6 +2584,7 @@
     "card": "Darksteel Plate",
     "oracleId": "b5b4cf54-ed5e-42d0-9d98-5fec76b0b0b8",
     "typeLine": "Artifact — Equipment",
+    "manaCost": "{3}",
     "oracleText": "Indestructible\nEquipped creature has indestructible.\nEquip {2}",
     "rulings": []
   },
@@ -2470,6 +2592,7 @@
     "card": "Shielded by Faith",
     "oracleId": "79085dea-8daa-41c0-a975-61e3e6da2e26",
     "typeLine": "Enchantment — Aura",
+    "manaCost": "{1}{W}{W}",
     "oracleText": "Enchant creature\nEnchanted creature has indestructible.\nWhenever a creature enters, you may attach this Aura to that creature.",
     "rulings": []
   },
@@ -2477,6 +2600,7 @@
     "card": "Yawgmoth, Thran Physician",
     "oracleId": "a1e232c0-dc38-47be-a5a0-f68bc1d86a29",
     "typeLine": "Legendary Creature — Human Cleric",
+    "manaCost": "{2}{B}{B}",
     "oracleText": "Protection from Humans\nPay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one target creature and draw a card.\n{B}{B}, Discard a card: Proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
     "rulings": [
       {
@@ -2533,6 +2657,7 @@
     "card": "Nim Deathmantle",
     "oracleId": "66d41377-626d-4ae6-ba86-17bf0c8b3362",
     "typeLine": "Artifact — Equipment",
+    "manaCost": "{2}",
     "oracleText": "Equipped creature gets +2/+2, has intimidate, and is a black Zombie. (A creature with intimidate can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nWhenever a nontoken creature is put into your graveyard from the battlefield, you may pay {4}. If you do, return that card to the battlefield and attach this Equipment to it.\nEquip {4}",
     "rulings": [
       {
@@ -2573,6 +2698,7 @@
     "card": "Reveillark",
     "oracleId": "1be13ede-98f8-497e-800c-03e5802932b3",
     "typeLine": "Creature — Elemental",
+    "manaCost": "{4}{W}",
     "oracleText": "Flying\nWhen this creature leaves the battlefield, return up to two target creature cards with power 2 or less from your graveyard to the battlefield.\nEvoke {5}{W} (You may cast this spell for its evoke cost. If you do, it's sacrificed when it enters.)",
     "rulings": [
       {
@@ -2609,6 +2735,7 @@
     "card": "Karmic Guide",
     "oracleId": "8c31fec9-e4b3-4761-990e-7be38eb05604",
     "typeLine": "Creature — Angel Spirit",
+    "manaCost": "{3}{W}{W}",
     "oracleText": "Flying, protection from black\nEcho {3}{W}{W} (At the beginning of your upkeep, if this came under your control since the beginning of your last upkeep, sacrifice it unless you pay its echo cost.)\nWhen this creature enters, return target creature card from your graveyard to the battlefield.",
     "rulings": [
       {
@@ -2625,6 +2752,7 @@
     "card": "Kaalia of the Vast",
     "oracleId": "cb8d80c9-ed58-4f2d-aa8c-c383370c7f1a",
     "typeLine": "Legendary Creature — Human Cleric",
+    "manaCost": "{1}{R}{W}{B}",
     "oracleText": "Flying\nWhenever Kaalia attacks an opponent, you may put an Angel, Demon, or Dragon creature card from your hand onto the battlefield tapped and attacking that opponent.",
     "rulings": [
       {
@@ -2653,6 +2781,7 @@
     "card": "Edgar Markov",
     "oracleId": "41e2790d-49f5-4e98-b8d9-04179f47f13a",
     "typeLine": "Legendary Creature — Vampire Knight",
+    "manaCost": "{3}{R}{W}{B}",
     "oracleText": "Eminence — Whenever you cast another Vampire spell, if Edgar is in the command zone or on the battlefield, create a 1/1 black Vampire creature token.\nFirst strike, haste\nWhenever Edgar attacks, put a +1/+1 counter on each Vampire you control.",
     "rulings": [
       {
@@ -2669,6 +2798,7 @@
     "card": "Krenko, Mob Boss",
     "oracleId": "68418069-f615-40ef-ae0d-764192acae00",
     "typeLine": "Legendary Creature — Goblin Warrior",
+    "manaCost": "{2}{R}{R}",
     "oracleText": "{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.",
     "rulings": [
       {
@@ -2681,6 +2811,7 @@
     "card": "Atraxa, Praetors' Voice",
     "oracleId": "7e6b9b59-cd68-4e3c-827b-38833c92d6eb",
     "typeLine": "Legendary Creature — Phyrexian Angel Horror",
+    "manaCost": "{G}{W}{U}{B}",
     "oracleText": "Flying, vigilance, deathtouch, lifelink\nAt the beginning of your end step, proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
     "rulings": [
       {
@@ -2713,6 +2844,7 @@
     "card": "Ezuri, Claw of Progress",
     "oracleId": "40eacdae-fae5-46b9-a9e5-9211469f74fc",
     "typeLine": "Legendary Creature — Phyrexian Elf Warrior",
+    "manaCost": "{2}{G}{U}",
     "oracleText": "Whenever a creature you control with power 2 or less enters, you get an experience counter.\nAt the beginning of combat on your turn, put X +1/+1 counters on another target creature you control, where X is the number of experience counters you have.",
     "rulings": [
       {
@@ -2733,6 +2865,7 @@
     "card": "Meren of Clan Nel Toth",
     "oracleId": "0310dfdb-0498-488d-9f1a-279f8239e024",
     "typeLine": "Legendary Creature — Human Shaman",
+    "manaCost": "{2}{B}{G}",
     "oracleText": "Whenever another creature you control dies, you get an experience counter.\nAt the beginning of your end step, choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of experience counters you have, return it to the battlefield. Otherwise, put it into your hand.",
     "rulings": [
       {
@@ -2765,6 +2898,7 @@
     "card": "Muldrotha, the Gravetide",
     "oracleId": "e4625704-1d52-44e4-804f-2f45644d76ac",
     "typeLine": "Legendary Creature — Elemental Avatar",
+    "manaCost": "{3}{B}{G}{U}",
     "oracleText": "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard. (If a card has multiple permanent types, choose one as you play it.)",
     "rulings": [
       {
@@ -2805,6 +2939,7 @@
     "card": "Tergrid, God of Fright // Tergrid's Lantern",
     "oracleId": "8485cfaa-1dbf-432b-b5d0-92a6aa6a329b",
     "typeLine": "Legendary Creature — God // Legendary Artifact",
+    "manaCost": "{3}{B}{B}",
     "oracleText": "Tergrid, God of Fright\nMenace\nWhenever an opponent sacrifices a nontoken permanent or discards a permanent card, you may put that card from a graveyard onto the battlefield under your control.\n//\nTergrid's Lantern\n{T}: Target player loses 3 life unless they sacrifice a nonland permanent of their choice or discard a card.\n{3}{B}: Untap Tergrid's Lantern.",
     "rulings": [
       {
@@ -2873,6 +3008,7 @@
     "card": "Korvold, Fae-Cursed King",
     "oracleId": "9ae669dd-7e60-4649-b96e-35da28be641a",
     "typeLine": "Legendary Creature — Dragon Noble",
+    "manaCost": "{2}{B}{R}{G}",
     "oracleText": "Flying\nWhenever Korvold enters or attacks, sacrifice another permanent.\nWhenever you sacrifice a permanent, put a +1/+1 counter on Korvold and draw a card.",
     "rulings": [
       {
@@ -2901,6 +3037,7 @@
     "card": "Prosper, Tome-Bound",
     "oracleId": "1e9b0fd6-5aae-401a-8df5-d94ce6442696",
     "typeLine": "Legendary Creature — Tiefling Warlock",
+    "manaCost": "{2}{B}{R}",
     "oracleText": "Deathtouch\nMystic Arcanum — At the beginning of your end step, exile the top card of your library. Until the end of your next turn, you may play that card.\nPact Boon — Whenever you play a card from exile, create a Treasure token.",
     "rulings": [
       {
@@ -2917,6 +3054,7 @@
     "card": "Yuriko, the Tiger's Shadow",
     "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
     "typeLine": "Legendary Creature — Human Ninja",
+    "manaCost": "{1}{U}{B}",
     "oracleText": "Commander ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand or the command zone tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, reveal the top card of your library and put that card into your hand. Each opponent loses life equal to that card's mana value.",
     "rulings": [
       {
@@ -2941,6 +3079,7 @@
     "card": "Tymna the Weaver",
     "oracleId": "d15642e4-e61c-4d29-af48-de837991245e",
     "typeLine": "Legendary Creature — Human Cleric",
+    "manaCost": "{1}{W}{B}",
     "oracleText": "Lifelink\nAt the beginning of each of your postcombat main phases, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.\nPartner (You can have two commanders if both have partner.)",
     "rulings": [
       {
@@ -2989,6 +3128,7 @@
     "card": "Thrasios, Triton Hero",
     "oracleId": "3d867016-2601-4a37-a73d-308898d3bd37",
     "typeLine": "Legendary Creature — Merfolk Wizard",
+    "manaCost": "{G}{U}",
     "oracleText": "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.\nPartner (You can have two commanders if both have partner.)",
     "rulings": [
       {
@@ -3033,6 +3173,7 @@
     "card": "Rograkh, Son of Rohgahh",
     "oracleId": "584cee10-f18c-4633-95cc-f2e7a11841ac",
     "typeLine": "Legendary Creature — Kobold Warrior",
+    "manaCost": "{0}",
     "oracleText": "First strike, menace, trample\nPartner (You can have two commanders if both have partner.)",
     "rulings": [
       {
@@ -3069,6 +3210,7 @@
     "card": "Kraum, Ludevic's Opus",
     "oracleId": "5f694f2d-9349-4988-b2b4-788136d4293e",
     "typeLine": "Legendary Creature — Zombie Horror",
+    "manaCost": "{3}{U}{R}",
     "oracleText": "Flying, haste\nWhenever an opponent casts their second spell each turn, draw a card.\nPartner (You can have two commanders if both have partner.)",
     "rulings": [
       {
@@ -3121,6 +3263,7 @@
     "card": "Najeela, the Blade-Blossom",
     "oracleId": "09619943-6aec-4080-ace5-a0c6ebb23f1c",
     "typeLine": "Legendary Creature — Human Warrior",
+    "manaCost": "{2}{R}",
     "oracleText": "Whenever a Warrior attacks, you may have its controller create a 1/1 white Warrior creature token that's tapped and attacking.\n{W}{U}{B}{R}{G}: Untap all attacking creatures. They gain trample, lifelink, and haste until end of turn. After this phase, there is an additional combat phase. Activate only during combat.",
     "rulings": [
       {
@@ -3145,6 +3288,7 @@
     "card": "Derevi, Empyrial Tactician",
     "oracleId": "afa49a09-146f-4439-850e-dd1938c93cef",
     "typeLine": "Legendary Creature — Bird Wizard",
+    "manaCost": "{G}{W}{U}",
     "oracleText": "Flying\nWhen Derevi enters and whenever a creature you control deals combat damage to a player, you may tap or untap target permanent.\n{1}{G}{W}{U}: Put Derevi onto the battlefield from the command zone.",
     "rulings": [
       {
@@ -3161,6 +3305,7 @@
     "card": "Golos, Tireless Pilgrim",
     "oracleId": "efe9c3e0-7315-408e-9903-9d25a681039b",
     "typeLine": "Legendary Artifact Creature — Scout",
+    "manaCost": "{5}",
     "oracleText": "When Golos enters, you may search your library for a land card, put that card onto the battlefield tapped, then shuffle.\n{2}{W}{U}{B}{R}{G}: Exile the top three cards of your library. You may play them this turn without paying their mana costs.",
     "rulings": [
       {
@@ -3185,6 +3330,7 @@
     "card": "Leovold, Emissary of Trest",
     "oracleId": "d5d91377-fd66-4dbe-a092-07f2ea379ca7",
     "typeLine": "Legendary Creature — Elf Advisor",
+    "manaCost": "{B}{G}{U}",
     "oracleText": "Each opponent can't draw more than one card each turn.\nWhenever you or a permanent you control becomes the target of a spell or ability an opponent controls, you may draw a card.",
     "rulings": [
       {
@@ -3213,6 +3359,7 @@
     "card": "Sen Triplets",
     "oracleId": "f0c5864f-83c3-4d99-8f97-0ab92608fff3",
     "typeLine": "Legendary Artifact Creature — Human Wizard",
+    "manaCost": "{2}{W}{U}{B}",
     "oracleText": "At the beginning of your upkeep, choose target opponent. This turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play lands and cast spells from that player's hand this turn.",
     "rulings": [
       {
@@ -3245,6 +3392,7 @@
     "card": "Hullbreacher",
     "oracleId": "2f533667-e29b-4bec-897a-e7a9eee08314",
     "typeLine": "Creature — Merfolk Pirate",
+    "manaCost": "{2}{U}",
     "oracleText": "Flash\nIf an opponent would draw a card except the first one they draw in each of their draw steps, instead you create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
     "rulings": [
       {
@@ -3261,6 +3409,7 @@
     "card": "Consecrated Sphinx",
     "oracleId": "311a449d-dc74-46e6-9a47-6a597931f736",
     "typeLine": "Creature — Sphinx",
+    "manaCost": "{4}{U}{U}",
     "oracleText": "Flying\nWhenever an opponent draws a card, you may draw two cards.",
     "rulings": [
       {
@@ -3281,6 +3430,7 @@
     "card": "Mana Crypt",
     "oracleId": "2c63e4e1-89d2-4bc6-a232-94e75c4b1c8a",
     "typeLine": "Artifact",
+    "manaCost": "{0}",
     "oracleText": "At the beginning of your upkeep, flip a coin. If you lose the flip, this artifact deals 3 damage to you.\n{T}: Add {C}{C}.",
     "rulings": [
       {
@@ -3293,6 +3443,7 @@
     "card": "Mana Vault",
     "oracleId": "736892cb-a34b-4bb9-b56c-e26e3db207a2",
     "typeLine": "Artifact",
+    "manaCost": "{1}",
     "oracleText": "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.",
     "rulings": []
   },
@@ -3300,6 +3451,7 @@
     "card": "Jeweled Lotus",
     "oracleId": "23216e59-f147-4bb7-a698-12777c2f8584",
     "typeLine": "Artifact",
+    "manaCost": "{0}",
     "oracleText": "{T}, Sacrifice this artifact: Add three mana of any one color. Spend this mana only to cast your commander.",
     "rulings": []
   },
@@ -3307,6 +3459,7 @@
     "card": "Chrome Mox",
     "oracleId": "ec3d4466-547c-4e02-b1b5-a156ec4637e9",
     "typeLine": "Artifact",
+    "manaCost": "{0}",
     "oracleText": "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors.",
     "rulings": [
       {
@@ -3327,6 +3480,7 @@
     "card": "Mox Diamond",
     "oracleId": "f3c5978a-70fa-431f-933b-b954bd0db0ea",
     "typeLine": "Artifact",
+    "manaCost": "{0}",
     "oracleText": "If this artifact would enter, you may discard a land card instead. If you do, put this artifact onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
     "rulings": [
       {
@@ -3339,6 +3493,7 @@
     "card": "Panoptic Mirror",
     "oracleId": "505cb78d-b292-4d16-b3f2-110164b4cc93",
     "typeLine": "Artifact",
+    "manaCost": "{5}",
     "oracleText": "Imprint — {X}, {T}: You may exile an instant or sorcery card with mana value X from your hand.\nAt the beginning of your upkeep, you may copy a card exiled with this artifact. If you do, you may cast the copy without paying its mana cost.",
     "rulings": [
       {
@@ -3375,6 +3530,7 @@
     "card": "Time Warp",
     "oracleId": "dbd6a94b-62ff-4a10-9d52-bdd90b26e425",
     "typeLine": "Sorcery",
+    "manaCost": "{3}{U}{U}",
     "oracleText": "Target player takes an extra turn after this one.",
     "rulings": [
       {
@@ -3387,6 +3543,7 @@
     "card": "Mass Hysteria",
     "oracleId": "4500131b-7417-4f30-a1b0-97d51b2e6458",
     "typeLine": "Enchantment",
+    "manaCost": "{R}",
     "oracleText": "All creatures have haste.",
     "rulings": []
   },
@@ -3394,6 +3551,7 @@
     "card": "Sunforger",
     "oracleId": "d1421070-a3cc-4af3-bf91-0f97372f4161",
     "typeLine": "Artifact — Equipment",
+    "manaCost": "{3}",
     "oracleText": "Equipped creature gets +4/+0.\n{R}{W}, Unattach this Equipment: Search your library for a red or white instant card with mana value 4 or less and cast that card without paying its mana cost. Then shuffle.\nEquip {3}",
     "rulings": [
       {
@@ -3414,6 +3572,7 @@
     "card": "Dualcaster Mage",
     "oracleId": "8eb7c0a5-6190-40de-b473-2d1daa3bbe28",
     "typeLine": "Creature — Human Wizard",
+    "manaCost": "{1}{R}{R}",
     "oracleText": "Flash\nWhen this creature enters, copy target instant or sorcery spell. You may choose new targets for the copy.",
     "rulings": [
       {
@@ -3450,6 +3609,7 @@
     "card": "Ghostly Flicker",
     "oracleId": "ad0070db-6454-41cb-861f-8f5b8fc2a3b8",
     "typeLine": "Instant",
+    "manaCost": "{2}{U}",
     "oracleText": "Exile two target artifacts, creatures, and/or lands you control, then return those cards to the battlefield under your control.",
     "rulings": [
       {
@@ -3462,6 +3622,7 @@
     "card": "Ephemerate",
     "oracleId": "0fd57894-b917-41c8-a394-360d1d31b236",
     "typeLine": "Instant",
+    "manaCost": "{W}",
     "oracleText": "Exile target creature you control, then return it to the battlefield under its owner's control.\nRebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)",
     "rulings": [
       {
@@ -3486,6 +3647,7 @@
     "card": "Eternal Witness",
     "oracleId": "30b24e8e-3b0e-4d8e-90f3-f66eb7c1858c",
     "typeLine": "Creature — Human Shaman",
+    "manaCost": "{1}{G}{G}",
     "oracleText": "When this creature enters, you may return target card from your graveyard to your hand.",
     "rulings": [
       {
@@ -3498,6 +3660,7 @@
     "card": "Riftsweeper",
     "oracleId": "1ba0dce5-e767-47cc-9967-174e52bce120",
     "typeLine": "Creature — Elf Shaman",
+    "manaCost": "{1}{G}",
     "oracleText": "When this creature enters, choose target face-up exiled card. Its owner shuffles it into their library.",
     "rulings": [
       {
@@ -3518,6 +3681,7 @@
     "card": "Hushbringer",
     "oracleId": "3d21f710-6bbc-41ae-a8e5-02debe3e02bd",
     "typeLine": "Creature — Faerie",
+    "manaCost": "{1}{W}",
     "oracleText": "Flying, lifelink\nCreatures entering or dying don't cause abilities to trigger.",
     "rulings": [
       {
@@ -3562,6 +3726,7 @@
     "card": "Sensei's Divining Top",
     "oracleId": "13575cf9-65c1-4861-b21e-eb2155e07766",
     "typeLine": "Artifact",
+    "manaCost": "{1}",
     "oracleText": "{1}: Look at the top three cards of your library, then put them back in any order.\n{T}: Draw a card, then put this artifact on top of its owner's library.",
     "rulings": [
       {
@@ -3578,6 +3743,7 @@
     "card": "Mystic Forge",
     "oracleId": "994bc16d-fdc6-475c-96df-beeb4d5aa03e",
     "typeLine": "Artifact",
+    "manaCost": "{4}",
     "oracleText": "You may look at the top card of your library any time.\nYou may cast artifact spells and colorless spells from the top of your library.\n{T}, Pay 1 life: Exile the top card of your library.",
     "rulings": [
       {
@@ -3610,6 +3776,7 @@
     "card": "Scroll Rack",
     "oracleId": "648bd03d-247e-4d6f-87a9-12a67688cbf5",
     "typeLine": "Artifact",
+    "manaCost": "{2}",
     "oracleText": "{1}, {T}: Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.",
     "rulings": [
       {
@@ -3622,6 +3789,7 @@
     "card": "Land Tax",
     "oracleId": "d2d9ecea-7925-420e-98b9-2f87f41f387c",
     "typeLine": "Enchantment",
+    "manaCost": "{W}",
     "oracleText": "At the beginning of your upkeep, if an opponent controls more lands than you, you may search your library for up to three basic land cards, reveal them, put them into your hand, then shuffle.",
     "rulings": [
       {
@@ -3642,6 +3810,7 @@
     "card": "Field of the Dead",
     "oracleId": "aa959340-c869-4caa-92c7-572bd8d23eef",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "This land enters tapped.\n{T}: Add {C}.\nWhenever this land or another land you control enters, if you control seven or more lands with different names, create a 2/2 black Zombie creature token.",
     "rulings": [
       {
@@ -3662,6 +3831,7 @@
     "card": "Cabal Coffers",
     "oracleId": "7358e164-5704-4e78-9b21-6a9bf2a968ce",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{2}, {T}: Add {B} for each Swamp you control.",
     "rulings": [
       {
@@ -3674,6 +3844,7 @@
     "card": "Urborg, Tomb of Yawgmoth",
     "oracleId": "db6174d7-211d-4817-b8e4-8384594c83f9",
     "typeLine": "Legendary Land",
+    "manaCost": "",
     "oracleText": "Each land is a Swamp in addition to its other land types.",
     "rulings": [
       {
@@ -3698,6 +3869,7 @@
     "card": "Strip Mine",
     "oracleId": "d21a89eb-7c5b-459a-acc7-12b20b13bf79",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{T}, Sacrifice this land: Destroy target land.",
     "rulings": []
   },
@@ -3705,6 +3877,7 @@
     "card": "Wasteland",
     "oracleId": "09a70ae8-3859-4a09-901d-dce063fa3b5f",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{T}, Sacrifice this land: Destroy target nonbasic land.",
     "rulings": []
   },
@@ -3712,6 +3885,7 @@
     "card": "Glacial Chasm",
     "oracleId": "73e7a2ad-d11c-4867-b97d-f971809da778",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhen this land enters, sacrifice a land.\nCreatures you control can't attack.\nPrevent all damage that would be dealt to you.",
     "rulings": [
       {
@@ -3724,6 +3898,7 @@
     "card": "Maze of Ith",
     "oracleId": "38a12bd7-4394-44a8-91a0-6a4ff7fa4f71",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Untap target attacking creature. Prevent all combat damage that would be dealt to and dealt by that creature this turn.",
     "rulings": [
       {
@@ -3748,6 +3923,7 @@
     "card": "Kor Haven",
     "oracleId": "276cece9-f9f2-46e6-ae76-daddaa2fb9ab",
     "typeLine": "Legendary Land",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{1}{W}, {T}: Prevent all combat damage that would be dealt by target attacking creature this turn.",
     "rulings": []
   },
@@ -3755,6 +3931,7 @@
     "card": "Homeward Path",
     "oracleId": "cb8ec2e4-8223-4172-8f2c-37c918a573fa",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{T}: Each player gains control of all creatures they own.",
     "rulings": [
       {
@@ -3771,6 +3948,7 @@
     "card": "Command Beacon",
     "oracleId": "7e8c2a18-e404-40ff-a9e0-ec3eeb6d576e",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{T}, Sacrifice this land: Put your commander into your hand from the command zone.",
     "rulings": [
       {
@@ -3803,6 +3981,7 @@
     "card": "Leyline of the Void",
     "oracleId": "f4e32fc1-1b8d-441e-8e76-71f19f98e925",
     "typeLine": "Enchantment",
+    "manaCost": "{2}{B}{B}",
     "oracleText": "If this card is in your opening hand, you may begin the game with it on the battlefield.\nIf a card would be put into an opponent's graveyard from anywhere, exile it instead.",
     "rulings": [
       {
@@ -3827,6 +4006,7 @@
     "card": "Dauthi Voidwalker",
     "oracleId": "f1c2dbe2-fbe0-4058-bdf1-91d1b1832786",
     "typeLine": "Creature — Dauthi Rogue",
+    "manaCost": "{B}{B}",
     "oracleText": "Shadow (This creature can block or be blocked by only creatures with shadow.)\nIf a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it.\n{T}, Sacrifice this creature: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.",
     "rulings": [
       {
@@ -3863,6 +4043,7 @@
     "card": "Bojuka Bog",
     "oracleId": "04b7362d-0490-4cb0-b5d7-2a7732f659ce",
     "typeLine": "Land",
+    "manaCost": "",
     "oracleText": "This land enters tapped.\nWhen this land enters, exile target player's graveyard.\n{T}: Add {B}.",
     "rulings": []
   },
@@ -3870,6 +4051,7 @@
     "card": "Scavenger Grounds",
     "oracleId": "5ece7d03-9ee7-4953-a06e-9d8e41874903",
     "typeLine": "Land — Desert",
+    "manaCost": "",
     "oracleText": "{T}: Add {C}.\n{2}, {T}, Sacrifice a Desert: Exile all graveyards.",
     "rulings": [
       {

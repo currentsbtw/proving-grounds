@@ -10,7 +10,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { JudgeDriver } from '../../src/domain/judge.ts';
-import { ModelAuthError, ModelLimitError, type JudgeModel } from '../../server/judge/model.ts';
+import {
+  ModelAuthError,
+  ModelLimitError,
+  TRANSIENT_RETRY_DELAYS_MS,
+  TRANSIENT_STOP_CODE,
+  type JudgeModel,
+} from '../../server/judge/model.ts';
 import { probeApiCredentials, probeClaudeCode, selectDriver } from '../../server/judge/drivers/index.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -172,6 +178,32 @@ export async function resolveModel(
 /** Why a run stopped early, when it did. Both are the driver saying "not now". */
 export type StopKind = 'auth' | 'limit';
 
+/** Did this stop come from a refresh collision that outlasted its retries? */
+export function isTransientStop(err: unknown): boolean {
+  return err instanceof ModelAuthError && err.code === TRANSIENT_STOP_CODE;
+}
+
+/**
+ * The gate's one-line reason for a stopped run. Split out so the wording is
+ * checkable without running an eval, and because the three stops want three
+ * different sentences: a spent plan window waits on a clock, a bad login waits
+ * on the player, and a refresh collision waits on nothing at all -- rerunning
+ * resumes it, and telling the player to log in again would be a wild goose chase.
+ */
+export function stopReasonLine(
+  kind: StopKind,
+  undispatched: number,
+  opts?: { transient?: boolean; retries?: number },
+): string {
+  const never = `${undispatched} item${undispatched === 1 ? '' : 's'} never asked`;
+  if (kind === 'limit') return `run stopped at the plan limit with ${never}`;
+  if (opts?.transient) {
+    const n = opts.retries ?? TRANSIENT_RETRY_DELAYS_MS.length;
+    return `run stopped: the CLI could not refresh its login after ${n} retries (transient; rerun resumes), ${never}`;
+  }
+  return `run stopped: the driver could not authenticate, ${never}`;
+}
+
 /**
  * The one sentence a run that cannot continue gets, said the same way by both
  * scripts. Returns null when `err` was some other failure, which the caller owns.
@@ -192,6 +224,13 @@ export function reportStop(driver: JudgeDriver, err: unknown): StopKind | null {
     return 'limit';
   }
   if (err instanceof ModelAuthError) {
+    // A collision that outlasted its retries is not a login the player can fix.
+    if (isTransientStop(err)) {
+      console.error(
+        `Stopped: the CLI could not refresh its login after ${TRANSIENT_RETRY_DELAYS_MS.length} retries (${err.message}). Run this again; graded items are kept and the rest are re-asked.`,
+      );
+      return 'auth';
+    }
     console.error(
       driver === 'claude-code'
         ? `Stopped: Claude Code is not logged in (${err.message}). Run claude /login once, then run this again.`
