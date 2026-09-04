@@ -29,6 +29,13 @@ export interface CardData {
   imageNormal?: string;
   imageSmall?: string;
   layout: string;
+  /**
+   * Scryfall's own list of the keywords printed on the card. Optional because
+   * cards cached before it was mapped are still perfectly good cards — nothing
+   * re-fetches on a schema addition, and the glossary reads the oracle text
+   * rather than this list, so an absent one costs nothing.
+   */
+  keywords?: string[];
 }
 
 export interface TokenSpec {

@@ -28,6 +28,7 @@ interface ScryfallCard extends ScryfallFace {
   cmc?: number;
   color_identity?: string[];
   layout?: string;
+  keywords?: string[];
   card_faces?: ScryfallFace[];
 }
 
@@ -74,6 +75,11 @@ export function toCardData(card: ScryfallCard): CardData {
     imageNormal: images?.normal,
     imageSmall: images?.small,
     layout: card.layout ?? 'normal',
+    // Scryfall lists the keywords on a card whether or not they appear as bare
+    // words in the oracle text, so this is the reliable answer to "what does
+    // this card do that has a name". Left off entirely when the card has none,
+    // to keep the cached row the same shape it has always been.
+    keywords: card.keywords && card.keywords.length > 0 ? card.keywords : undefined,
   };
 }
 

@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { CardData, CardInstance } from '../../domain/types';
+import { Glossed } from '../glossary/Glossed';
 import { CARD_ASPECT } from './cardGeometry';
 
 /** Widest the panel gets. The image fills it, so this is the printed card size. */
@@ -28,6 +29,13 @@ const HOVER_DELAY = 350;
  */
 const SWAP_DELAY = 90;
 const SWAP_WINDOW = 450;
+/**
+ * How long the panel survives the pointer leaving the card. The oracle text in
+ * it is glossed, so a keyword in it is something to point at, and the trip from
+ * the card to that word crosses the gap between them. Short enough that a
+ * pointer heading anywhere else never notices it.
+ */
+const LEAVE_GRACE = 220;
 
 /* ── Controller ──────────────────────────────────────────────────────────── */
 
@@ -44,13 +52,43 @@ let owner: string | null = null;
 let lastChange = 0;
 let pointerDown = false;
 let installed = false;
+/** True while the pointer is inside the open panel itself. */
+let panelHover = false;
+let grace: number | null = null;
+/**
+ * The open panel's element, so the global press handler can tell a press on a
+ * glossed keyword inside it from a press anywhere else. Registered by the panel
+ * rather than looked up, because it is portalled out of the card's subtree.
+ */
+let panelEl: HTMLElement | null = null;
 const listeners = new Set<() => void>();
 
 function setOwner(next: string | null): void {
   if (owner === next) return;
   owner = next;
   lastChange = performance.now();
+  // Whatever the last panel knew about the pointer died with it.
+  panelHover = false;
   for (const listener of listeners) listener();
+}
+
+function cancelGrace(): void {
+  if (grace === null) return;
+  window.clearTimeout(grace);
+  grace = null;
+}
+
+/**
+ * Close, but leave the panel up long enough for the pointer to reach it. The
+ * check is deferred rather than the close: a panel the pointer landed on stays,
+ * and one the owner has already changed out from under is left alone.
+ */
+function closeAfterGrace(id: string): void {
+  cancelGrace();
+  grace = window.setTimeout(() => {
+    grace = null;
+    if (!panelHover && owner === id) setOwner(null);
+  }, LEAVE_GRACE);
 }
 
 function subscribe(listener: () => void): () => void {
@@ -70,8 +108,14 @@ function install(): void {
   installed = true;
   window.addEventListener(
     'pointerdown',
-    () => {
+    (e) => {
       pointerDown = true;
+      // A press inside the panel is the one press that is not on its way
+      // somewhere else: it is a click on a glossed keyword, which focuses the
+      // word and holds its definition open. Taking the panel down under it
+      // would make the keyword unclickable and its tooltip unfocusable.
+      const target = e.target;
+      if (panelEl && target instanceof Node && panelEl.contains(target)) return;
       setOwner(null);
     },
     true,
@@ -98,8 +142,10 @@ export interface CardPreviewHandle {
   onPointerEnter: (e: ReactPointerEvent) => void;
   /** Clears a stale press latch; it never opens a panel on its own. */
   onPointerMove: (e: ReactPointerEvent) => void;
+  /** Closes after a grace period, so the pointer can reach the panel. */
   onPointerLeave: () => void;
   toggle: () => void;
+  /** Closes at once — Escape, a scroll, the card leaving the table. */
   close: () => void;
 }
 
@@ -129,9 +175,24 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
     timer.current = null;
   }, []);
 
+  // The grace timer is only ever this card's to cancel while this card owns the
+  // panel; another card unmounting must not call off a countdown that is not its
+  // own, which would leave the open panel with nothing left to close it.
   const close = useCallback(() => {
     clear();
-    if (owner === id) setOwner(null);
+    if (owner !== id) return;
+    cancelGrace();
+    setOwner(null);
+  }, [clear, id]);
+
+  /**
+   * The pointer leaving the card is not the end of the panel any more: it may
+   * be on its way to a glossed keyword in the oracle text. A pending open is
+   * still cancelled outright — that hover never became a panel.
+   */
+  const leave = useCallback(() => {
+    clear();
+    if (owner === id) closeAfterGrace(id);
   }, [clear, id]);
 
   // A card that leaves the table (played, moved, run ended) takes its preview
@@ -157,6 +218,9 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
       if (!enabled || pointerDown) return;
       if (e.pointerType === 'touch') return;
       clear();
+      // Coming back to the card the panel already belongs to calls off the
+      // countdown that leaving it started.
+      if (owner === id) cancelGrace();
       const delay = performance.now() - lastChange < SWAP_WINDOW ? SWAP_DELAY : HOVER_DELAY;
       timer.current = window.setTimeout(() => {
         timer.current = null;
@@ -177,7 +241,7 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
     id,
     onPointerEnter,
     onPointerMove: unlatch,
-    onPointerLeave: close,
+    onPointerLeave: leave,
     toggle,
     close,
   };
@@ -208,6 +272,15 @@ interface CardPreviewProps {
 export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewProps) {
   const box = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Placement | null>(null);
+
+  // Only one panel is ever up, so the module can hold the open one for the
+  // global press handler to test a press against.
+  useLayoutEffect(() => {
+    panelEl = box.current;
+    return () => {
+      panelEl = null;
+    };
+  }, []);
 
   useLayoutEffect(() => {
     function place(): void {
@@ -277,6 +350,19 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
         width: pos?.width ?? PREVIEW_WIDTH,
         visibility: pos ? 'visible' : 'hidden',
       }}
+      // The panel itself never takes the pointer — the board under it has to
+      // stay clickable — so these only ever fire by way of a glossed keyword
+      // inside it, which does. Reaching one holds the panel open; leaving it
+      // starts the countdown again rather than closing outright, so the pointer
+      // can carry on to the next keyword.
+      onPointerEnter={() => {
+        panelHover = true;
+        cancelGrace();
+      }}
+      onPointerLeave={() => {
+        panelHover = false;
+        closeAfterGrace(id);
+      }}
     >
       {image && (
         <img
@@ -298,7 +384,11 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
         </div>
         {pt && <div className="tbl-preview-pt num">{pt}</div>}
         {typeLine && <div className="tbl-preview-type">{typeLine}</div>}
-        {oracle && <div className="tbl-preview-oracle">{oracle}</div>}
+        {oracle && (
+          <div className="tbl-preview-oracle">
+            <Glossed text={oracle} />
+          </div>
+        )}
       </div>
     </div>,
     document.body,

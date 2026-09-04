@@ -1,51 +1,111 @@
-/* ── Proving Grounds — the readout column ────────────────────────────────── */
+/* ── Proving Grounds — the live HUD ──────────────────────────────────────── */
 /*
-   Printed labels above tabular figures, blocks separated by hairline rules
-   rather than boxed, and one accent held back for whatever needs an answer now.
+   The readout stopped being a rail. It is now a set of translucent panes over a
+   full-width board: three opponent frames along the top edge, whatever each seat
+   is telling you hanging under its own frame, and your own numbers as one bar
+   across the foot. The printed idiom is unchanged — small-caps labels over
+   tabular figures, hairline rules, one accent held back for whatever needs an
+   answer now — it is only the sheet that moved.
 */
 
-.pg-readout {
+/* ── The pane ───────────────────────────────────────────────────────────── */
+
+/*
+   The one recipe every floating piece of the HUD is drawn with: the theme's own
+   ground at 78% (or 92% for the pieces that carry controls), blurred behind, a
+   single hairline, and no radius. A pane is a sheet laid on the board, not a new
+   surface colour, so it never gains a fill of its own or a shadow.
+*/
+/*
+   The fill and the blur ride on a pseudo-element rather than on the pane itself,
+   and this is load-bearing rather than tidy: `backdrop-filter` makes an element
+   the containing block for every fixed-position descendant, and the glossary's
+   keyword tooltip is fixed and positioned from viewport coordinates. On the pane
+   itself the blur silently moved every tooltip opened inside a HUD pane by the
+   pane's own offset. On a pseudo-element with no descendants it cannot.
+*/
+.pg-pane,
+.pg-pane-strong {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  pointer-events: auto;
+}
+
+.pg-pane::before,
+.pg-pane-strong::before {
+  content: '';
+  position: absolute;
+  /* Out to the border box, so the hairline is drawn over the pane's own fill
+     rather than over whatever card happens to be under that edge. */
+  inset: -1px;
+  z-index: -1;
+  background: var(--pane);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.pg-pane-strong::before {
+  background: var(--pane-strong);
+}
+
+/* Blur is a paint effect, not a reading: where it is unavailable the pane simply
+   sits on the ground at full strength rather than letting the board show
+   through text. */
+@supports not (backdrop-filter: blur(8px)) {
+  .pg-pane::before,
+  .pg-pane-strong::before {
+    background: var(--ground);
+  }
+}
+
+/* Forced colours flatten the alpha to one system pair anyway; stating it keeps
+   the pane opaque rather than leaving cards legible through the text. */
+@media (forced-colors: active) {
+  .pg-pane::before,
+  .pg-pane-strong::before {
+    background: Canvas;
+  }
+}
+
+/* Read aloud, never drawn: the full wording of a reading the bar prints
+   abbreviated. Standard recipe — a 1px box clipped to nothing, which every
+   screen reader still treats as rendered. */
+.pg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── The overlay layer ──────────────────────────────────────────────────── */
+
+/*
+   Shares the board's grid cell and contributes no height to it: everything
+   inside is out of flow, so the board is sized exactly as it would be with no
+   HUD at all. The layer itself is inert — only the panes take the pointer — so
+   a card can be dropped anywhere a pane is not.
+*/
+.hud-over {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 20;
   min-width: 0;
-  background: var(--ground);
-}
-
-/* Seats and your own numbers scroll together; tells and the event stay pinned
-   below them, so neither ever scrolls away under the other. */
-.rd-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-  display: flex;
-  flex-direction: column;
-}
-
-/* The rules run across the whole column. At a tall window the
-   two blocks used to end well short of the pinned foot and leave a band of
-   nothing between the numbers and the event waiting below them; the slack now
-   goes to the rules inside each block instead, so every slot keeps its order
-   and its label and the sheet simply fills. `1 0 auto` grows and never shrinks,
-   so a short window still scrolls rather than compressing the rows. */
-.rd-scroll > .rd-block {
-  flex: 1 0 auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  pointer-events: none;
 }
 
 /* ── The settle ─────────────────────────────────────────────────────────── */
 /*
-   On turn advance the column's values settle in reading order — seats, then
-   your own numbers, then the tells and the event waiting at the foot. The two
-   keyframe sets are identical: `data-settle` alternates between them with the
-   turn, and a changed animation name is what replays the animation. Opacity and
-   transform only, so nothing reflows and the figures never move the scan.
+   On turn advance the frames settle. The two keyframe sets are identical:
+   `data-settle` alternates between them with the turn, and a changed animation
+   name is what replays the animation. Opacity and transform only, so nothing
+   reflows and the figures never move the scan.
 */
 @keyframes rd-settle-a {
   from {
@@ -69,55 +129,364 @@
   }
 }
 
-.pg-readout[data-settle='a'] .rd-settle {
+.hud-over[data-settle='a'] .hud-frame {
   animation: rd-settle-a 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.pg-readout[data-settle='b'] .rd-settle {
+.hud-over[data-settle='b'] .hud-frame {
   animation: rd-settle-b 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Reading order: seats, then your own numbers, then the pinned foot. These have
-   to outrank the shorthand above, which would otherwise reset the delay. */
-.pg-readout[data-settle] .rd-settle.is-step2 {
+/* Reading order, left to right across the three seats. */
+.hud-over[data-settle] .hud-col:nth-child(2) .hud-frame {
   animation-delay: 60ms;
 }
 
-.pg-readout[data-settle] .rd-settle.is-step3 {
+.hud-over[data-settle] .hud-col:nth-child(3) .hud-frame {
   animation-delay: 120ms;
 }
 
-/* Reduced motion reads the settled state and nothing else — this is the only
-   motion left in the column. */
+/* Reduced motion reads the settled state and nothing else. */
 @media (prefers-reduced-motion: reduce) {
-  .pg-readout[data-settle] .rd-settle {
+  .hud-over[data-settle] .hud-frame {
     animation: none;
   }
 }
 
-.rd-block {
-  padding: 6px 14px 7px;
-  border-bottom: 1px solid var(--line);
+/* ── Frame placement ────────────────────────────────────────────────────── */
+
+/*
+   Three fixed columns across the top edge — A left, B centred, C right — with
+   the slack between them rather than inside them, so a seat is always in the
+   same place whatever the window is doing. The event pane rides in a second row
+   of the same grid: that is how it can move between seats without ever changing
+   parent, and a live region that changes parent is a live region that stops
+   speaking.
+*/
+.hud-frames {
+  position: absolute;
+  top: var(--hud-inset);
+  left: var(--hud-inset);
+  right: var(--hud-inset);
+  display: grid;
+  grid-template-columns: repeat(3, var(--hud-frame-w));
+  grid-auto-rows: min-content;
+  justify-content: space-between;
+  align-items: start;
+  column-gap: 10px;
 }
 
-/* The event card below already rules the column off, so the last block in the
-   scroll area spends no height on a second rule. */
-.rd-scroll .rd-block:last-child {
-  border-bottom: none;
+/* Positioned, because the detail pane hangs off the bottom of the whole column
+   rather than off the bottom of the frame: below the tells and the queue, so it
+   covers none of them, and out of flow, so opening it costs the grid nothing. */
+.hud-col {
+  grid-row: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
-.rd-head {
+/* ── The seat frame ─────────────────────────────────────────────────────── */
+
+.hud-frame-wrap {
+  min-width: 0;
+}
+
+/* The whole frame is the pin target, so it is one button and nothing inside it
+   is interactive. It is still a printed block: no fill of its own, no radius,
+   and a border that only changes when the seat is the one to hit. The border is
+   `rule` rather than `line` because this pane is a control edge, and because a
+   hairline in `line` over a board of card art was not a frame at all. */
+.hud-frame,
+.hud-detail {
+  border-color: var(--rule);
+}
+
+.hud-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px 8px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.hud-frame:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+/* The accent is spent on the seat to hit, on the frame's own border as well as
+   on its chip: the answer to "who do I attack" is the loudest thing up there. */
+.hud-frame.is-hit {
+  border-color: var(--accent);
+}
+
+.hud-frame-top {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 5px;
+  min-width: 0;
+}
+
+/* The seat letter is the one place on the play surface the display face is
+   allowed: it names a chair, it is never a figure, and it never changes. */
+.hud-seat-id {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.hud-life {
+  flex: none;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.hud-frame-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* An eliminated seat keeps its slot: dimmed, ruled through, never moved. */
+.hud-frame.is-out {
+  opacity: 0.6;
+}
+
+.hud-frame.is-out .hud-frame-top {
+  position: relative;
+}
+
+.hud-frame.is-out .hud-frame-top::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--rule);
+  pointer-events: none;
+}
+
+/* ── The detail pane ────────────────────────────────────────────────────── */
+
+/* Hover reads it, the pin makes it act. It hangs out of flow under the whole
+   column — below the frame, the tells and the queue — the same width, so
+   opening it costs the layout nothing and covers none of the seat's own lines.
+   The one thing it can reach is the event pane in row two, which is pushed
+   clear of it by `is-under-detail` below rather than being raised over it: the
+   detail holds the buttons, so the detail stays on top. */
+.hud-detail {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 10px 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.hud-sil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+}
+
+.hud-sil .num {
+  color: var(--ink);
+}
+
+.hud-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hud-cmdr-tally {
+  color: var(--ink);
+}
+
+/* Says what the pin is for, in the space the buttons will take once it is
+   pinned, so the pane does not grow a row on the way in. */
+.hud-pin-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hud-detail .rd-steps {
+  margin-left: auto;
+}
+
+/* ── Tells and the queue ────────────────────────────────────────────────── */
+
+.hud-tell-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* One line under the seat it belongs to, in the tell's own printed voice: a left
+   rule rather than a box. It is a reading and not a control, so it hands the
+   pointer back to the board underneath — a line of text must not be the reason
+   a card cannot be hovered or right-clicked. Only the things inside it that are
+   controls take the pointer back. */
+.hud-tell {
+  margin: 0;
+  padding: 4px 9px 5px 10px;
+  pointer-events: none;
+  border-left-width: 2px;
+  border-left-color: var(--rule);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+/* The standing hint is a reminder rather than a read; it recedes a step. */
+.hud-tell.is-quiet {
+  border-left-color: var(--line);
+  color: var(--muted);
+}
+
+.hud-tell .rd-quiet-btn {
+  margin-left: 6px;
+  pointer-events: auto;
+}
+
+/* Waiting, not happening: dashed, one line, and no pane behind it — the queue is
+   a note about the future and never competes with the event in front. */
+.hud-queued {
+  margin: 0;
+  padding: 2px 8px 3px;
+  border: 1px dashed var(--rule);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Nothing here is clickable, so the board keeps the pointer: a queued line is
+     a note about the future, not a lid over the cards under it. */
+  pointer-events: none;
+}
+
+/* ── The active event ───────────────────────────────────────────────────── */
+
+/*
+   Row two of the frame grid, in the column of the seat that threw it, aligned to
+   that frame's outer edge so it can never leave the viewport: A opens to the
+   right, C to the left, B spreads either side of centre. It is wider than a
+   frame because it carries the citation and two full answers.
+*/
+.hud-event-host {
+  grid-row: 2;
+  width: var(--hud-event-w);
+  margin-top: 6px;
+  padding: 8px 10px 9px;
+  border-color: var(--accent);
+}
+
+.hud-event-host[data-seat='A'] {
+  justify-self: start;
+}
+
+.hud-event-host[data-seat='B'] {
+  justify-self: center;
+}
+
+.hud-event-host[data-seat='C'] {
+  justify-self: end;
+}
+
+/* The seat holding the event is also the seat whose detail is open, so the pane
+   steps down past it. Written as the column's own 6px gap, the measured detail,
+   and one more gap — the detail's height is not knowable from the markup, so
+   the HUD measures it and hands it over as `--hud-detail-h`. */
+.hud-event-host.is-under-detail {
+  margin-top: calc(12px + var(--hud-detail-h, 0px));
+}
+
+/* The pane stays in the tree with nothing standing — its reading is a live
+   region, and a live region only speaks if it was already there when its text
+   arrived. So it is hidden the visually-hidden way rather than collapsed to
+   nothing: a box at 0x0 with `overflow: hidden` is treated by some screen
+   readers as not rendered at all, which would have cost the first event of
+   every run its announcement. Out of flow, so it claims no grid row either. */
+.hud-event-host.is-empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-width: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The prompt is the one part of the event with no fixed length, and it names
+   cards, so it is the part that is capped: the seat, class and responses stay
+   whole, and the pane never grows down over the board it is read against. */
+.hud-event-host .pgp-prompt {
+  max-height: 2.8em;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+/* Same for the extras line: a named target scrolls inside its own slot. */
+.hud-event-host .pgp-target {
+  max-height: 2.2em;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+/* The picker hangs down over the battlefield, on the side the pane itself is
+   anchored to, so it stays inside the window at every seat. */
+.hud-event-host .pgp-picker {
+  width: min(460px, 60vw);
+}
+
+.hud-event-host[data-seat='A'] .pgp-picker {
+  left: -1px;
+  right: auto;
+}
+
+.hud-event-host[data-seat='B'] .pgp-picker {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.hud-event-host[data-seat='C'] .pgp-picker {
+  left: auto;
+  right: -1px;
 }
 
 /* ── The printed idiom: label, figure, chip, key ─────────────────────────── */
 
 .rd-title,
-.rd-label,
-.rd-pair-label {
+.rd-label {
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 500;
@@ -125,23 +494,15 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-.rd-title,
-.rd-label {
   flex: none;
   white-space: nowrap;
 }
 
-/* Two underlined words in the column's own voice: one opens a panel, the other
-   opens a seat's silhouette. They are printed the same because they are.
-
-   The box is held to the 24px pointer minimum while the word stays exactly the
-   size it was printed at: the extra height is taken as padding and handed
-   straight back as negative margin, so the row rhythm above and below is
-   untouched and only the target grows. */
-.rd-quiet-btn,
-.rd-disclose {
+/* The underlined word in the readout's own voice. The box is held to the 24px
+   pointer minimum while the word stays exactly the size it was printed at: the
+   extra height is taken as padding and handed straight back as negative margin,
+   so the row rhythm above and below is untouched and only the target grows. */
+.rd-quiet-btn {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
@@ -157,16 +518,7 @@
   text-underline-offset: 2px;
 }
 
-.rd-quiet-btn {
-  margin-left: auto;
-}
-
-.rd-disclose {
-  flex: none;
-}
-
-.rd-quiet-btn:hover,
-.rd-disclose:hover {
+.rd-quiet-btn:hover {
   color: var(--ink);
   border-color: transparent;
 }
@@ -185,131 +537,26 @@
 }
 
 /* The accent is spent on one chip only: the seat to hit is the answer to "who
-   do I attack", and it has to be the loudest word on the row. CLOCK prints its
-   own name and sits beside the clock's own slot in YOU, so it loses nothing by
-   reading in the same printed rule ARMED and OUT read in. */
+   do I attack", and it has to be the loudest word on the frame. */
 .rd-chip.is-hit {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-/* ── Seats ──────────────────────────────────────────────────────────────── */
-
-.rd-seat {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 3px 0 4px;
-  border-top: 1px solid var(--line);
-}
-
-.rd-seat:first-of-type {
-  padding-top: 2px;
-  border-top: 0;
-}
-
-.rd-seat-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* The on-demand half of the row is the only line allowed to take a second one. */
-.rd-seat-line.is-foot {
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-
-.rd-seat-id {
-  flex: none;
-  width: 13px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-}
-
-.rd-seat-life {
-  flex: none;
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-}
-
-/* An eliminated seat keeps its slot: ruled through, dimmed, never moved. */
-.rd-seat.is-out {
-  opacity: 0.6;
-}
-
-.rd-seat-line.is-top {
-  position: relative;
-}
-
-.rd-seat.is-out .rd-seat-line.is-top::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  border-top: 1px solid var(--rule);
-  pointer-events: none;
-}
-
-/* Life adjust stays reachable but recessive: the number is the reading. */
-.rd-steps {
-  display: flex;
-  gap: 3px;
-  margin-left: auto;
-}
-
-/* Same trick as the underlined words: the figure keeps its printed size, the
-   box clears 24px, and the negative margin gives the row its height back. A
-   mis-hit here writes a wrong number into the log the scorer reads. */
-.rd-steps button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 25px;
-  min-height: 24px;
-  padding: 1px 4px;
-  margin-top: -2px;
-  margin-bottom: -2px;
-  font-size: 12px;
-  line-height: 1.3;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 0;
-}
-
-.rd-steps button:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-.rd-steps button:focus-visible {
-  border-color: var(--rule);
-}
-
+/* Three chips beside a 22px figure do not fit a narrow frame, so the row is
+   allowed to take a second line rather than run out of the pane. It should not
+   have to: `showHit` drops the HIT chip below 1280px, where the accent border
+   round the whole frame is already saying it. This is the floor under that. */
 .rd-chips {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
   margin-left: auto;
-}
-
-.rd-threat {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 auto;
   min-width: 0;
 }
+
+/* ── The threat meter ───────────────────────────────────────────────────── */
 
 .rd-threat-bar {
   display: flex;
@@ -362,33 +609,48 @@
   color: var(--muted);
 }
 
-.rd-cmdr {
-  flex: none;
-  font-size: 12px;
-  color: var(--muted);
-}
+/* ── Life steps ─────────────────────────────────────────────────────────── */
 
-.rd-sil {
+/* Life adjust stays reachable but recessive: the number is the reading. */
+.rd-steps {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 4px 0 2px 21px;
-  font-size: 12px;
-  color: var(--muted);
+  gap: 3px;
 }
 
-.rd-sil .num {
+/* Same trick as the underlined word: the figure keeps its printed size, the box
+   clears 24px, and the negative margin gives the row its height back. A mis-hit
+   here writes a wrong number into the log the scorer reads. */
+.rd-steps button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  min-height: 24px;
+  padding: 1px 4px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+}
+
+.rd-steps button:hover:not(:disabled) {
   color: var(--ink);
+  border-color: var(--line);
+}
+
+.rd-steps button:focus-visible {
+  border-color: var(--rule);
 }
 
 .rd-sil-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.rd-sil-label {
-  color: var(--muted);
+  margin-left: auto;
 }
 
 .rd-sil-actions button {
@@ -413,80 +675,98 @@
   border-color: var(--line);
 }
 
-/* ── You ────────────────────────────────────────────────────────────────── */
+/* ── The player bar ─────────────────────────────────────────────────────── */
 
-/* Label over figure, two slots to a line, each ruled off from the one above. */
-.rd-pairs {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.rd-pair {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 50%;
-  min-width: 0;
-  padding: 3px 0 4px;
-  border-top: 1px solid var(--line);
-}
-
-/* The first pair of slots opens the block, so it carries no rule above it. */
-.rd-pairs > .rd-pair:nth-child(1),
-.rd-pairs > .rd-pair:nth-child(2) {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.rd-pair.is-wide {
-  position: relative;
-  width: 100%;
-}
-
-.rd-pair-label {
+/*
+   One row across the foot of the live shell, under the table strip rather than
+   over it: your own readings in the order they are looked at, then the two turn
+   controls, then the tabs. It is the only part of the readout still holding a
+   row of its own, so it is ruled off rather than floated.
+*/
+/* One row, and one row is the point: the readings, the two turn controls and the
+   tabs are scanned left to right in that order, and a second line put the tabs
+   somewhere the eye had to go looking for them. Everything but the clock holds
+   its printed width; the clock is a sentence, so it is the slot that gives way,
+   and only below 1100px does the row break at all. */
+.hud-bar {
+  grid-row: 2;
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 4px 14px;
+  padding: 5px 14px 6px;
+  background: var(--ground);
+  border-top: 1px solid var(--line);
+  min-width: 0;
 }
 
-/* Your own OUT chip. It rides in the label row, where the life steps pinned to
-   the foot of the slot cannot collide with it. */
-.rd-chip.is-dead {
-  border-color: var(--danger);
-  color: var(--danger);
+/* Printed label, then the figure, then whatever caption the slot carries. */
+.hud-stat {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
 }
 
-.rd-pair-value {
+.hud-stat-value {
   font-size: 19px;
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.005em;
   color: var(--ink);
   white-space: nowrap;
+}
+
+/* The clock slot is a sentence rather than a figure, so it reads a size down —
+   and it is the one reading allowed to lose its tail, because losing "2 turns"
+   off the end of a sentence costs less than losing the tabs off the row. */
+.hud-stat.is-clock {
+  flex: 0 1 auto;
+  min-width: 8ch;
+}
+
+.hud-stat-value.is-sentence {
+  font-size: 16px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.rd-pair-value.is-none {
+.hud-stat-value.is-none {
   color: var(--muted);
-}
-
-/* The clock slot is a sentence rather than a figure, so it reads a size down. */
-.rd-pair.is-clock .rd-pair-value {
-  font-size: 16px;
 }
 
 /* The wording already carries the state ("this is the last turn"); the colour
    and weight only underline it. */
-.rd-pair-value.is-urgent {
+.hud-stat-value.is-urgent {
   color: var(--danger);
   font-weight: 600;
 }
 
-.rd-pair-sub {
+.hud-stat-sub {
   font-size: 12px;
   line-height: 1.3;
   color: var(--muted);
+  white-space: nowrap;
+}
+
+.hud-stat.is-life {
+  gap: 8px;
+}
+
+/* Your own OUT chip rides in the label, where the life steps beside the figure
+   cannot collide with it. */
+.hud-stat .rd-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rd-chip.is-dead {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .rd-swing {
@@ -499,27 +779,28 @@
   color: var(--danger);
 }
 
-/* The life row keeps its adjust buttons on the same line as the figure. */
-.rd-pair.is-wide .rd-steps {
-  position: absolute;
-  right: 0;
-  bottom: 4px;
+/* Grows into whatever is left and shrinks to nothing first: its flex base is 0,
+   so the readings give up width only after the gap between them and the
+   controls has gone. */
+.hud-bar-spacer {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .rd-turn-actions {
+  flex: none;
   display: flex;
   gap: 6px;
-  margin-top: 5px;
 }
 
 .rd-turn-actions button {
-  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   padding: 4px 8px;
   font-size: 13px;
+  white-space: nowrap;
   background: transparent;
   border: 1px solid var(--rule);
   border-radius: 0;
@@ -538,101 +819,19 @@
   color: var(--muted);
 }
 
-/* ── Tells ──────────────────────────────────────────────────────────────── */
-
-.rd-tell {
-  margin: 0;
-  padding: 3px 0 3px 10px;
-  border-left: 1px solid var(--rule);
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--ink);
-}
-
-/* The standing hint is a reminder rather than a read; it recedes a step. */
-.rd-tell.is-quiet {
-  border-left-color: var(--line);
-  color: var(--muted);
-}
-
-.rd-tell .rd-quiet-btn {
-  margin-left: 6px;
-}
-
-.rd-tell-slot:not(:empty) + .rd-tell-slot:not(:empty) {
-  margin-top: 4px;
-}
-
-/* ── Pinned foot: tells and the active event ────────────────────────────── */
-
-.rd-pinned {
-  flex: none;
-  position: relative;
-}
-
-.rd-pinned > .rd-tells,
-.rd-pinned > .pgp-dock {
-  padding: 8px 14px 9px;
-  border-top: 1px solid var(--line);
-  border-bottom: 0;
-}
-
-/* The prompt is the one part of the event with no fixed length, and it names
-   cards, so it is the part that is capped: the seat, class, responses and queue
-   count stay whole, and LIFE, CLOCK and the turn controls above keep their room
-   at every width rather than only in a narrow column. */
-.rd-pinned .pgp-prompt {
-  max-height: 2.8em;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
-
-/* Same for the extras line: a named target scrolls inside its own slot instead
-   of growing the pinned foot until the turn controls above it scroll away. */
-.rd-pinned .pgp-target {
-  max-height: 2.2em;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
-
-/* Both slots stay in the accessibility tree with nothing in them, so a tell
-   arriving is announced. With neither standing the block clips to nothing
-   rather than spending a printed heading on an empty slot. The active event's
-   own slot is held open on exactly the same terms. */
-.rd-pinned > .rd-tells.is-empty,
-.rd-pinned > .pgp-dock.is-empty {
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  overflow: hidden;
-  border-top-width: 0;
-}
-
-/* The picker hangs up and to the left, over the battlefield rather than over
-   the readout it was opened from. */
-.rd-pinned .pgp-picker {
-  top: auto;
-  bottom: calc(100% + 6px);
-  left: auto;
-  right: 0;
-  width: min(460px, 88vw);
-}
-
-/* ── Foot tabs and drawer ───────────────────────────────────────────────── */
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
 
 .rd-tabs {
   flex: none;
   display: flex;
-  height: 34px;
-  border-top: 1px solid var(--line);
+  align-items: stretch;
+  height: 26px;
+  border: 1px solid var(--line);
 }
 
 .rd-tab {
-  flex: 1 1 0;
   min-width: 0;
-  padding: 0 2px;
+  padding: 0 8px;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -662,7 +861,7 @@
 }
 
 /* Forced colours drop box-shadow outright, which took the open tab's underline
-   with it and left the four tabs identical. The rule is redrawn as a border. */
+   with it and left the tabs identical. The rule is redrawn as a border. */
 @media (forced-colors: active) {
   .rd-tab.is-open {
     border-bottom: 2px solid Highlight;
@@ -670,22 +869,43 @@
   }
 }
 
-.rd-drawer {
+/* ── The drawer ─────────────────────────────────────────────────────────── */
+
+/* A slide-over from the right edge, over the board and never over the bar: the
+   panels it holds are read while the table stays where it is. */
+.hud-drawer {
   position: absolute;
-  left: 0;
+  top: 0;
   right: 0;
-  bottom: 34px;
-  height: 62%;
+  bottom: 0;
+  width: min(360px, 100%);
   z-index: 30;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-  box-shadow: 0 -10px 26px var(--shadow);
+  border-width: 0 0 0 1px;
+  box-shadow: -10px 0 26px var(--shadow);
+  animation: hud-drawer-in 140ms ease-out;
 }
 
-.rd-drawer-head {
+@keyframes hud-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-drawer {
+    animation: none;
+  }
+}
+
+.hud-drawer-head {
   flex: none;
   display: flex;
   align-items: center;
@@ -694,7 +914,11 @@
   border-bottom: 1px solid var(--line);
 }
 
-.rd-drawer-body {
+.hud-drawer-head .rd-quiet-btn {
+  margin-left: auto;
+}
+
+.hud-drawer-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -705,43 +929,14 @@
 }
 
 /* The log fills its drawer; everything else keeps its natural height. */
-.rd-drawer-body > .pg-hud-log {
+.hud-drawer-body > .pg-hud-log {
   flex: 1 1 auto;
 }
 
-/* Narrow column: the chips still own line one of a seat row, so the row gives
-   up the "life" caption and the chips tighten rather than wrapping ad hoc. */
+/* ── Narrow and short windows ───────────────────────────────────────────── */
+
+/* A narrower frame keeps its readings and tightens its chips first. */
 @media (max-width: 1280px) {
-  .rd-block,
-  .rd-pinned > .rd-tells,
-  .rd-pinned > .pgp-dock {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  /* A narrow column has less height to spare, so the caps tighten. */
-  .rd-pinned .pgp-prompt {
-    max-height: 2.8em;
-  }
-
-  .rd-pinned .pgp-target {
-    max-height: 2.6em;
-  }
-
-  /* The folded seat row hands its third line to the disclosure, so the
-     disclosure has to sit at the end of the meter line instead. */
-  .rd-seat-line.is-meter .rd-disclose {
-    margin-left: 4px;
-  }
-
-  .rd-seat {
-    gap: 3px;
-  }
-
-  .rd-seat-line.is-top .rd-label {
-    display: none;
-  }
-
   .rd-chip {
     padding: 2px 4px;
     letter-spacing: 0.06em;
@@ -751,109 +946,70 @@
     gap: 3px;
   }
 
+  /* The row still has to hold the whole clock reading at 1280, and the clock is
+     the slot that must not give: the deadline turn is the number it exists for.
+     So the slack comes from the chrome around it — the tabs' side padding, the
+     turn buttons' gap and padding, and a little off the row gap — and never
+     from the reading itself. */
+  .hud-bar {
+    gap: 4px 10px;
+  }
+
   .rd-tab {
-    letter-spacing: 0.02em;
+    padding: 0 5px;
   }
 
-  .rd-seat-life {
-    font-size: 20px;
-  }
-
-  .rd-pair-value {
-    font-size: 17px;
-  }
-}
-
-/* The life steps sit in the disclosure once the row is folded, where they are a
-   labelled pair rather than a right-aligned tail. */
-.rd-sil .rd-steps {
-  margin-left: 0;
-}
-
-/* A short window is the tighter constraint: 768px of height has to hold three
-   seats, your own numbers, the tells and the event without any of them sliding
-   under the pinned foot. Every slot keeps its place; the rules just close up. */
-@media (max-height: 940px) {
-  .rd-block,
-  .rd-pinned > .rd-tells,
-  .rd-pinned > .pgp-dock {
-    padding-top: 5px;
-    padding-bottom: 5px;
-  }
-
-  .rd-head {
-    margin-bottom: 3px;
-  }
-
-  .rd-pair {
-    padding: 2px 0 3px;
-  }
-
-  .rd-seat {
-    padding: 2px 0 3px;
-  }
-
-  .rd-turn-actions {
-    margin-top: 4px;
-  }
-
-  .rd-pinned .pgp-dock {
+  .rd-turn-actions button {
     gap: 5px;
+    padding: 4px 6px;
+  }
+
+  .rd-turn-actions .rd-key {
+    min-width: 16px;
+    padding: 0 3px;
+  }
+}
+
+/* Below this the row genuinely cannot hold the readings, the turn controls and
+   six tabs, so it is allowed to break — and the frame gives up the "life"
+   caption, the one word on it the 22px figure beside it already says. */
+@media (max-width: 1100px) {
+  .hud-bar {
+    flex-wrap: wrap;
+  }
+
+  .hud-frame-top .rd-label {
+    display: none;
   }
 }
 
 /* 768px of height is the floor the layout is held to. Every slot keeps its
-   printed label above its figure — the rules just close up further, and the two
-   turn buttons give up enough type to stay on one line each. */
+   printed label beside its figure — the frames just close up, and the board
+   gets the height back through `--hud-top` in App.css. */
 @media (max-height: 820px) {
-  .rd-block,
-  .rd-pinned > .rd-tells,
-  .rd-pinned > .pgp-dock {
-    padding-top: 4px;
-    padding-bottom: 4px;
+  .hud-frame {
+    gap: 4px;
+    padding: 5px 9px 6px;
   }
 
-  .rd-head {
-    margin-bottom: 2px;
+  .hud-life {
+    font-size: 19px;
   }
 
-  .rd-pair {
-    padding: 1px 0 2px;
-  }
-
-  .rd-pair-value {
-    font-size: 16px;
-  }
-
-  .rd-seat {
-    gap: 2px;
-    padding: 1px 0 2px;
-  }
-
-  .rd-seat-life {
-    font-size: 18px;
+  .hud-seat-id {
+    font-size: 17px;
   }
 
   .rd-threat-seg {
     height: 8px;
   }
 
-  .rd-pair-sub {
-    font-size: 11px;
-    line-height: 1.2;
+  .hud-stat-value {
+    font-size: 16px;
   }
 
-  .rd-chip {
-    padding: 1px 4px;
-  }
-
-  .rd-pinned .pgp-answers .pgp-btn {
-    padding-top: 3px;
-    padding-bottom: 3px;
-  }
-
-  .rd-turn-actions {
-    margin-top: 3px;
+  .hud-stat-value.is-sentence {
+    font-size: 14px;
   }
 
   .rd-turn-actions button {
@@ -862,11 +1018,16 @@
     font-size: 12px;
   }
 
-  .rd-tabs {
-    height: 30px;
+  .hud-bar {
+    padding: 3px 12px 4px;
   }
 
-  .rd-pinned .pgp-dock {
-    gap: 4px;
+  .rd-chip {
+    padding: 1px 4px;
+  }
+
+  .hud-event-host .pgp-answers .pgp-btn {
+    padding-top: 3px;
+    padding-bottom: 3px;
   }
 }

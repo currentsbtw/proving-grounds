@@ -34,6 +34,14 @@
   --shadow: rgb(0 0 0 / 30%);
   --shadow-strong: rgb(0 0 0 / 55%);
 
+  /* The HUD's panes: the ground itself at two strengths, blurred behind, so a
+     frame reads as a sheet laid over the board rather than as a new surface
+     colour. Both are the theme's own ground, so light stays paper. 84% is the
+     floor at which a frame over a run of card faces still reads as one sheet
+     rather than as text sitting on the art. */
+  --pane: rgb(23 24 28 / 84%);
+  --pane-strong: rgb(23 24 28 / 94%);
+
   /* Type */
   --font-body: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
   --font-display: 'Marcellus', Georgia, 'Times New Roman', serif;
@@ -41,9 +49,9 @@
      Declared here so the type system is readable in one file. */
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
 
-  /* Layout */
+  /* Layout. There is no right rail during a run any more: the HUD floats over
+     a full-width board, and its own widths live with the live shell in App.css. */
   --rail-left: 280px;
-  --rail-right: 320px;
   --titlebar-h: 44px;
   --radius: 6px;
   --gap: 12px;
@@ -70,6 +78,11 @@
   --scrim: rgb(43 36 26 / 55%);
   --shadow: rgb(74 62 44 / 16%);
   --shadow-strong: rgb(74 62 44 / 30%);
+
+  /* Same recipe, the light ground: the pane is never a tinted glass, it is the
+     page's own paper at the same two strengths. */
+  --pane: rgb(245 242 236 / 84%);
+  --pane-strong: rgb(245 242 236 / 94%);
 
   /* Mana chips */
   --mana-w: #6f6224;

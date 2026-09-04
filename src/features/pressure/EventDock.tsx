@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PressureEvent } from '../../domain/types';
+import type { PressureEvent, SeatId } from '../../domain/types';
 import type { ResolveEventPayload } from '../../state/gameStore';
 import { cardName, isCreatureCard, useGameStore } from '../../state/gameStore';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { EVENT_RESPONSE_EVENT } from '../../hooks/useHotkeys';
 import type { EventResponseDetail } from '../../hooks/useHotkeys';
+import Glossed from '../glossary/Glossed';
 import { CardView } from '../table/CardView';
 import {
   collectChoices,
@@ -76,8 +77,11 @@ function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: Pi
 
 interface DockBodyProps {
   event: PressureEvent;
-  /** Called as the event leaves the card; true asks for the post-wipe tell. */
-  onRetired: (hint: boolean) => void;
+  /**
+   * Called as the event leaves the pane. A seat id asks for the post-wipe tell
+   * under that seat's frame; null clears whatever tell was standing.
+   */
+  onRetired: (seatId: SeatId | null) => void;
 }
 
 /**
@@ -150,12 +154,12 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   const resolveBlocked = answers.blocked;
 
   function doRespond(): void {
-    onRetired(false);
+    onRetired(null);
     respondToActiveEvent(note.trim() || undefined);
   }
 
   function doDeclare(): void {
-    onRetired(false);
+    onRetired(null);
     declareInteraction();
   }
 
@@ -185,7 +189,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
         break;
     }
 
-    onRetired(event.type === 'wipe');
+    onRetired(event.type === 'wipe' ? event.seatId : null);
     resolveActiveEvent(payload);
   }
 
@@ -460,14 +464,17 @@ function ClockAnswer() {
 }
 
 interface EventDockProps {
-  /** Raised when a wipe resolves, so the readout can post the survivor tell. */
-  onWipeResolved: (hint: boolean) => void;
+  /**
+   * Raised as an event retires. A seat id asks the HUD to post the post-wipe
+   * survivor tell under that seat; null clears it.
+   */
+  onWipeResolved: (seatId: SeatId | null) => void;
 }
 
 /**
- * The active event, pinned to the foot of the readout. Non-modal by design: the
- * player can tap mana and move cards while deciding how the event resolves, and
- * the hand never leaves the screen.
+ * The active event, hung under the frame of the seat that produced it. Non-modal
+ * by design: the player can tap mana and move cards while deciding how the event
+ * resolves, and the hand never leaves the screen.
  *
  * One section serves the event and the bare race clock alike, because the
  * reading at the top of it — seat, class, prompt — is a live region, and a live
@@ -478,7 +485,6 @@ interface EventDockProps {
 export default function EventDock({ onWipeResolved }: EventDockProps) {
   const event = useGameStore((s) => s.activeEvent);
   const clock = useGameStore((s) => s.clock);
-  const pendingCount = useGameStore((s) => s.pendingEvents.length);
 
   const standing = event ?? clock;
   const type = event?.type ?? 'clock';
@@ -507,16 +513,10 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
       <div className="pgp-say" role="status">
         {standing && (
           <>
+            {/* Whatever is waiting behind this one is printed under the seat
+                that will throw it, so the head no longer carries a count. */}
             <div className="pgp-dock-head">
               <span className="pgp-head-label">{event ? 'active event' : 'race clock'}</span>
-              {event && pendingCount > 0 && (
-                <span
-                  className="pgp-more"
-                  title={`${pendingCount} more event${pendingCount === 1 ? '' : 's'} waiting behind this one`}
-                >
-                  {pendingCount} more queued
-                </span>
-              )}
             </div>
 
             <div className="pgp-dock-main">
@@ -524,7 +524,10 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
               <span className={`pgp-type type-${type}`}>{EVENT_LABEL[type]}</span>
             </div>
 
-            <p className="pgp-prompt">{prompt}</p>
+            {/* The prose the player actually reads under time pressure, so the
+                keywords in it carry their reminder text. The answer buttons
+                below are labels, not rules text, and are left alone. */}
+            <p className="pgp-prompt">{prompt && <Glossed text={prompt} />}</p>
 
             {/* The card the seat is casting, cited: name, printed mana value,
                 and the real effect the player resolves by hand. The prompt says
@@ -542,7 +545,7 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
                   </span>
                 </div>
                 <p className="pgp-cite-effect" title={event.card.effect}>
-                  {event.card.effect}
+                  <Glossed text={event.card.effect} />
                 </p>
               </div>
             )}

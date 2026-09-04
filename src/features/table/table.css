@@ -89,10 +89,17 @@
 
 /* The hand column carries a real floor: with `auto` outer tracks and no minimum
    of its own it was the only track that could give, so a narrow window squeezed
-   the hand to nothing while the zone stacks kept their full width. */
+   the hand to nothing while the zone stacks kept their full width. The floor is
+   a few strip cards wide, so the hand still fans rather than stacking to a
+   single overlapped edge before the strip starts to scroll. */
 .tbl-strip {
+  /* The strip's one card size, matching STRIP_CARD_WIDTH in cardGeometry.ts:
+     the cards themselves are sized in TS, and the frames and empty slots that
+     hold them are sized here. */
+  --strip-card: 84px;
+  --strip-card-h: 117px;
   display: grid;
-  grid-template-columns: auto minmax(260px, 1fr) auto;
+  grid-template-columns: auto minmax(240px, 1fr) auto;
   gap: 12px;
   align-items: stretch;
   padding: 8px 12px 9px;
@@ -113,7 +120,9 @@
    Scryfall's artwork, not our frame. */
 .tbl-stack {
   position: relative;
-  width: 92px;
+  /* The frame is the card plus its own padding and rule, so every pile is
+     exactly as wide as the card it holds. */
+  width: calc(var(--strip-card) + 14px);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -132,7 +141,7 @@
 
 .tbl-stack.is-wide {
   width: auto;
-  min-width: 92px;
+  min-width: calc(var(--strip-card) + 14px);
   flex-direction: row;
   gap: 8px;
   align-items: flex-start;
@@ -185,8 +194,8 @@
 
 .tbl-stack-slot {
   position: relative;
-  width: 80px;
-  height: 112px;
+  width: var(--strip-card);
+  height: var(--strip-card-h);
   border-radius: 0;
   background: var(--raised);
   border: 1px dashed var(--rule);
@@ -221,8 +230,8 @@
 /* The back of the library is a plain slab carrying the count — a hatched fill
    was a drawn card back, and this world has no rendered props in it. */
 .tbl-lib-back {
-  width: 80px;
-  height: 112px;
+  width: var(--strip-card);
+  height: var(--strip-card-h);
   border-radius: 0;
   background: var(--raised);
   border: 1px solid var(--rule);
@@ -283,10 +292,11 @@
 
 /* Narrow strip ----------------------------------------------------------- */
 
-/* Below the layout's comfortable width the readout narrows first (App.css), and
-   the zone stacks give up their second column before the hand gives up a pixel.
-   This block used to sit above the rules it overrides, where equal specificity
-   and source order meant none of the sizes below ever took effect. */
+/* Below the layout's comfortable width the strip gives up its spacing, not its
+   card size: every card in the strip is one size at every width now, and a pile
+   that shrank while the hand beside it did not was the thing this row was
+   reorganised to stop. What is left over goes to the hand; past that the strip
+   scrolls, in the block below. */
 @media (max-width: 1100px) {
   .tbl-strip {
     gap: 8px;
@@ -297,23 +307,13 @@
     gap: 6px;
   }
 
-  .tbl-stack {
-    width: 78px;
-  }
-
   .tbl-stack-head {
     letter-spacing: 0.06em;
-  }
-
-  .tbl-stack-slot,
-  .tbl-lib-back {
-    width: 66px;
-    height: 92px;
   }
 }
 
 /* A browser at 200% zoom on a 1440px screen reports 720px of width, well under
-   the layout's declared floor. Four stacks and a 260px hand cannot share that
+   the layout's declared floor. Four stacks and a 240px hand cannot share that
    line, and the strip was clipping the graveyard and exile off the right edge.
    Below the floor the surface scrolls instead: nothing is lost, the hand keeps
    its width, and the board above is untouched. */
@@ -328,16 +328,6 @@
   .tbl-strip {
     min-width: max-content;
   }
-
-  .tbl-stack {
-    width: 70px;
-  }
-
-  .tbl-stack-slot,
-  .tbl-lib-back {
-    width: 58px;
-    height: 81px;
-  }
 }
 
 /* Hand ------------------------------------------------------------------- */
@@ -349,10 +339,12 @@
   min-width: 0;
 }
 
-/* The hand never scrolls: Hand.tsx sizes and overlaps the cards to the measured
-   width. Vertical overflow stays visible so the hover lift can rise out of the
-   box; horizontal is clipped purely as a backstop for a squeezed-to-nothing
-   column, with a margin so the hover scale still shows at the edges. */
+/* The hand never scrolls: the cards are the strip's one size and Hand.tsx
+   overlaps them to the measured width. Vertical overflow stays visible so the
+   hover lift can rise out of the box; horizontal is clipped purely as a
+   backstop for a squeezed-to-nothing column, with a margin so the hover scale
+   still shows at the edges. The row stands at one card tall whether or not it
+   is holding any, so the strip does not change height as the hand empties. */
 .tbl-hand {
   position: relative;
   flex: 1;
@@ -365,7 +357,7 @@
   padding: 6px 10px;
   background: transparent;
   border: 1px solid transparent;
-  min-height: 182px;
+  min-height: calc(var(--strip-card-h) + 12px);
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 

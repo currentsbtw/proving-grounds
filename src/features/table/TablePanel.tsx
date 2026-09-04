@@ -20,6 +20,7 @@ import {
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
+import { STRIP_CARD_WIDTH } from './cardGeometry';
 import { CardMenuProvider } from './CardMenu';
 import { CardView } from './CardView';
 import { Hand } from './Hand';
@@ -27,7 +28,6 @@ import { MulliganBar } from './MulliganBar';
 import { askNumber, MenuHead, MenuItem, MenuSep, MenuTitle, PopMenu } from './PopMenu';
 import { StackTray, STACK_DROP_ID } from './StackTray';
 import { CommandZone, LibraryStack, ZoneStack } from './ZoneStack';
-import EventToast from '../pressure/EventToast';
 import './table.css';
 
 type OpenZone = Extract<ZoneId, 'graveyard' | 'exile' | 'command'>;
@@ -204,22 +204,26 @@ function TableSurface() {
       >
         <Battlefield cards={zones.battlefield} />
 
-        {/* Shares the battlefield's grid cell at zero height, so it hangs over
-            the top of the board without taking a pixel from it, without
-            covering the hand, and outside every drop surface. */}
-        <EventToast />
-
         <StackTray dragging={activeId !== null} canDrop={canCast} />
 
         <div className="tbl-strip">
+          {/* Where the cards go on their way out, on the left; where they come
+              from, on the right. Reading order across the strip is then the
+              order of play — graveyard, exile, hand, library, command. */}
           <div className="tbl-stack-group">
-            <CommandZone
-              cards={zones.command}
-              onOpen={() => setOverlay({ kind: 'zone', zone: 'command' })}
+            <ZoneStack
+              zone="graveyard"
+              label="Grave"
+              name="Graveyard"
+              cards={zones.graveyard}
+              onOpen={() => setOverlay({ kind: 'zone', zone: 'graveyard' })}
             />
-            <LibraryStack
-              count={library.length}
-              onOpenMenu={(x, y) => setLibMenu({ x, y })}
+            <ZoneStack
+              zone="exile"
+              label="Exile"
+              name="Exile"
+              cards={zones.exile}
+              onOpen={() => setOverlay({ kind: 'zone', zone: 'exile' })}
             />
           </div>
 
@@ -267,19 +271,13 @@ function TableSurface() {
           </div>
 
           <div className="tbl-stack-group">
-            <ZoneStack
-              zone="graveyard"
-              label="Grave"
-              name="Graveyard"
-              cards={zones.graveyard}
-              onOpen={() => setOverlay({ kind: 'zone', zone: 'graveyard' })}
+            <LibraryStack
+              count={library.length}
+              onOpenMenu={(x, y) => setLibMenu({ x, y })}
             />
-            <ZoneStack
-              zone="exile"
-              label="Exile"
-              name="Exile"
-              cards={zones.exile}
-              onOpen={() => setOverlay({ kind: 'zone', zone: 'exile' })}
+            <CommandZone
+              cards={zones.command}
+              onOpen={() => setOverlay({ kind: 'zone', zone: 'command' })}
             />
           </div>
         </div>
@@ -401,7 +399,7 @@ function TableSurface() {
         {activeCard ? (
           <CardView
             card={activeCard}
-            width={activeCard.zone === 'hand' ? 120 : activeCard.zone === 'battlefield' ? 140 : 80}
+            width={activeCard.zone === 'battlefield' ? 140 : STRIP_CARD_WIDTH}
             lifted
             menu={false}
           />

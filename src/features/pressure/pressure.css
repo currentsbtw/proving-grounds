@@ -53,9 +53,11 @@
   border-color: transparent;
 }
 
-/* ── Active event card ──────────────────────────────────────────────────── */
+/* ── Active event ───────────────────────────────────────────────────────── */
 
-/* Not a card: a block in the column, ruled off at the top by .rd-event. */
+/* Not a card: the contents of the pane the HUD hangs under the seat that threw
+   the event. The pane itself — its width, its accent border and where it aligns
+   — is `.hud-event-host` in readout.css; this is only the rhythm inside it. */
 .pgp-dock {
   position: relative;
   display: flex;
@@ -254,14 +256,6 @@
   .pgp-cite-effect {
     -webkit-line-clamp: 2;
   }
-}
-
-.pgp-more {
-  flex: none;
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
 }
 
 /* ── The two numbered responses ─────────────────────────────────────────── */
@@ -491,176 +485,8 @@
   unicode-bidi: isolate;
 }
 
+
 /* The counter-armed tell has exactly two renderings: the ARMED n+ chip on the
-   seat row that locates it, and the sentence in the readout's TELLS block. It
-   no longer rides over the hand, so nothing here blinks. */
-
-/* ── Toast (rides the top of the board when the pod acts) ───────────────── */
-
-/* The table panel is the notice's containing block, so the notice can never
-   reach the readout column beyond the rule or the hand below. The panel's own
-   grid is untouched: the host is out of flow, and the fixed pop menus and
-   overlays that hang over the table are unaffected by a positioned ancestor. */
-.pg-table.tbl-root {
-  position: relative;
-}
-
-/* A zero-height strip across the top of the board: it takes the board's width
-   to position against and none of its height, so the rows the table sizes its
-   cards from are exactly the rows it had before. The host is inert; only the
-   notice itself takes the pointer, and both sit under the browse overlay and
-   the pop menus. */
-.pgp-toast-host {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 0;
-  z-index: 20;
-  pointer-events: none;
-}
-
-/* Top-right of the board, on the battlefield's own 16px margin, clear of the
-   hand row below and of the readout column beyond the rule. */
-.pgp-toast {
-  position: absolute;
-  top: 10px;
-  right: 16px;
-  width: min(340px, calc(100% - 32px));
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 9px 12px 10px;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  /* The one accent, spent on the thing waiting for an answer. */
-  border-left-color: var(--accent);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 26px var(--shadow);
-  pointer-events: auto;
-  animation: pgp-toast-in 140ms ease-out;
-}
-
-.pgp-toast.is-leaving {
-  animation: pgp-toast-out 140ms ease-in forwards;
-}
-
-/* Same mnemonic as the dock, carried on the class chip, and never alone: the
-   chip prints its own name beside the colour. */
-.pgp-toast.type-wipe {
-  --pgp-accent: var(--mana-w);
-}
-.pgp-toast.type-removal,
-.pgp-toast.type-resource {
-  --pgp-accent: var(--mana-b);
-}
-.pgp-toast.type-counter {
-  --pgp-accent: var(--mana-u);
-}
-.pgp-toast.type-combat {
-  --pgp-accent: var(--mana-r);
-}
-.pgp-toast.type-clock {
-  --pgp-accent: var(--mana-g);
-}
-
-@keyframes pgp-toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes pgp-toast-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pgp-toast,
-  .pgp-toast.is-leaving {
-    animation: none;
-  }
-}
-
-.pgp-toast-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.pgp-toast-label {
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-/* The One Accent Rule: the accent is spent on the active event, and a race clock
-   standing on its own is not that. It prints in rule, the way the CLOCK chip
-   does on the seat row. */
-.pgp-toast-label.is-clock {
-  color: var(--muted);
-}
-
-/* The cited card's name beside the class chip. One line, ellipsised: the toast
-   is a notice, and the dock under it prints the mana value and the card text. */
-.pgp-toast-card {
-  min-width: 0;
-  flex: 0 1 auto;
-  font-size: 12px;
-  line-height: 1.3;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  unicode-bidi: isolate;
-}
-
-/* Three lines of the prompt over the board; the dock carries the whole of it. */
-.pgp-toast-prompt {
-  min-width: 0;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 13px;
-  line-height: 1.35;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-.pgp-toast-answers {
-  display: flex;
-  gap: 6px;
-}
-
-.pgp-toast-answers .pgp-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 7px;
-  padding: 4px 9px 4px 5px;
-  font-size: 13px;
-  white-space: normal;
-  text-align: left;
-}
-
-.pgp-toast-details {
-  align-self: flex-start;
-}
+   seat frame that locates it, and the one-line tell hanging under that frame.
+   The toast that used to ride the top of the board is gone — the event now
+   hangs under the seat that threw it, which is the notice. */

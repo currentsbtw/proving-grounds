@@ -1,9 +1,8 @@
 import { useDroppable } from '@dnd-kit/core';
 import type { CardInstance, ZoneId } from '../../domain/types';
 import { commanderTax, useGameStore } from '../../state/gameStore';
+import { STRIP_CARD_WIDTH } from './cardGeometry';
 import { DraggableCardView } from './CardView';
-
-const STACK_CARD_WIDTH = 80;
 
 export interface ZoneStackProps {
   zone: Extract<ZoneId, 'graveyard' | 'exile'>;
@@ -50,7 +49,7 @@ export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) 
       {top ? (
         <DraggableCardView
           card={top}
-          width={STACK_CARD_WIDTH}
+          width={STRIP_CARD_WIDTH}
           small
           badge={false}
           title="Drag out, or right-click for options"
@@ -79,7 +78,7 @@ function CommanderCell({ card, onBrowse }: { card: CardInstance; onBrowse: () =>
       >
         <span>Command</span>
       </button>
-      <DraggableCardView card={card} width={STACK_CARD_WIDTH} small badge={false} />
+      <DraggableCardView card={card} width={STRIP_CARD_WIDTH} small badge={false} />
       {/* The tax figure has a fixed home in the readout's YOU block; this
           button only has to say what it does. */}
       <button

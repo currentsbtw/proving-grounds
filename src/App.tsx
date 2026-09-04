@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import DeckPanel from './features/decks/DeckPanel';
 import TablePanel from './features/table/TablePanel';
 import HotkeyHelp from './features/hotkeys/HotkeyHelp';
-import ReadoutColumn from './features/readout/ReadoutColumn';
+import LiveHud from './features/readout/LiveHud';
 import ScorecardPanel from './features/scorecard/ScorecardPanel';
 import { useHotkeys } from './hooks/useHotkeys';
 import { keyLabel, useHotkeyStore } from './state/hotkeyStore';
@@ -90,9 +90,10 @@ export default function App() {
   useHotkeys();
   const helpKey = useHotkeyStore((s) => s.keymap.help);
   const toggleHelp = useHotkeyStore((s) => s.toggleHelp);
-  // A live run takes the whole shell: board and hand on the left, readout on the
-  // right. Between runs the three columns come back, with the selected run's
-  // scorecard in the centre and the table's own empty state before that.
+  // A live run takes the whole shell: the board full width, the readout floating
+  // over it as unit frames and a foot bar. Between runs the two columns come
+  // back, with the selected run's scorecard in the centre and the table's own
+  // empty state before that.
   const runActive = useGameStore((s) => s.run !== null);
   const selectedRunId = useUiStore((s) => s.selectedRunId);
   const showScorecard = !runActive && selectedRunId !== null;
@@ -105,9 +106,9 @@ export default function App() {
         <h1 className="pg-wordmark">Proving Grounds</h1>
         {runActive && <RunChip />}
         <span className="pg-titlebar-spacer" />
-        {/* While a run is live the readout's KEYS tab is the mouse entry point
-            to the overlay, so the title row does not carry a second one.
-            Between runs there is no readout, and this is the only one. */}
+        {/* While a run is live the player bar's KEYS tab is the mouse entry
+            point to the overlay, so the title row does not carry a second one.
+            Between runs there is no bar, and this is the only one. */}
         {!runActive && (
           <button
             type="button"
@@ -124,7 +125,7 @@ export default function App() {
         {runActive ? (
           <>
             <TablePanel />
-            <ReadoutColumn />
+            <LiveHud />
           </>
         ) : (
           <>

@@ -1,0 +1,109 @@
+/* Keyword glossary ------------------------------------------------------- */
+
+/* Rules text printed by <Glossed>. The wrapper only has to keep the line
+   breaks the source wrote: an oracle text is read one ability to a line, and
+   the runs inside it are inline spans that must not disturb that. */
+.gl {
+  white-space: pre-line;
+}
+
+/* A glossed word is marked the way a printed rulebook marks one — a dotted rule
+   under it, not a colour change — so a creature with six keywords does not read
+   as six links. Hover is where it commits to the accent. */
+.gl-kw {
+  position: relative;
+  border-bottom: 1px dotted var(--rule);
+  color: inherit;
+  cursor: help;
+  /* The card preview is a tooltip and refuses the pointer as a whole, so that
+     the board under it stays clickable. A child can opt back in through a
+     `pointer-events: none` parent, and the glossed words are the one part of it
+     you are meant to point at — so they, and nothing else, are hittable. */
+  pointer-events: auto;
+}
+
+.gl-kw:hover,
+.gl-kw:focus-visible {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+
+/* The pane. Fixed rather than absolute so no scrolling or clipped ancestor can
+   cut it off — the first surface it appears in is the card preview, which is
+   both — and positioned by Glossed.tsx, which writes the word's viewport
+   coordinates onto the word itself and flips the pane below when the word sits
+   too near the top of the screen for it to fit above. */
+.gl-tip {
+  --gl-tip-w: 240px;
+
+  position: fixed;
+  z-index: 2;
+  left: var(--gl-x, 0);
+  width: var(--gl-tip-w);
+  max-width: calc(100vw - 16px);
+  padding: 7px 9px 8px;
+  background: var(--pane-strong, var(--surface));
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  box-shadow: 0 8px 22px var(--shadow-strong);
+  /* The definition is read in place; it is never the thing you are pointing at,
+     and it must not swallow a click meant for the board underneath. */
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 90ms ease-out;
+  /* The text it is printed over keeps its own line breaks; this is prose. */
+  white-space: normal;
+  text-align: left;
+  cursor: default;
+}
+
+.gl-kw[data-gl-side='above'] > .gl-tip {
+  bottom: var(--gl-bottom, auto);
+}
+
+.gl-kw[data-gl-side='below'] > .gl-tip {
+  top: var(--gl-top, auto);
+}
+
+.gl-kw:hover > .gl-tip,
+.gl-kw:focus > .gl-tip,
+.gl-kw:focus-visible > .gl-tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-tip {
+    transition: none;
+  }
+}
+
+/* The term is named in the same small printed label the readout uses for the
+   value it sits over, so the pane reads as part of the same document. */
+.gl-tip-term {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.gl-tip-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.gl-tip-cr {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+}

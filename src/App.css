@@ -123,13 +123,25 @@
   min-width: 0;
 }
 
-/* During a run the board and hand take the whole left, full height, and the
-   readout is the only rail. The two are separated by one rule rather than by a
-   gap between two floating panels. */
+/* During a run the board takes the whole shell and the readout stops being a
+   rail: the seat frames, the active event and the drawers float over the board
+   as translucent panes, and the only thing still holding a row of its own is the
+   player's own bar at the foot. The body is the HUD's containing block. */
 .pg-body.is-live {
-  grid-template-columns: minmax(0, 1fr) var(--rail-right);
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 0;
   padding: 0;
+
+  /* The HUD's margin from the board's edges, the two pane widths, and the room
+     the board keeps free under the seat frames. `--hud-top` is the frame height
+     plus that gap, and the battlefield spends it as padding below, so no card is
+     ever dealt onto the board already hidden behind a frame. */
+  --hud-inset: 10px;
+  --hud-frame-w: 272px;
+  --hud-event-w: 320px;
+  --hud-top: 82px;
 }
 
 .pg-rail,
@@ -143,11 +155,22 @@
   min-width: 0;
 }
 
+/* The board and the HUD share the first row. The board's own z-indexes — a
+   hovered hand card lifts to 60 — are sealed into a stacking context of its own
+   so none of them can climb over a pane floating above the board. The pop menus,
+   the card preview and the browse overlay portal to the body and are unaffected. */
 .pg-body.is-live .pg-table {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 0;
   background: var(--ground);
   border: 0;
-  border-right: 1px solid var(--line);
   border-radius: 0;
+}
+
+/* The room under the seat frames, spent by the board rather than taken from it. */
+.pg-body.is-live .tbl-battlefield {
+  padding-top: var(--hud-top);
 }
 
 .pg-rail > h2,
@@ -155,17 +178,19 @@
   margin-bottom: 10px;
 }
 
-/* Responsive floor: the readout gives up width before the board does, and the
-   board never drops under the 260px of card width the hand needs. */
+/* Responsive floor: the frames give up width before the board does. Three of
+   them plus the two 10px insets is the only thing competing with the board for
+   width now, and below 1100px they stop trying to hold 272px each. */
 @media (max-width: 1280px) {
   .pg-body.is-live {
-    --rail-right: 280px;
+    --hud-frame-w: 244px;
   }
 }
 
 @media (max-width: 1100px) {
   .pg-body.is-live {
-    --rail-right: 250px;
+    --hud-frame-w: 212px;
+    --hud-event-w: 300px;
   }
 }
 
@@ -181,15 +206,11 @@
     font-size: 11px;
     line-height: 1.25;
   }
-}
 
-/* Narrow *and* short is the hard case: at 250px every row in the column doubles
-   up — the turn caption, the two turn buttons, the event's two answers — and the
-   doubled lines are what push LIFE, CLOCK and the turn controls off the bottom.
-   A little width back costs the board nothing (it keeps well over its 260px of
-   card width) and buys the column a whole line back on five separate rows. */
-@media (max-width: 1100px) and (max-height: 820px) {
+  /* The frames set a step tighter in a short window (readout.css), so the room
+     the board holds for them closes up by the same amount. */
   .pg-body.is-live {
-    --rail-right: 276px;
+    --hud-inset: 8px;
+    --hud-top: 72px;
   }
 }

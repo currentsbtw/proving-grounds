@@ -3,40 +3,25 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { CardInstance } from '../../domain/types';
 import { useGameStore } from '../../state/gameStore';
+import { STRIP_CARD_WIDTH } from './cardGeometry';
 import { DraggableCardView } from './CardView';
 
-/** Comfortable width; the hand never renders a card wider than this. */
-const CARD_MAX = 120;
-/** Readability floor. Past this the hand overlaps instead of shrinking. */
-const CARD_MIN = 70;
 /** Breathing room between cards while they still fit side by side. */
 const GAP = 8;
 /** Smallest distance between two card left edges when overlapping. */
 const STEP_MIN = 12;
 
-interface HandLayout {
-  /** Rendered card width in px. */
-  width: number;
-  /** Distance between the left edges of two neighbouring cards. */
-  step: number;
-}
-
 /**
- * Fit `count` cards into `avail` px without ever scrolling: shrink first, then
- * overlap. `step < width` means the cards overlap by `width - step`.
+ * Distance between the left edges of two neighbouring cards. The card width is
+ * the strip's one size and never gives — a hand that shrank to fit printed its
+ * cards smaller than the graveyard beside it — so a hand too wide for its
+ * column overlaps instead, down to the STEP_MIN floor. A step below the card
+ * width means the cards overlap by `width - step`; hovering one lifts it clear.
  */
-function handLayout(avail: number, count: number): HandLayout {
-  if (count <= 0 || avail <= 0) return { width: CARD_MAX, step: CARD_MAX + GAP };
-
-  const spread = Math.min(CARD_MAX, (avail - (count - 1) * GAP) / count);
-  if (spread >= CARD_MIN) {
-    const width = Math.floor(spread);
-    return { width, step: width + GAP };
-  }
-
-  const width = CARD_MIN;
-  if (count === 1) return { width, step: width + GAP };
-  return { width, step: Math.max(STEP_MIN, (avail - width) / (count - 1)) };
+function handStep(avail: number, count: number): number {
+  const spread = STRIP_CARD_WIDTH + GAP;
+  if (count <= 1 || avail <= 0) return spread;
+  return Math.max(STEP_MIN, Math.min(spread, (avail - STRIP_CARD_WIDTH) / (count - 1)));
 }
 
 export interface HandProps {
@@ -104,8 +89,8 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
     stops[Math.min(index, stops.length - 1)].focus();
   }, [cards.length]);
 
-  const { width, step } = handLayout(avail, cards.length);
-  const overlap = step - width;
+  const step = handStep(avail, cards.length);
+  const overlap = step - STRIP_CARD_WIDTH;
 
   return (
     <div
@@ -133,7 +118,7 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
           >
             <DraggableCardView
               card={card}
-              width={width}
+              width={STRIP_CARD_WIDTH}
               selected={selecting && selected.includes(card.iid)}
               onClick={selecting ? () => onToggleSelect(card.iid) : undefined}
               onDoubleClick={
