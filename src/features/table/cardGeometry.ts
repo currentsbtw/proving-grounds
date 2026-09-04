@@ -9,7 +9,7 @@ export const CARD_ASPECT = 1.396;
  * table.css carries the same figure in `--strip-card` for the frames and empty
  * slots the DOM draws rather than a card; the two have to move together.
  */
-export const STRIP_CARD_WIDTH = 84;
+export const STRIP_CARD_WIDTH = 105;
 
 export function cardHeight(width: number): number {
   return Math.round(width * CARD_ASPECT);

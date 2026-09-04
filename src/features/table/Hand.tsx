@@ -7,9 +7,14 @@ import { STRIP_CARD_WIDTH } from './cardGeometry';
 import { DraggableCardView } from './CardView';
 
 /** Breathing room between cards while they still fit side by side. */
-const GAP = 8;
-/** Smallest distance between two card left edges when overlapping. */
-const STEP_MIN = 12;
+const GAP = 10;
+/**
+ * Smallest distance between two card left edges when overlapping — the sliver
+ * of a covered card that stays readable. Both figures are a fraction of
+ * STRIP_CARD_WIDTH rather than absolute room, so a change to the strip's card
+ * size fans the hand the same way it did at the old one.
+ */
+const STEP_MIN = 15;
 
 /**
  * Distance between the left edges of two neighbouring cards. The card width is

@@ -90,14 +90,14 @@
 /* The hand column carries a real floor: with `auto` outer tracks and no minimum
    of its own it was the only track that could give, so a narrow window squeezed
    the hand to nothing while the zone stacks kept their full width. The floor is
-   a few strip cards wide, so the hand still fans rather than stacking to a
-   single overlapped edge before the strip starts to scroll. */
+   a few strip cards wide — it moves with `--strip-card` — so the hand still fans
+   rather than stacking to a single overlapped edge before the strip scrolls. */
 .tbl-strip {
   /* The strip's one card size, matching STRIP_CARD_WIDTH in cardGeometry.ts:
      the cards themselves are sized in TS, and the frames and empty slots that
      hold them are sized here. */
-  --strip-card: 84px;
-  --strip-card-h: 117px;
+  --strip-card: 105px;
+  --strip-card-h: 147px;
   /* One frame recipe for all five zones — graveyard, exile, hand, library,
      command. The head row is lifted out of the flow and the frame reserves its
      band as padding, so no zone's head can push its frame wider or taller than
@@ -106,7 +106,7 @@
   --zone-head-h: 14px;
   --zone-head-gap: 4px;
   display: grid;
-  grid-template-columns: auto minmax(240px, 1fr) auto;
+  grid-template-columns: auto minmax(300px, 1fr) auto;
   gap: 12px;
   align-items: start;
   padding: 8px 12px 9px;
@@ -319,7 +319,7 @@
 /* "⋯" opens at itself the menu the right-click opens at the pointer, so the
    rest of the library is reachable without a mouse. It sits on the back rather
    than in the head because the head is the shared label-and-count row every
-   zone prints, and 84px of it does not hold a third thing. */
+   zone prints, and one card's width of it does not hold a third thing. */
 .tbl-lib-more {
   position: absolute;
   right: 1px;
@@ -358,8 +358,10 @@
    card size: every card in the strip is one size at every width now, and a pile
    that shrank while the hand beside it did not was the thing this row was
    reorganised to stop. What is left over goes to the hand; past that the strip
-   scrolls, in the block below. */
-@media (max-width: 1100px) {
+   scrolls, in the block below. The comfortable width moves with the card size:
+   the five frames and the hand's floor are ~840px wide now, and this keeps the
+   same ~400px of slack over that figure the strip had at the smaller size. */
+@media (max-width: 1240px) {
   .tbl-strip {
     gap: 8px;
     padding: 8px 8px 10px;
@@ -375,11 +377,13 @@
 }
 
 /* A browser at 200% zoom on a 1440px screen reports 720px of width, well under
-   the layout's declared floor. Four stacks and a 240px hand cannot share that
+   the layout's declared floor. Four stacks and a 300px hand cannot share that
    line, and the strip was clipping the graveyard and exile off the right edge.
    Below the floor the surface scrolls instead: nothing is lost, the hand keeps
-   its width, and the board above is untouched. */
-@media (max-width: 940px) {
+   its width, and the board above is untouched. The breakpoint sits above the
+   strip's true minimum (about 930px with a partner pair at the 105px card) so
+   a second commander never clips in the band just above it. */
+@media (max-width: 1000px) {
   .pg-table.tbl-root {
     overflow-x: auto;
     overflow-y: hidden;
@@ -1078,7 +1082,7 @@
 /* Short windows (200% zoom on a laptop). The board keeps room for two rows of
    floor-width cards; if the tray and the strip cannot fit under that, the table
    scrolls vertically rather than closing the battlefield to a few pixels. This
-   block sits after the 940px rules so its overflow-y wins there too. */
+   block sits after the 1000px rules so its overflow-y wins there too. */
 @media (max-height: 560px) {
   .pg-table.tbl-root {
     grid-template-rows: minmax(136px, 1fr) auto auto;

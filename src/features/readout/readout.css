@@ -163,17 +163,41 @@
    parent, and a live region that changes parent is a live region that stops
    speaking.
 */
+/*
+   One stacking context for the whole set of frames, and it is load-bearing
+   rather than tidy. The pieces inside carry z-indexes of their own — the detail
+   pane at 5, the event pane's picker at 40 — and a column is only
+   `position: relative`, so without this those numbers escaped every column and
+   landed in `.hud-over`, where the drawer is their sibling. They compared
+   against the drawer's 30 instead of against each other: the picker outright
+   beat it, and a pinned seat's frame and detail, kept on composited layers of
+   their own by the settle animation and the panes' own `backdrop-filter`,
+   were free to be composited over it — a drawer with the seat's numbers
+   printed across its text. Isolating here keeps every one of those numbers a
+   comparison between seats, and leaves the whole set one layer under the
+   drawer whatever any seat is doing.
+*/
 .hud-frames {
   position: absolute;
   top: var(--hud-inset);
   left: var(--hud-inset);
   right: var(--hud-inset);
+  isolation: isolate;
   display: grid;
   grid-template-columns: repeat(3, var(--hud-frame-w));
   grid-auto-rows: min-content;
   justify-content: space-between;
   align-items: start;
   column-gap: 10px;
+}
+
+/* The one thing in the frames that has to beat the drawer: an open answer
+   picker. The player pressed a hotkey to answer the event in front of them, and
+   a picker composited under a Notes or Log drawer is a control they cannot see.
+   While one is open the whole set lifts over the drawer, pinned detail and all;
+   a picker is transient, the drawer is not. */
+.hud-frames:has(.pgp-picker) {
+  z-index: 35;
 }
 
 /* Positioned, because the detail pane hangs off the bottom of the whole column

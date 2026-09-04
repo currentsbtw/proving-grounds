@@ -69,7 +69,7 @@ export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) 
  * corner in the same chip the counters already use.
  *
  * The figure belongs to this commander rather than to the zone, which is why it
- * is not in the head: an 84px head holds the zone's name and its count and
+ * is not in the head: a one-card-wide head holds the zone's name and its count and
  * nothing else, and a partner pair's two taxes would have had to share it.
  */
 function CommanderCard({ card }: { card: CardInstance }) {

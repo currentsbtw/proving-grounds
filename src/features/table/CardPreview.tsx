@@ -78,6 +78,27 @@ function cancelGrace(): void {
   grace = null;
 }
 
+function pointIn(rect: DOMRect, x: number, y: number): boolean {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+/**
+ * Whether a point falls on the open panel. The panel takes no pointer events —
+ * the board under it has to stay clickable — so on a crowded table the browser
+ * reports the pointer as being over whatever card the panel is covering, and a
+ * hover decision made on that alone swaps the preview to a card the reader
+ * cannot see. Every such decision asks this first and treats a hit as the panel.
+ */
+function overPanel(x: number, y: number): boolean {
+  return panelEl !== null && pointIn(panelEl.getBoundingClientRect(), x, y);
+}
+
+/** The pointer reached the panel: hold it open, exactly as a keyword does. */
+function holdPanel(): void {
+  panelHover = true;
+  cancelGrace();
+}
+
 /**
  * Close, but leave the panel up long enough for the pointer to reach it. The
  * check is deferred rather than the close: a panel the pointer landed on stays,
@@ -140,7 +161,10 @@ export interface CardPreviewHandle {
   /** Id of the panel, for `aria-describedby` while it is up. */
   id: string;
   onPointerEnter: (e: ReactPointerEvent) => void;
-  /** Clears a stale press latch; it never opens a panel on its own. */
+  /**
+   * Clears a stale press latch, keeps a pending open's reading of the pointer
+   * current, and pays back the open that entering under the panel withheld.
+   */
   onPointerMove: (e: ReactPointerEvent) => void;
   /** Closes after a grace period, so the pointer can reach the panel. */
   onPointerLeave: () => void;
@@ -159,6 +183,15 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
   // the ownership token, unique to this mount of this card.
   const id = useId();
   const timer = useRef<number | null>(null);
+  /** Where the pointer was last seen on this card, kept current by every move. */
+  const at = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * True while this card's hover belongs to the panel rather than to the card:
+   * the pointer is on the card only because the open panel covers the part of it
+   * under the pointer. The open that hover would have scheduled is owed, and a
+   * move onto a part of the card the panel does not cover pays it.
+   */
+  const viaPanel = useRef(false);
   const open = useSyncExternalStore(
     subscribe,
     () => owner === id,
@@ -180,6 +213,7 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
   // own, which would leave the open panel with nothing left to close it.
   const close = useCallback(() => {
     clear();
+    viaPanel.current = false;
     if (owner !== id) return;
     cancelGrace();
     setOwner(null);
@@ -192,6 +226,7 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
    */
   const leave = useCallback(() => {
     clear();
+    viaPanel.current = false;
     if (owner === id) closeAfterGrace(id);
   }, [clear, id]);
 
@@ -212,22 +247,82 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
     if (e.buttons === 0) pointerDown = false;
   }, []);
 
+  /**
+   * Arm the open, and read the pointer again when it fires rather than trusting
+   * where it was armed from: during the wait a panel can open over this card, or
+   * the pointer can slide along the card onto the part an open panel covers, and
+   * neither is a `pointerleave` this card would hear. An open decided on the
+   * stale point is the swap to an unreadable card this all exists to prevent.
+   */
+  const schedule = useCallback(
+    (x: number, y: number) => {
+      viaPanel.current = false;
+      at.current = { x, y };
+      const delay = performance.now() - lastChange < SWAP_WINDOW ? SWAP_DELAY : HOVER_DELAY;
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        const p = at.current;
+        if (p && overPanel(p.x, p.y)) {
+          viaPanel.current = true;
+          holdPanel();
+          return;
+        }
+        if (!pointerDown) setOwner(id);
+      }, delay);
+    },
+    [id],
+  );
+
   const onPointerEnter = useCallback(
     (e: ReactPointerEvent) => {
       unlatch(e);
       if (!enabled || pointerDown) return;
       if (e.pointerType === 'touch') return;
       clear();
+      at.current = { x: e.clientX, y: e.clientY };
+      // The pointer only reached this card by passing through the panel's
+      // rectangle, which does not take the pointer itself. Reading the open
+      // panel is not a hover on the card it happens to cover, so this holds the
+      // panel open the way reaching a keyword in it does, and schedules nothing
+      // — until the pointer reaches a part of the card the panel leaves clear.
+      if (overPanel(e.clientX, e.clientY)) {
+        viaPanel.current = true;
+        holdPanel();
+        return;
+      }
       // Coming back to the card the panel already belongs to calls off the
       // countdown that leaving it started.
       if (owner === id) cancelGrace();
-      const delay = performance.now() - lastChange < SWAP_WINDOW ? SWAP_DELAY : HOVER_DELAY;
-      timer.current = window.setTimeout(() => {
-        timer.current = null;
-        if (!pointerDown) setOwner(id);
-      }, delay);
+      schedule(e.clientX, e.clientY);
     },
-    [clear, enabled, id, unlatch],
+    [clear, enabled, id, schedule, unlatch],
+  );
+
+  /**
+   * The pointer can cross between the panel's rectangle and the card's own face
+   * without ever leaving the card, so a move is the only word this card gets on
+   * where inside it the pointer actually is: it keeps a pending open honest, and
+   * it opens the panel the entry under the rectangle withheld. A move that never
+   * had anything to do with the panel still opens nothing — one is not a fresh
+   * hover, and must not put back a panel Escape or a scroll just took down.
+   */
+  const move = useCallback(
+    (e: ReactPointerEvent) => {
+      unlatch(e);
+      if (!enabled || pointerDown) return;
+      if (e.pointerType === 'touch') return;
+      if (overPanel(e.clientX, e.clientY)) {
+        // Slid under the panel mid-wait: the open is off, and owed again.
+        clear();
+        viaPanel.current = true;
+        holdPanel();
+        return;
+      }
+      at.current = { x: e.clientX, y: e.clientY };
+      if (timer.current !== null || owner === id) return;
+      if (viaPanel.current) schedule(e.clientX, e.clientY);
+    },
+    [clear, enabled, id, schedule, unlatch],
   );
 
   const toggle = useCallback(() => {
@@ -240,7 +335,7 @@ export function useCardPreview(enabled: boolean): CardPreviewHandle {
     open,
     id,
     onPointerEnter,
-    onPointerMove: unlatch,
+    onPointerMove: move,
     onPointerLeave: leave,
     toggle,
     close,
@@ -315,6 +410,39 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
     return () => window.removeEventListener('resize', place);
   }, [anchor, card.iid, data]);
 
+  /**
+   * The panel's rectangle behaves as if the panel took the pointer, even though
+   * it does not: inside it the panel is held open, and leaving it starts the
+   * same countdown that leaving the card does. The cards under the panel answer
+   * for the part of the rectangle they cover; this answers for the rest of it
+   * (empty board, the gap between cards) and for every way out of it.
+   */
+  useEffect(() => {
+    function onMove(e: PointerEvent): void {
+      // A touch drag is not a hover: one that ends inside the rectangle used to
+      // leave the panel held open for good, and every later countdown — a
+      // keyboard-toggled panel's included — with nothing to close.
+      if (e.pointerType === 'touch') return;
+      if (overPanel(e.clientX, e.clientY)) {
+        if (!panelHover) holdPanel();
+        return;
+      }
+      if (!panelHover) return;
+      panelHover = false;
+      // Stepping back onto the card the panel belongs to is not leaving it:
+      // that card's own hover holds the panel, and its `pointerenter` has
+      // already fired by the time this move is heard.
+      const host = anchor.current;
+      if (host && pointIn(host.getBoundingClientRect(), e.clientX, e.clientY)) {
+        cancelGrace();
+        return;
+      }
+      closeAfterGrace(id);
+    }
+    window.addEventListener('pointermove', onMove, true);
+    return () => window.removeEventListener('pointermove', onMove, true);
+  }, [anchor, id]);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key === 'Escape') onDismiss();
@@ -352,14 +480,12 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
       }}
       // The panel itself never takes the pointer — the board under it has to
       // stay clickable — so these only ever fire by way of a glossed keyword
-      // inside it, which does. Reaching one holds the panel open; leaving it
-      // starts the countdown again rather than closing outright, so the pointer
-      // can carry on to the next keyword.
-      onPointerEnter={() => {
-        panelHover = true;
-        cancelGrace();
-      }}
-      onPointerLeave={() => {
+      // inside it, which does. Reaching one holds the panel open; leaving one
+      // for the panel's own body is not leaving the panel at all, so it only
+      // hands back to the countdown once the pointer is out of the rectangle.
+      onPointerEnter={holdPanel}
+      onPointerLeave={(e) => {
+        if (overPanel(e.clientX, e.clientY)) return;
         panelHover = false;
         closeAfterGrace(id);
       }}
