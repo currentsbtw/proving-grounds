@@ -210,7 +210,7 @@ function TableSurface() {
           {/* Where the cards go on their way out, on the left; where they come
               from, on the right. Reading order across the strip is then the
               order of play — graveyard, exile, hand, library, command. */}
-          <div className="tbl-stack-group">
+          <div className="tbl-zone-group">
             <ZoneStack
               zone="graveyard"
               label="Grave"
@@ -227,39 +227,37 @@ function TableSurface() {
             />
           </div>
 
+          {/* The mulligan bar floats over the board rather than sitting in this
+              column: the hand frame has to stand the same height as the four
+              piles beside it whether or not the opening hand is still open. */}
           <div className="tbl-hand-col">
-            {/* The tell reads once, in the readout's TELLS block; the chip on the
-                seat row is its locator. How to move a card lives in the Keys
-                overlay rather than in a line of copy over the hand. */}
-            <div className="tbl-hand-head">
-              <span>Hand</span>
-            </div>
-
             {showMulligan && (
-              <MulliganBar
-                mulliganCount={mulliganCount}
-                selecting={bottoming}
-                selectedCount={selection.length}
-                onMulligan={() => {
-                  setBottomingFor(null);
-                  setSelected([]);
-                  takeMulligan();
-                }}
-                onKeep={() => resolveMulligan([])}
-                onStartBottoming={() => {
-                  setSelected([]);
-                  setBottomingFor(mulliganCount);
-                }}
-                onCancelBottoming={() => {
-                  setBottomingFor(null);
-                  setSelected([]);
-                }}
-                onConfirmBottoming={() => {
-                  resolveMulligan(selection);
-                  setBottomingFor(null);
-                  setSelected([]);
-                }}
-              />
+              <div className="tbl-mull-float">
+                <MulliganBar
+                  mulliganCount={mulliganCount}
+                  selecting={bottoming}
+                  selectedCount={selection.length}
+                  onMulligan={() => {
+                    setBottomingFor(null);
+                    setSelected([]);
+                    takeMulligan();
+                  }}
+                  onKeep={() => resolveMulligan([])}
+                  onStartBottoming={() => {
+                    setSelected([]);
+                    setBottomingFor(mulliganCount);
+                  }}
+                  onCancelBottoming={() => {
+                    setBottomingFor(null);
+                    setSelected([]);
+                  }}
+                  onConfirmBottoming={() => {
+                    resolveMulligan(selection);
+                    setBottomingFor(null);
+                    setSelected([]);
+                  }}
+                />
+              </div>
             )}
 
             <Hand
@@ -270,9 +268,12 @@ function TableSurface() {
             />
           </div>
 
-          <div className="tbl-stack-group">
+          <div className="tbl-zone-group">
+            {/* Drawing is the same action however it is reached — the D hotkey,
+                the menu's Draw 1, and a plain click on the library. */}
             <LibraryStack
               count={library.length}
+              onDraw={runLibraryAction(() => drawCards(1))}
               onOpenMenu={(x, y) => setLibMenu({ x, y })}
             />
             <CommandZone

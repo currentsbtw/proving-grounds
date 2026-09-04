@@ -1,4 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
+import type { MouseEvent } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
 import { commanderTax, useGameStore } from '../../state/gameStore';
 import { STRIP_CARD_WIDTH } from './cardGeometry';
@@ -30,13 +31,13 @@ export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) 
   return (
     <div
       ref={setNodeRef}
-      className={`tbl-stack tbl-drop${isOver ? ' is-over' : ''}`}
+      className={`tbl-zone tbl-drop${isOver ? ' is-over' : ''}`}
       title={`${name} (${cards.length}) · click to browse`}
       onClick={onOpen}
     >
       <button
         type="button"
-        className="tbl-stack-head"
+        className="tbl-zone-head"
         aria-label={`Browse ${name.toLowerCase()}: ${cards.length} cards`}
         onClick={(e) => {
           e.stopPropagation();
@@ -44,62 +45,69 @@ export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) 
         }}
       >
         <span>{label}</span>
-        <span className="tbl-stack-count">{cards.length}</span>
+        <span className="tbl-zone-count">{cards.length}</span>
       </button>
-      {top ? (
-        <DraggableCardView
-          card={top}
-          width={STRIP_CARD_WIDTH}
-          small
-          badge={false}
-          title="Drag out, or right-click for options"
-        />
-      ) : (
-        <div className="tbl-stack-slot" />
-      )}
-    </div>
-  );
-}
-
-function CommanderCell({ card, onBrowse }: { card: CardInstance; onBrowse: () => void }) {
-  const tax = useGameStore((s) => (card.scryfallId ? commanderTax(s, card.scryfallId) : 0));
-  const castCommander = useGameStore((s) => s.castCommander);
-
-  return (
-    <div className="tbl-commander-cell">
-      <button
-        type="button"
-        className="tbl-stack-head"
-        aria-label="Browse command zone"
-        onClick={(e) => {
-          e.stopPropagation();
-          onBrowse();
-        }}
-      >
-        <span>Command</span>
-      </button>
-      <DraggableCardView card={card} width={STRIP_CARD_WIDTH} small badge={false} />
-      {/* The tax figure has a fixed home in the readout's YOU block; this
-          button only has to say what it does. */}
-      <button
-        type="button"
-        className="tbl-tax"
-        title={`Cast · commander tax +${tax}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          castCommander(card.iid);
-        }}
-      >
-        Cast
-      </button>
+      <div className="tbl-zone-body">
+        {top ? (
+          <DraggableCardView
+            card={top}
+            width={STRIP_CARD_WIDTH}
+            small
+            badge={false}
+            title="Drag out, or right-click for options"
+          />
+        ) : (
+          <div className="tbl-zone-slot" />
+        )}
+      </div>
     </div>
   );
 }
 
 /**
- * Command zone: every commander with its current tax and a one-click cast.
- * Same rule as the piles above — the zone holds cards and Cast buttons, so it
- * cannot itself be a button. Each commander's head row browses.
+ * A commander, with the tax figure the Cast row used to carry pinned to its
+ * corner in the same chip the counters already use.
+ *
+ * The figure belongs to this commander rather than to the zone, which is why it
+ * is not in the head: an 84px head holds the zone's name and its count and
+ * nothing else, and a partner pair's two taxes would have had to share it.
+ */
+function CommanderCard({ card }: { card: CardInstance }) {
+  const tax = useGameStore((s) => (card.scryfallId ? commanderTax(s, card.scryfallId) : 0));
+  const castCommander = useGameStore((s) => s.castCommander);
+
+  // The card swallows its own clicks: the zone behind it opens the browse
+  // overlay on a plain click, and a first click that opened an overlay would
+  // never let the second one land. Browsing stays on the head row and on the
+  // rest of the frame.
+  const swallow = (e: MouseEvent<HTMLDivElement>) => e.stopPropagation();
+  const cast = () => castCommander(card.iid);
+
+  return (
+    <div className="tbl-commander">
+      <DraggableCardView
+        card={card}
+        width={STRIP_CARD_WIDTH}
+        small
+        badge={false}
+        onClick={swallow}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          cast();
+        }}
+        onActivate={cast}
+        title={`Double-click or Enter to cast (tax +${tax}) · right-click for options`}
+      />
+      <span className="tbl-tax-chip">Tax {tax}</span>
+    </div>
+  );
+}
+
+/**
+ * Command zone: the same frame as every other pile — one head row, one card
+ * slot. Casting is the card's own action (double-click, Enter, or the
+ * right-click menu's "Cast commander") rather than a button row that made this
+ * one frame taller than the four beside it.
  */
 export function CommandZone({ cards, onOpen }: { cards: CardInstance[]; onOpen: () => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'command' });
@@ -107,68 +115,100 @@ export function CommandZone({ cards, onOpen }: { cards: CardInstance[]; onOpen: 
   return (
     <div
       ref={setNodeRef}
-      className={`tbl-stack is-wide tbl-drop${isOver ? ' is-over' : ''}`}
-      title="Command zone · click to browse"
+      className={`tbl-zone tbl-drop${isOver ? ' is-over' : ''}`}
+      title="Command zone · click to browse · double-click a commander to cast it"
       onClick={onOpen}
     >
-      {cards.length === 0 && (
-        <div>
-          <button
-            type="button"
-            className="tbl-stack-head"
-            aria-label="Browse command zone: 0 cards"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-          >
-            <span>Command</span>
-            <span className="tbl-stack-count">0</span>
-          </button>
-          <div className="tbl-stack-slot" />
-        </div>
-      )}
-
-      {cards.map((card) => (
-        <CommanderCell key={card.iid} card={card} onBrowse={onOpen} />
-      ))}
+      <button
+        type="button"
+        className="tbl-zone-head"
+        aria-label={`Browse command zone: ${cards.length} cards`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+      >
+        <span>Command</span>
+        <span className="tbl-zone-count">{cards.length}</span>
+      </button>
+      <div className="tbl-zone-body">
+        {cards.length === 0 ? (
+          <div className="tbl-zone-slot" />
+        ) : (
+          cards.map((card) => <CommanderCard key={card.iid} card={card} />)
+        )}
+      </div>
     </div>
   );
 }
 
-/** Library: face-down back with a prominent count, plus top/bottom drop strips. */
-export function LibraryStack({ count, onOpenMenu }: { count: number; onOpenMenu: (x: number, y: number) => void }) {
+export interface LibraryStackProps {
+  count: number;
+  /** Draw one card — the same action as the D hotkey and the menu's "Draw 1". */
+  onDraw: () => void;
+  onOpenMenu: (x: number, y: number) => void;
+}
+
+/**
+ * Library: a face-down card carrying the count, plus top/bottom drop strips.
+ *
+ * Drawing is the loop this zone is in the strip for, so it is the plain click,
+ * everywhere on the frame; everything else is one right-click away. Both are
+ * reachable without a mouse: the head button draws, and the "⋯" on the back —
+ * which is where the room for it is, the head being the shared label-and-count
+ * row every zone prints — opens the same menu at itself.
+ */
+export function LibraryStack({ count, onDraw, onOpenMenu }: LibraryStackProps) {
   const { setNodeRef: setTopRef, isOver: overTop } = useDroppable({ id: 'library-top' });
   const { setNodeRef: setBottomRef, isOver: overBottom } = useDroppable({ id: 'library-bottom' });
 
   return (
     <div
-      className="tbl-stack"
-      title={`Library (${count}) · click to draw, shuffle or search`}
-      onClick={(e) => onOpenMenu(e.clientX, e.clientY)}
+      className="tbl-zone"
+      title={`Library (${count}) · click to draw · right-click for options`}
+      onClick={onDraw}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onOpenMenu(e.clientX, e.clientY);
+      }}
     >
-      {/* The three piles work the same way: the head row is the control, the
-          pile is a drop target that also takes a pointer click. */}
       <button
         type="button"
-        className="tbl-stack-head"
-        aria-label={`Library: ${count} cards. Draw, shuffle or search.`}
+        className="tbl-zone-head"
+        aria-label={`Library: ${count} cards. Draw one card.`}
         onClick={(e) => {
           e.stopPropagation();
-          const r = e.currentTarget.getBoundingClientRect();
-          onOpenMenu(r.right, r.top);
+          onDraw();
         }}
       >
         <span>Library</span>
+        <span className="tbl-zone-count">{count}</span>
       </button>
-      <div className="tbl-lib-back">
-        <span className="tbl-lib-count">{count}</span>
-      </div>
-      <div ref={setTopRef} className={`tbl-lib-strip is-top${overTop ? ' is-over' : ''}`}>
-        top
-      </div>
-      <div ref={setBottomRef} className={`tbl-lib-strip is-bottom${overBottom ? ' is-over' : ''}`}>
-        bottom
+      <div className="tbl-zone-body tbl-lib-body">
+        {/* The back is the card, not a number in a box: the strip's one card
+            size, a thin inner rule, and the count printed on it. */}
+        <div className="tbl-lib-back">
+          <span className="tbl-lib-count">{count}</span>
+          <button
+            type="button"
+            className="tbl-lib-more"
+            aria-label="Library options"
+            onClick={(e) => {
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              onOpenMenu(r.right, r.bottom);
+            }}
+          >
+            ⋯
+          </button>
+        </div>
+        <div ref={setTopRef} className={`tbl-lib-strip is-top${overTop ? ' is-over' : ''}`}>
+          top
+        </div>
+        <div ref={setBottomRef} className={`tbl-lib-strip is-bottom${overBottom ? ' is-over' : ''}`}>
+          bottom
+        </div>
       </div>
     </div>
   );

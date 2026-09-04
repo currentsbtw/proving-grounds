@@ -98,35 +98,41 @@
      hold them are sized here. */
   --strip-card: 84px;
   --strip-card-h: 117px;
+  /* One frame recipe for all five zones — graveyard, exile, hand, library,
+     command. The head row is lifted out of the flow and the frame reserves its
+     band as padding, so no zone's head can push its frame wider or taller than
+     the card it holds, and the five stand at exactly the same height. */
+  --zone-pad: 6px;
+  --zone-head-h: 14px;
+  --zone-head-gap: 4px;
   display: grid;
   grid-template-columns: auto minmax(240px, 1fr) auto;
   gap: 12px;
-  align-items: stretch;
+  align-items: start;
   padding: 8px 12px 9px;
   background: var(--ground);
   border-top: 1px solid var(--line);
 }
 
-.tbl-stack-group {
+.tbl-zone-group {
   display: flex;
   gap: 10px;
   align-items: flex-start;
 }
 
-/* Zone stacks ------------------------------------------------------------ */
+/* Zone frames ------------------------------------------------------------ */
 
 /* Square frames in the printed rule, matching the chips and key squares in the
    readout. The card faces inside them keep their own corners — those are
    Scryfall's artwork, not our frame. */
-.tbl-stack {
+.tbl-zone {
   position: relative;
-  /* The frame is the card plus its own padding and rule, so every pile is
-     exactly as wide as the card it holds. */
-  width: calc(var(--strip-card) + 14px);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
+  /* The frame is its cards plus its own padding and rule, so a pile is exactly
+     as wide as the card it holds and the command zone is exactly as wide as its
+     commanders. The head is out of flow and contributes nothing here. */
+  width: fit-content;
+  padding: calc(var(--zone-pad) + var(--zone-head-h) + var(--zone-head-gap)) var(--zone-pad)
+    var(--zone-pad);
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 0;
@@ -135,31 +141,33 @@
   text-align: left;
 }
 
-.tbl-stack:hover {
+.tbl-zone:hover {
   border-color: var(--accent);
 }
 
-.tbl-stack.is-wide {
-  width: auto;
-  min-width: calc(var(--strip-card) + 14px);
-  flex-direction: row;
-  gap: 8px;
-  align-items: flex-start;
+/* Exactly one card tall in every zone, whether it is holding a card, a row of
+   commanders, a fanned hand, or nothing at all. */
+.tbl-zone-body {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  height: var(--strip-card-h);
 }
 
-/* The head row is the pile's one control. It is printed exactly as it was as a
-   caption — no button chrome — and the 24px pointer box it now needs is taken
-   as padding and handed back as negative margin, so the pile's height is
-   unchanged. */
-.tbl-stack-head {
+/* The head row sits in the band the frame reserved for it: an 11px label on the
+   left, the count on the right, the same in all five zones. The pointer box is
+   the whole band rather than the 14px of printed type inside it. */
+.tbl-zone-head {
+  position: absolute;
+  top: 0;
+  left: var(--zone-pad);
+  right: var(--zone-pad);
+  height: calc(var(--zone-pad) + var(--zone-head-h) + var(--zone-head-gap));
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 6px;
-  width: 100%;
-  min-height: 24px;
-  padding: 6px 0;
-  margin: -6px 0;
+  padding: var(--zone-pad) 0 var(--zone-head-gap);
   background: none;
   border: 0;
   border-radius: 0;
@@ -173,26 +181,31 @@
   overflow: hidden;
 }
 
-.tbl-stack-head:hover:not(:disabled) {
+.tbl-zone-head:hover:not(:disabled):not(.is-static) {
   color: var(--ink);
   border-color: transparent;
 }
 
-.tbl-stack-head > span:first-child {
+/* The hand's head names the zone and counts it; there is nothing to browse. */
+.tbl-zone-head.is-static {
+  cursor: default;
+}
+
+.tbl-zone-head > span:first-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tbl-stack-count {
+.tbl-zone-count {
   flex: none;
   color: var(--ink);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.tbl-stack-slot {
+.tbl-zone-slot {
   position: relative;
   width: var(--strip-card);
   height: var(--strip-card-h);
@@ -205,44 +218,68 @@
   overflow: hidden;
 }
 
-.tbl-commander-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: stretch;
+/* The figure the command zone's Cast row used to carry. That row made this one
+   frame taller than the four beside it; the number it printed did not have to
+   go with it, and it belongs to the commander rather than to the zone — so it
+   is pinned to the card in the same chip a counter is printed in. */
+.tbl-commander {
+  position: relative;
+  flex: 0 0 auto;
 }
 
-.tbl-tax {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 24px;
+.tbl-tax-chip {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  z-index: 3;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--accent);
   font-size: 11px;
-  padding: 3px 6px;
-  line-height: 1.2;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 /* Library ---------------------------------------------------------------- */
 
-/* The back of the library is a plain slab carrying the count — a hatched fill
-   was a drawn card back, and this world has no rendered props in it. */
+/* The library reads as a face-down card, not a number in a raised box: the
+   strip's one card size, the card faces' own corners, a thin inner rule, and
+   the count printed across it. Drawn in the theme's own ink — there is no
+   rendered prop in this world, and no image to fetch. */
 .tbl-lib-back {
+  position: relative;
   width: var(--strip-card);
   height: var(--strip-card-h);
-  border-radius: 0;
-  background: var(--raised);
+  border-radius: 5px;
+  /* Mixed towards the accent rather than towards the ink, so the back is the
+     same warm slab a shade off the frame in both themes — mixing towards the
+     ink would darken it on paper and lighten it in the dark. */
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent) 26%, var(--ground)),
+    color-mix(in srgb, var(--accent) 9%, var(--ground)) 72%
+  );
   border: 1px solid var(--rule);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+}
+
+.tbl-lib-back::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 .tbl-lib-count {
+  position: relative;
   font-size: 26px;
   font-weight: 600;
   line-height: 1;
@@ -250,10 +287,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The drop strips divide the back itself, so they need no offsets of their own
+   beyond the body they sit in. */
 .tbl-lib-strip {
   position: absolute;
-  left: 6px;
-  right: 6px;
+  left: 0;
+  right: 0;
   height: 50%;
   pointer-events: none;
   border-radius: 0;
@@ -270,11 +309,34 @@
 }
 
 .tbl-lib-strip.is-top {
-  top: 24px;
+  top: 0;
 }
 
 .tbl-lib-strip.is-bottom {
-  bottom: 6px;
+  bottom: 0;
+}
+
+/* "⋯" opens at itself the menu the right-click opens at the pointer, so the
+   rest of the library is reachable without a mouse. It sits on the back rather
+   than in the head because the head is the shared label-and-count row every
+   zone prints, and 84px of it does not hold a third thing. */
+.tbl-lib-more {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  z-index: 2;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--muted);
+}
+
+.tbl-lib-more:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: transparent;
 }
 
 .tbl-dragging .tbl-lib-strip {
@@ -303,11 +365,11 @@
     padding: 8px 8px 10px;
   }
 
-  .tbl-stack-group {
+  .tbl-zone-group {
     gap: 6px;
   }
 
-  .tbl-stack-head {
+  .tbl-zone-head {
     letter-spacing: 0.06em;
   }
 }
@@ -332,33 +394,44 @@
 
 /* Hand ------------------------------------------------------------------- */
 
+/* The positioning context for the mulligan bar, which floats above the frame
+   rather than sitting in this column. */
 .tbl-hand-col {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
 }
 
-/* The hand never scrolls: the cards are the strip's one size and Hand.tsx
-   overlaps them to the measured width. Vertical overflow stays visible so the
-   hover lift can rise out of the box; horizontal is clipped purely as a
-   backstop for a squeezed-to-nothing column, with a margin so the hover scale
-   still shows at the edges. The row stands at one card tall whether or not it
-   is holding any, so the strip does not change height as the hand empties. */
-.tbl-hand {
-  position: relative;
+/* The hand's frame is the one that takes its width from the column rather than
+   from its cards; everything else about it is the frame recipe above, so it
+   stands at exactly the height of the four piles beside it. It is a drop target,
+   not a control, so it keeps the plain cursor and the plain rule. */
+.tbl-hand-zone {
+  width: auto;
   flex: 1;
   min-width: 0;
-  display: flex;
+  cursor: default;
+}
+
+.tbl-hand-zone:hover {
+  border-color: var(--rule);
+}
+
+/* The row never scrolls: the cards are the strip's one size and Hand.tsx
+   overlaps them to the measured width, so they are laid out by margin and the
+   body's own gap has to go. Vertical overflow stays visible so the hover lift
+   can rise out of the frame; horizontal is clipped purely as a backstop for a
+   squeezed-to-nothing column, with a margin so the hover scale still shows at
+   the edges. */
+.tbl-hand-row {
+  flex: 1;
+  min-width: 0;
+  gap: 0;
   align-items: flex-start;
   overflow-x: clip;
   overflow-y: visible;
   overflow-clip-margin: 10px;
-  padding: 6px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  min-height: calc(var(--strip-card-h) + 12px);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  padding: 0 4px;
 }
 
 .tbl-hand-slot {
@@ -402,8 +475,7 @@
      colour or border fade on a surface the player is dragging over, and the
      state each one announces reads the same without the fade. */
   .tbl-battlefield,
-  .tbl-hand,
-  .tbl-stack,
+  .tbl-zone,
   .tbl-lib-strip {
     transition: none;
   }
@@ -413,19 +485,6 @@
   color: var(--muted);
   font-size: 13px;
   margin: auto;
-}
-
-.tbl-hand-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 0 2px;
 }
 
 /* Drop highlight --------------------------------------------------------- */
@@ -439,7 +498,7 @@
   background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-.tbl-dragging .tbl-stack.tbl-drop.is-over {
+.tbl-dragging .tbl-zone.tbl-drop.is-over {
   border-color: var(--accent);
 }
 
@@ -784,6 +843,21 @@
 }
 
 /* Mulligan bar ----------------------------------------------------------- */
+
+/* Over the board, not inside the strip: the hand frame has to stand at one card
+   tall alongside the four piles whether or not the opening hand is still being
+   decided, so the bar cannot take a row in that column. */
+.tbl-mull-float {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+}
+
+.tbl-mull-float .tbl-mull {
+  box-shadow: 0 10px 24px var(--shadow-strong);
+}
 
 .tbl-mull {
   display: flex;

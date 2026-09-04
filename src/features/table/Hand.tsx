@@ -43,13 +43,12 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
   // one keyboard play would cost the player their place in the hand.
   const refocus = useRef<number | null>(null);
 
-  const setRefs = useCallback(
-    (el: HTMLDivElement | null) => {
-      boxRef.current = el;
-      setNodeRef(el);
-    },
-    [setNodeRef],
-  );
+  // The whole frame takes the drop, the way the four piles beside it do; the
+  // card row is measured on its own, because it is the row's width — not the
+  // frame's — that the fan has to fit inside.
+  const setRowRef = useCallback((el: HTMLDivElement | null) => {
+    boxRef.current = el;
+  }, []);
 
   // Content-box width of the hand, tracked live so a window resize re-fans it.
   useLayoutEffect(() => {
@@ -94,52 +93,63 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
 
   return (
     <div
-      ref={setRefs}
-      className={`tbl-hand tbl-drop${isOver ? ' is-over' : ''}`}
+      ref={setNodeRef}
+      className={`tbl-zone tbl-hand-zone tbl-drop${isOver ? ' is-over' : ''}`}
       aria-label="Hand"
     >
-      {cards.length === 0 && <p className="tbl-hand-empty">Hand is empty. Draw from the library.</p>}
+      {/* The same head row as the four piles: label, then the count. Nothing
+          here is a control — the hand has no browse view, it is already open. */}
+      <div className="tbl-zone-head is-static">
+        <span>Hand</span>
+        <span className="tbl-zone-count">{cards.length}</span>
+      </div>
 
-      {/* Nothing renders until the container has been measured, so the row can
-          never briefly overflow at its default width. */}
-      {avail > 0 &&
-        cards.map((card, i) => (
-          <div
-            key={card.iid}
-            className="tbl-hand-slot"
-            style={
-              {
-                marginLeft: i === 0 ? 0 : overlap,
-                // Earlier cards sit on top, so every card keeps its right edge
-                // — and its mana-value badge — visible when they overlap.
-                '--hand-z': cards.length - i,
-              } as CSSProperties
-            }
-          >
-            <DraggableCardView
-              card={card}
-              width={STRIP_CARD_WIDTH}
-              selected={selecting && selected.includes(card.iid)}
-              onClick={selecting ? () => onToggleSelect(card.iid) : undefined}
-              onDoubleClick={
-                selecting ? undefined : () => moveCard(card.iid, 'battlefield')
+      <div ref={setRowRef} className="tbl-zone-body tbl-hand-row">
+        {cards.length === 0 && (
+          <p className="tbl-hand-empty">Hand is empty. Draw from the library.</p>
+        )}
+
+        {/* Nothing renders until the container has been measured, so the row can
+            never briefly overflow at its default width. */}
+        {avail > 0 &&
+          cards.map((card, i) => (
+            <div
+              key={card.iid}
+              className="tbl-hand-slot"
+              style={
+                {
+                  marginLeft: i === 0 ? 0 : overlap,
+                  // Earlier cards sit on top, so every card keeps its right edge
+                  // — and its mana-value badge — visible when they overlap.
+                  '--hand-z': cards.length - i,
+                } as CSSProperties
               }
-              onActivate={
-                selecting
-                  ? () => onToggleSelect(card.iid)
-                  : () => {
-                      refocus.current = i;
-                      moveCard(card.iid, 'battlefield');
-                    }
-              }
-              title={
-                selecting
-                  ? 'Click or Enter to put on the bottom'
-                  : 'Double-click or Enter to play · right-click for options'
-              }
-            />
-          </div>
-        ))}
+            >
+              <DraggableCardView
+                card={card}
+                width={STRIP_CARD_WIDTH}
+                selected={selecting && selected.includes(card.iid)}
+                onClick={selecting ? () => onToggleSelect(card.iid) : undefined}
+                onDoubleClick={
+                  selecting ? undefined : () => moveCard(card.iid, 'battlefield')
+                }
+                onActivate={
+                  selecting
+                    ? () => onToggleSelect(card.iid)
+                    : () => {
+                        refocus.current = i;
+                        moveCard(card.iid, 'battlefield');
+                      }
+                }
+                title={
+                  selecting
+                    ? 'Click or Enter to put on the bottom'
+                    : 'Double-click or Enter to play · right-click for options'
+                }
+              />
+            </div>
+          ))}
+      </div>
     </div>
   );
 }
