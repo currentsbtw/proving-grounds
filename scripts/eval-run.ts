@@ -77,6 +77,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import type { JudgeGrounding, JudgeResponse, JudgeRule, JudgeUsage } from '../src/domain/judge.ts';
+import { printedParts } from '../src/domain/judge.ts';
 import { type Corpus, loadCorpus, resolveRule } from '../server/judge/corpus.ts';
 import { MAX_QUESTION_CHARS, askJudge, buildSystemBlocks } from '../server/judge/core.ts';
 import { ModelAuthError, ModelLimitError, type JudgeModel } from '../server/judge/model.ts';
@@ -121,7 +122,11 @@ const PRICE = { input: 5, cacheRead: 0.5, cacheWrite: 10, output: 25 };
  *
  * 1: the question alone.
  * 2: the question plus a "Card text for reference" block for the cards it names.
- * 3: that block carries each card's printed mana cost between type line and text.
+ * 3: that block carries each card's printed mana cost between type line and text,
+ *    and, since Sep 4, 2026, the printed box after it -- power/toughness, or a
+ *    planeswalker's `starting loyalty`. Not bumped to 4 for the box: resume
+ *    compares each item's stored question text, so an item whose reference block
+ *    grew a box is re-asked on its own rather than by voiding the whole file.
  *
  * Bump it whenever the request an item produces changes shape. It is part of the
  * harness fingerprint below, so a bump makes every earlier result unresumable,
@@ -327,6 +332,10 @@ interface StoredCardRulings {
   typeLine: string;
   /** Printed cost, `{1}{U}`. Absent in a rulings file written before it was stored. */
   manaCost?: string;
+  /** Printed box: power/toughness or starting loyalty. Absent in a file written before it was stored. */
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
   oracleText: string;
 }
 interface StoredExample {
@@ -396,6 +405,9 @@ function referenceBlock(
     // request carried one.
     const parts = [hit.card, hit.typeLine];
     if (hit.manaCost) parts.push(hit.manaCost);
+    // Then the printed box, through the same function `describeCard` renders a
+    // table card with, so the two never drift into two wordings of one fact.
+    parts.push(...printedParts(hit));
     parts.push(hit.oracleText.replace(/\n+/g, ' / '));
     lines.push(`- ${parts.join(' | ')}`);
   }

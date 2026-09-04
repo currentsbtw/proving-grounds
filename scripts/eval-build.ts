@@ -26,9 +26,12 @@
  * step 1 and the sampling stay usable offline.
  *
  * Caching: step 1 skips cards already in `eval/rulings.json` -- except one it has
- * to top up: an entry written before the printed mana cost was stored is refetched
- * from Scryfall for that field alone, one card call and no rulings call, because
- * a judge asked what a spell costs cannot read the answer off a type line. Step 2 skips rulings
+ * to top up: an entry missing either printed field (`manaCost === undefined ||
+ * power === undefined`, the two the store gained in turn) is refetched from
+ * Scryfall for the printed box alone -- cost, power, toughness and starting
+ * loyalty, written on every entry and empty on a card that has none -- one card
+ * call and no rulings call and no model, because a judge asked what a spell costs
+ * or whether a creature survives cannot read either off a type line. Step 2 skips rulings
  * already in `eval/questions.json` or already judged unusable in
  * `eval/questions-skipped.json`, both keyed on the item id (`<oracle_id>#<n>`) so a
  * reworded ruling is still recognised. One cached question is not skipped: one
@@ -97,6 +100,18 @@ export interface CardRulings {
    * in from Scryfall without a model call. Empty string for a land.
    */
   manaCost?: string;
+  /**
+   * Printed power, toughness and starting loyalty, as Scryfall's strings so `*`
+   * and `1+*` survive. Optional for the same reason as `manaCost`: entries
+   * written before these fields existed do not have them and step 1 tops those
+   * up from Scryfall without a model call. Empty string on a card with no such
+   * box, exactly as `manaCost` is empty on a land, so that `undefined` keeps
+   * meaning "written before the field existed" and nothing else. A reader skips
+   * the empty ones.
+   */
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
   oracleText: string;
   rulings: RulingEntry[];
 }
@@ -181,6 +196,9 @@ interface ScryfallFace {
   name: string;
   mana_cost?: string;
   oracle_text?: string;
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
 }
 interface ScryfallCard {
   name: string;
@@ -188,6 +206,9 @@ interface ScryfallCard {
   type_line?: string;
   mana_cost?: string;
   oracle_text?: string;
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
   card_faces?: ScryfallFace[];
   rulings_uri: string;
 }
@@ -237,6 +258,26 @@ function manaCostOf(card: ScryfallCard): string {
   return card.mana_cost ?? card.card_faces?.[0]?.mana_cost ?? '';
 }
 
+/**
+ * The printed box, front face first for the same reason the cost is. Base
+ * values as Scryfall's strings, so `*` and `1+*` are kept whole.
+ *
+ * Stored the way the cost is: written on every entry, as the empty string on a
+ * card that has no such box. An instant legitimately has no power, so absence
+ * cannot mean both "this card has none" and "this file predates the field" —
+ * writing the empty string is what keeps `undefined` meaning only the second,
+ * which is what the top-up below tests. A reader skips the empty ones, as a
+ * blank in a reference line would read as a size of nothing.
+ */
+function boxOf(card: ScryfallCard): { power: string; toughness: string; loyalty: string } {
+  const front = card.card_faces?.[0];
+  return {
+    power: card.power ?? front?.power ?? '',
+    toughness: card.toughness ?? front?.toughness ?? '',
+    loyalty: card.loyalty ?? front?.loyalty ?? '',
+  };
+}
+
 async function step1Rulings(): Promise<CardRulings[]> {
   console.log('step 1: cards and rulings from Scryfall');
   const names = readCardNames();
@@ -271,24 +312,31 @@ async function step1Rulings(): Promise<CardRulings[]> {
     for (const name of names) {
       const hit = byName.get(name);
       if (hit) {
-        // A cached entry written before `manaCost` existed is topped up rather
-        // than refetched whole: one card call, no rulings call, no model. The
-        // judge cannot read a printed cost off a type line or off oracle text,
-        // and a live eval item was graded disagree for guessing one.
-        if (hit.manaCost === undefined) {
+        // A cached entry written before `manaCost` or the printed box existed is
+        // topped up rather than refetched whole: one card call, no rulings call,
+        // no model. The judge cannot read a printed cost or a printed size off a
+        // type line or off oracle text, and a live eval item was graded disagree
+        // for guessing a cost.
+        if (hit.manaCost === undefined || hit.power === undefined) {
           await sleep(SCRYFALL_DELAY_MS);
           const card = await scryfall<ScryfallCard>(
             `${SCRYFALL}/cards/named?exact=${encodeURIComponent(hit.card)}`,
           );
-          // Rebuilt rather than spread, so the field lands where a freshly
-          // fetched entry puts it and the two are the same shape on disk. A name
-          // Scryfall will not resolve today still gets the field, as the empty
-          // string, so the next run does not ask again for the same nothing.
+          // Rebuilt rather than spread, so the fields land where a freshly
+          // fetched entry puts them and the two are the same shape on disk. A
+          // name Scryfall will not resolve today still gets every field, as the
+          // empty string, so the next run does not ask again for the same
+          // nothing. A cost already on disk is kept rather than overwritten with
+          // a blank when this call is the one that fails.
+          const box = card ? boxOf(card) : { power: '', toughness: '', loyalty: '' };
           out.push({
             card: hit.card,
             oracleId: hit.oracleId,
             typeLine: hit.typeLine,
-            manaCost: card ? manaCostOf(card) : '',
+            manaCost: card ? manaCostOf(card) : (hit.manaCost ?? ''),
+            power: box.power,
+            toughness: box.toughness,
+            loyalty: box.loyalty,
             oracleText: hit.oracleText,
             rulings: hit.rulings,
           });
@@ -316,6 +364,7 @@ async function step1Rulings(): Promise<CardRulings[]> {
         oracleId: card.oracle_id ?? '',
         typeLine: card.type_line ?? '',
         manaCost: manaCostOf(card),
+        ...boxOf(card),
         oracleText: oracleTextOf(card),
         rulings: (rulings?.data ?? [])
           .filter((r) => r.source === 'wotc')
@@ -330,7 +379,7 @@ async function step1Rulings(): Promise<CardRulings[]> {
 
   const rulingCount = out.reduce((n, entry) => n + entry.rulings.length, 0);
   console.log(`  ${out.length} cards resolved (${fetched} newly fetched, ${cached.length} cached)`);
-  if (filled > 0) console.log(`  ${filled} cached entries topped up with their printed mana cost`);
+  if (filled > 0) console.log(`  ${filled} cached entries topped up with their printed cost and box`);
   console.log(`  ${rulingCount} Wizards rulings`);
   if (dropped.length > 0) {
     console.log(`  ${dropped.length} dropped, Scryfall could not resolve them exactly:`);

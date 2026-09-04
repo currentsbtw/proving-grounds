@@ -26,9 +26,15 @@
  * the run was started under. It is still a count, and it is still not a
  * judgement — a long turn is a long turn, not a bad one, and nothing here knows
  * whether the player was thinking, reading a card or answering the door.
+ *
+ * 5 — `fastRebuild.minMvLost`, the size of the sweep the rebuild good is owed
+ * to. The scorecard says whether the board came back; it cannot say whether
+ * coming back was worth anything, and a wrath that took three mana value is met
+ * by the next permanent played. It is the same shape as every number here: a
+ * count of mana value off the table, not a reading of how the turn felt.
  */
 export const REVIEW = {
-  version: 4,
+  version: 5,
 
   /** Hard cap on findings shown. A debrief nobody reads changes no decklist. */
   maxFindings: 8,
@@ -94,6 +100,19 @@ export const REVIEW = {
     minMvDeployed: 6,
     /** Nonland cards still in hand at the end of that turn. */
     minCardsInHand: 2,
+  },
+
+  fastRebuild: {
+    /**
+     * Mana value the wrath actually took off the table (`WipeRecovery.mvLost`)
+     * before rebuilding from it is an achievement. A wrath that took *nothing*
+     * never gets here — the scorecard leaves its `turnsToRecover` null, because
+     * there was nothing to recover — but one that took three mana value is met
+     * by the next permanent played, and that is a turn, not a comeback. Six
+     * matches `overextend.minMvDeployed`: the same board worth calling a
+     * commitment is the board worth calling a rebuild.
+     */
+    minMvLost: 6,
   },
 
   clock: {

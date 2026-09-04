@@ -1356,7 +1356,14 @@ export function reviewRun(run: RunRecord, card: Scorecard, options?: ReviewOptio
     });
   }
 
-  const fast = card.wipes.find((w) => !w.negated && w.turnsToRecover === 1);
+  // Rebuilding the turn after a wrath, but only when the wrath took enough for
+  // rebuilding to be an achievement. A sweep that took nothing has no
+  // `turnsToRecover` at all — the scorecard leaves it null — but a sweep that
+  // took three mana value is still met by the next thing played, and
+  // `minMvLost` is where a rebuild starts being worth saying out loud.
+  const fast = card.wipes.find(
+    (w) => !w.negated && w.turnsToRecover === 1 && w.mvLost >= REVIEW.fastRebuild.minMvLost,
+  );
   if (fast) {
     const wipeSeq = replay.wipeSeqs.get(fast.turn);
     drafts.push({

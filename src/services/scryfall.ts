@@ -19,6 +19,7 @@ interface ScryfallFace {
   oracle_text?: string;
   power?: string;
   toughness?: string;
+  loyalty?: string;
   image_uris?: { small?: string; normal?: string };
 }
 
@@ -71,6 +72,10 @@ export function toCardData(card: ScryfallCard): CardData {
     oracleText: oracle,
     power: card.power ?? front.power,
     toughness: card.toughness ?? front.toughness,
+    // Same card-then-front-face fallback as power and toughness: a transforming
+    // planeswalker prints its loyalty on a face rather than at the card level,
+    // and the face a question about casting it is about is the front one.
+    loyalty: card.loyalty ?? front.loyalty,
     colorIdentity: card.color_identity ?? [],
     imageNormal: images?.normal,
     imageSmall: images?.small,
@@ -81,6 +86,24 @@ export function toCardData(card: ScryfallCard): CardData {
     // to keep the cached row the same shape it has always been.
     keywords: card.keywords && card.keywords.length > 0 ? card.keywords : undefined,
   };
+}
+
+/**
+ * The one stale cache row we top up: a planeswalker written before `loyalty` was
+ * mapped. The field was added to `CardData` without a Dexie version bump, and
+ * nothing else in the app refetches on a schema addition, so a walker imported
+ * before this build would never gain a starting loyalty and the judge would be
+ * handed a table with the one number a loyalty question needs missing.
+ *
+ * Deliberately narrow: this refetches one kind of row, not the cache. The test
+ * reads the front face only, because that is the face `toCardData` takes loyalty
+ * from and the face a question about casting the card is about. A modal card
+ * with a creature front and a planeswalker back has no front-face loyalty to
+ * find, so matching on the whole type line would refetch it on every resolve,
+ * for ever, and still write the same row back.
+ */
+function needsLoyaltyTopUp(card: CardData): boolean {
+  return card.loyalty === undefined && /planeswalker/i.test(card.typeLine.split('//')[0]);
 }
 
 /**
@@ -180,16 +203,34 @@ export async function resolveCards(names: string[]): Promise<ResolveResult> {
 
   const found: CardData[] = [];
   const toFetch: string[] = [];
+  // A hit that `needsLoyaltyTopUp` is sent to the network like a miss, so the
+  // fetch below rewrites the row through `cacheCards`. The stale copy is kept as
+  // a fallback: a top-up that cannot reach Scryfall must still hand back the card
+  // we already had, one field short, rather than report it missing.
+  const stale = new Map<string, CardData>();
   for (const name of requested) {
     const hit = byKey.get(nameKey(name));
-    if (hit) found.push(hit);
-    else toFetch.push(name);
+    if (hit && !needsLoyaltyTopUp(hit)) {
+      found.push(hit);
+      continue;
+    }
+    if (hit) stale.set(nameKey(name), hit);
+    toFetch.push(name);
   }
 
   if (toFetch.length === 0) return { found, notFound: [] };
 
   // 2. Network for the remainder.
-  const { cards, missing } = await fetchInBatches(toFetch.map((name) => ({ name })));
+  let cards: ScryfallCard[] = [];
+  let missing: { name?: string; id?: string }[] = [];
+  try {
+    ({ cards, missing } = await fetchInBatches(toFetch.map((name) => ({ name }))));
+  } catch (err) {
+    // A batch of nothing but top-ups is allowed to fail quietly: every card in it
+    // is already in hand, and an offline moment should cost the added field, not
+    // the deck. One real miss riding along and the call fails as it always has.
+    if (toFetch.some((name) => !stale.has(nameKey(name)))) throw err;
+  }
   const fetched = cards.map(toCardData);
   if (fetched.length > 0) {
     try {
@@ -203,7 +244,7 @@ export async function resolveCards(names: string[]): Promise<ResolveResult> {
   const notFound: string[] = [];
 
   for (const name of toFetch) {
-    const hit = fetchedIndex.get(nameKey(name));
+    const hit = fetchedIndex.get(nameKey(name)) ?? stale.get(nameKey(name));
     if (hit) found.push(hit);
     else notFound.push(name);
   }
@@ -235,13 +276,30 @@ export async function resolveCardsByIds(
   }
 
   const byId = new Map(cached.map((c) => [c.scryfallId, c]));
+  // Same one top-up as `resolveCards`: a planeswalker row cached before `loyalty`
+  // was mapped is refetched like a miss, and nothing else is. The stale row stays
+  // in `byId` until a fresh one overwrites it, so a refetch that fails leaves the
+  // card in hand rather than dropping it.
+  const staleIds = new Set(
+    unique.filter((id) => {
+      const hit = byId.get(id);
+      return hit !== undefined && needsLoyaltyTopUp(hit);
+    }),
+  );
   // Scryfall rejects the whole batch on a malformed `id`, so only send well-formed UUIDs.
-  const missingIds = unique.filter((id) => !byId.has(id) && UUID_RE.test(id));
-  if (unique.every((id) => byId.has(id))) {
+  const missingIds = unique.filter((id) => (!byId.has(id) || staleIds.has(id)) && UUID_RE.test(id));
+  if (staleIds.size === 0 && unique.every((id) => byId.has(id))) {
     return { found: unique.map((id) => byId.get(id)).filter((c): c is CardData => Boolean(c)), notFound: [] };
   }
 
-  const { cards } = await fetchInBatches(missingIds.map((id) => ({ id })));
+  let cards: ScryfallCard[] = [];
+  try {
+    ({ cards } = await fetchInBatches(missingIds.map((id) => ({ id }))));
+  } catch (err) {
+    // As above: a batch of nothing but top-ups fails quietly, because every card
+    // in it is already cached and the run can start without the added field.
+    if (missingIds.some((id) => !staleIds.has(id))) throw err;
+  }
   const fetched = cards.map(toCardData);
   if (fetched.length > 0) {
     try {

@@ -320,6 +320,106 @@ async function offline() {
     rendered.includes('- Swords to Plowshares | Instant | Exile target creature.'),
     rendered.split('\n').find((line) => line.includes('Swords to Plowshares')) ?? 'no line',
   );
+  // The printed box, for the same reason as the cost: "does my 3/3 survive
+  // this?" and "how many loyalty counters does it enter with?" cannot be
+  // answered off a type line, and a judge given neither answers from memory.
+  // These are BASE values -- the counters print after them and the sum is the
+  // judge's to do -- so the planeswalker below is deliberately sitting on five
+  // loyalty counters while its printed line still reads the 3 it starts with.
+  // Loyalty is the one box that must NOT read as a sum: loyalty counters are the
+  // walker's loyalty rather than a bonus on top of the printed number, so the
+  // renderer says `starting loyalty 3` and never a bare `loyalty 3` that a judge
+  // could add 5 to and answer 8. Rendered separately from `FIXTURE` so the
+  // assertions above keep the table they were written against. `*` and `1+*` are
+  // Scryfall's own strings and travel whole.
+  const box = renderTableContext({
+    ...FIXTURE,
+    cards: [
+      {
+        name: 'Tarmogoyf',
+        zone: 'battlefield',
+        typeLine: 'Creature — Lhurgoyf',
+        manaCost: '{1}{G}',
+        power: '*',
+        toughness: '1+*',
+        counters: { '+1/+1': 2 },
+        oracleText: "Tarmogoyf's power is equal to the number of card types among cards in all graveyards.",
+      },
+      {
+        name: 'Wrenn and Six',
+        zone: 'battlefield',
+        typeLine: 'Legendary Planeswalker — Wrenn',
+        manaCost: '{R}{G}',
+        loyalty: '3',
+        counters: { loyalty: 5 },
+        oracleText: '+1: Return up to one target land card from your graveyard to your hand.',
+      },
+      { name: 'Memnite', zone: 'battlefield', typeLine: 'Artifact Creature — Construct', power: '1', toughness: '1' },
+      { name: 'Wastes', zone: 'battlefield', typeLine: 'Basic Land' },
+    ],
+  });
+  check(
+    'a creature carries its printed power and toughness after the cost',
+    box.includes("- Tarmogoyf | Creature — Lhurgoyf | {1}{G} | */1+* | 2 +1/+1 counters | Tarmogoyf's power"),
+    box.split('\n').find((line) => line.includes('Tarmogoyf')) ?? 'no Tarmogoyf line',
+  );
+  check(
+    'a planeswalker carries its printed starting loyalty',
+    box.includes(
+      '- Wrenn and Six | Legendary Planeswalker — Wrenn | {R}{G} | starting loyalty 3 | 5 loyalty counters |',
+    ),
+    box.split('\n').find((line) => line.includes('Wrenn and Six')) ?? 'no Wrenn and Six line',
+  );
+  // And the printed number is labelled so it cannot be read as one more thing to
+  // add up. Both halves have to be on the line -- the base value and the count on
+  // the card now -- and the base one must never appear as a bare `loyalty N`
+  // ahead of the counters, which is the string a judge would sum to 8.
+  const walkerLine = box.split('\n').find((line) => line.includes('Wrenn and Six')) ?? '';
+  const beforeCounters = walkerLine.split('5 loyalty counters')[0];
+  check(
+    'and labels it so the counters cannot be added to it',
+    walkerLine.includes('starting loyalty 3') &&
+      walkerLine.includes('5 loyalty counters') &&
+      !/\|\s*loyalty\s+3/.test(beforeCounters),
+    walkerLine || 'no Wrenn and Six line',
+  );
+  check(
+    'a costless creature still carries its box',
+    box.includes('- Memnite | Artifact Creature — Construct | 1/1'),
+    box.split('\n').find((line) => line.includes('Memnite')) ?? 'no Memnite line',
+  );
+  check(
+    'a card with no box prints nothing extra',
+    box.includes('- Wastes | Basic Land') && !/\|\s*\|/.test(box),
+    box.split('\n').find((line) => line.includes('Wastes')) ?? 'no Wastes line',
+  );
+  // A cast creature only ever travels as a tray item, so the tray is the one
+  // place a question about what is about to resolve can read its box at all.
+  const trayBox = renderTableContext({
+    ...FIXTURE,
+    stack: [
+      {
+        kind: 'spell',
+        label: 'Grave Titan',
+        typeLine: 'Creature — Giant',
+        manaCost: '{4}{B}{B}',
+        power: '6',
+        toughness: '6',
+        oracleText: 'Deathtouch. When Grave Titan enters, create two 2/2 black Zombie creature tokens.',
+      },
+      { kind: 'trigger', label: 'Rhystic Study trigger' },
+    ],
+  });
+  check(
+    'a tray spell carries its printed box after the cost',
+    trayBox.includes('1. Grave Titan | Creature — Giant | {4}{B}{B} | 6/6 | Deathtouch.'),
+    trayBox.split('\n').find((line) => line.includes('Grave Titan')) ?? 'no Grave Titan line',
+  );
+  check(
+    'a tray item with no box prints no blank field',
+    trayBox.includes('2. trigger: Rhystic Study trigger') && !/\|\s*\|/.test(trayBox),
+    trayBox.split('\n').find((line) => line.includes('Rhystic Study')) ?? 'no trigger line',
+  );
   check('marks the dead seat', rendered.includes('Seat C: eliminated'));
   // A hate piece is a permanent on a seat's side of the table, so it prints
   // under that seat and changes nothing about the seat's own line. The checks

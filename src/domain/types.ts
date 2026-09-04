@@ -26,6 +26,16 @@ export interface CardData {
   oracleText: string;
   power?: string;
   toughness?: string;
+  /**
+   * Printed starting loyalty, as Scryfall's string. Optional twice over: only a
+   * planeswalker has one, and a card cached before this field was mapped keeps
+   * whatever it was written with — it is an unindexed field, so the Dexie store
+   * needs no version bump. Unlike every other addition here, this one does get
+   * topped up: `resolveCards` treats a cached planeswalker with no loyalty as a
+   * miss and refetches that row alone, because the judge cannot answer a loyalty
+   * question off a type line.
+   */
+  loyalty?: string;
   colorIdentity: string[];
   imageNormal?: string;
   imageSmall?: string;

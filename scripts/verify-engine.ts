@@ -1,7 +1,7 @@
 /**
  * Verification harness for the M1 pressure store.
  *
- * Twenty-one checks, each labelled below.
+ * Twenty-two checks, each labelled below.
  *
  * `verify-scorecard.ts` checks that the scorer agrees with the store about a run
  * that went normally. This script checks the seams that only open when the table
@@ -92,12 +92,22 @@
  *       own seat's events in the order they will be asked, and a pod hit lands
  *       on the attacker's turn with the defender and the damage the 'damage'
  *       entry claims
+ *   (v) the seed still draws what it always drew: the normalized logs of the
+ *       scripted run and the scripted answer run are compared against fixtures
+ *       committed under `scripts/fixtures/`, so a change to the RNG draw order
+ *       fails here instead of passing because both passes of (e) drifted
+ *       together. Accepting a new draw order is deliberate:
+ *       `npm run verify:engine -- --update-golden` rewrites the fixtures
  *
  * (a) to (c), (h), (i), (k), (l), (o) and (r) to (u) need a run where the pod actually did the thing
  * being tested, so each one searches seeds until it finds one and prints which
  * it used. Failures are collected rather than thrown, so one execution reports
  * everything.
  */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import {
   canCastToStack,
   canMulligan,
@@ -2499,7 +2509,7 @@ async function checkAnswersNameTheCard(): Promise<void> {
 
   // --- and a bound answer replays byte for byte -----------------------------
   const replaySeed = 'engine-answer-determinism';
-  const firstPass = normalizeLog(scriptedAnswerRun(replaySeed));
+  const firstPass = normalizedRun(replaySeed, () => normalizeLog(scriptedAnswerRun(replaySeed)));
   const secondPass = normalizeLog(scriptedAnswerRun(replaySeed));
   const at = firstDifference(firstPass, secondPass);
   check(
@@ -2951,6 +2961,27 @@ function normalizeLog(record: RunRecord): string {
   let json = JSON.stringify(stripped);
   for (const [id, alias] of aliases) json = json.split(id).join(alias);
   return json;
+}
+
+/**
+ * One normalized log per seed, kept for the rest of the process.
+ *
+ * A determinism check has to replay its seed twice — that is the whole check —
+ * but the golden-log check (v) then wants the very same string a third time,
+ * and a scripted run is the most expensive thing in this file. The first pass
+ * of each determinism check parks its string here and (v) reads it back; the
+ * second pass deliberately does not, or it would be comparing a value to
+ * itself.
+ */
+const normalizedRuns = new Map<string, string>();
+
+/** The memoized normalized log for `seed`, building it on the first ask. */
+function normalizedRun(seed: string, build: () => string): string {
+  const memo = normalizedRuns.get(seed);
+  if (memo !== undefined) return memo;
+  const built = build();
+  normalizedRuns.set(seed, built);
+  return built;
 }
 
 // ---------------------------------------------------------------------------
@@ -3848,7 +3879,7 @@ function checkWindowReadsAsSeatTurns(): void {
 
 function checkDeterminism(): void {
   const seed = 'engine-determinism';
-  const first = normalizeLog(scriptedRun(seed));
+  const first = normalizedRun(seed, () => normalizeLog(scriptedRun(seed)));
   const second = normalizeLog(scriptedRun(seed));
   const at = firstDifference(first, second);
   check(
@@ -3857,6 +3888,140 @@ function checkDeterminism(): void {
     at === -1 ? '' : `diverges at char ${at}: ${first.slice(at, at + 120)} | ${second.slice(at, at + 120)}`,
   );
   summary.push(`(e) seed ${seed}: ${first.length} chars of normalized log, replayed identically`);
+}
+
+// ---------------------------------------------------------------------------
+// (v) the seed draws what it has always drawn
+// ---------------------------------------------------------------------------
+
+/**
+ * (e) only proves that two passes in one process agree, which they would go on
+ * doing if the seeded draw order changed underneath them — every seed's run
+ * would quietly become a different run and nothing here would notice. These
+ * fixtures are the memory (e) has not got: the same normalized logs, recorded
+ * once and committed, so a reordered draw fails the suite.
+ *
+ * The fixture is written pretty-printed so a diff is readable, but the
+ * comparison is on the canonical `JSON.stringify` of both sides — reindenting
+ * the file is not a change to the run.
+ */
+const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url));
+
+/** `npm run verify:engine -- --update-golden` */
+const UPDATE_GOLDEN = process.argv.slice(2).includes('--update-golden');
+
+const GOLDEN_LOGS: { name: string; file: string; build: () => string }[] = [
+  {
+    name: 'engine-determinism',
+    file: 'golden-engine-determinism.json',
+    build: () => normalizeLog(scriptedRun('engine-determinism')),
+  },
+  {
+    name: 'engine-answer-determinism',
+    file: 'golden-engine-answer-determinism.json',
+    build: () => normalizeLog(scriptedAnswerRun('engine-answer-determinism')),
+  },
+];
+
+/**
+ * What a legitimate break looks like, so whoever hits it does not go hunting for
+ * a bug in the store when they retuned the table on purpose.
+ */
+const GOLDEN_ADVICE =
+  'if you changed src/data/pressure.ts, profiles.ts or citations.ts on purpose, ' +
+  'bump the version there and run `npm run verify:engine -- --update-golden`';
+
+function checkGoldenLogs(): void {
+  // A fixture is a record of what a correct run does, so it may only be taken
+  // from a run that was correct. Recording off a red run would freeze whatever
+  // the failing checks were complaining about into the file that is supposed to
+  // catch it. (v) runs last precisely so this count is final.
+  const otherFailures = failures.length;
+  if (UPDATE_GOLDEN && otherFailures > 0) {
+    failures.push(
+      `(v) the fixture was not recorded because ${otherFailures} other check(s) failed — ` +
+        'only a fully green run may record a golden log. Fix those, then re-run ' +
+        '`npm run verify:engine -- --update-golden`.',
+    );
+    return;
+  }
+
+  for (const golden of GOLDEN_LOGS) {
+    const path = join(FIXTURE_DIR, golden.file);
+    const canonical = normalizedRun(golden.name, golden.build);
+
+    if (UPDATE_GOLDEN) {
+      mkdirSync(FIXTURE_DIR, { recursive: true });
+      writeFileSync(path, `${JSON.stringify(JSON.parse(canonical), null, 2)}\n`, 'utf8');
+      console.log(`--update-golden: rewrote ${path} (${canonical.length} canonical chars)`);
+      summary.push(`(v) ${golden.name}: fixture rewritten from this run (--update-golden)`);
+      continue;
+    }
+
+    let recorded: string;
+    try {
+      recorded = readFileSync(path, 'utf8');
+    } catch {
+      failures.push(
+        `(v) no golden log for ${golden.name} at ${path} — record one once with ` +
+          '`npm run verify:engine -- --update-golden`',
+      );
+      continue;
+    }
+
+    let expected: unknown;
+    try {
+      expected = JSON.parse(recorded);
+    } catch (err: unknown) {
+      failures.push(
+        `(v) the golden log for ${golden.name} is not valid JSON (${
+          err instanceof Error ? err.message : String(err)
+        }) — re-record it with \`npm run verify:engine -- --update-golden\``,
+      );
+      continue;
+    }
+
+    if (JSON.stringify(expected) === canonical) {
+      summary.push(
+        `(v) ${golden.name}: ${canonical.length} chars of normalized log match ${golden.file}`,
+      );
+      continue;
+    }
+
+    failures.push(
+      `(v) ${golden.name} no longer replays the committed golden log — ` +
+        `${firstEntryDifference(expected, JSON.parse(canonical))}. ` +
+        `This is the seeded draw order changing: every seed's run just became a ` +
+        `different run. If that was not intended, the fix is in the engine, not here; ` +
+        `${GOLDEN_ADVICE}.`,
+    );
+  }
+}
+
+/** A one-line report of where two normalized logs first part company. */
+function firstEntryDifference(expected: unknown, actual: unknown): string {
+  const before = Array.isArray(expected) ? expected : [];
+  const after = Array.isArray(actual) ? actual : [];
+  const limit = Math.min(before.length, after.length);
+  for (let i = 0; i < limit; i++) {
+    const a = JSON.stringify(before[i]);
+    const b = JSON.stringify(after[i]);
+    if (a !== b) {
+      return `entry ${i} differs\n      golden: ${excerpt(a)}\n      now:    ${excerpt(b)}`;
+    }
+  }
+  if (before.length === after.length) {
+    return 'the entries all match but the canonical forms do not (key order?)';
+  }
+  const lengths = `golden has ${before.length} entries, this run has ${after.length}`;
+  return limit === 0
+    ? `one of the two logs is empty: ${lengths}`
+    : `entries 0-${limit - 1} match, then the length changes: ${lengths}`;
+}
+
+/** Enough of an entry to recognize it, not enough to bury the report. */
+function excerpt(json: string): string {
+  return json.length <= 220 ? json : `${json.slice(0, 220)}…`;
 }
 
 /** Index of the first differing character, or -1 when the strings match. */
@@ -3902,6 +4067,7 @@ async function main(): Promise<void> {
   checkQueuedHateHoldsTheSeatsSlot();
   checkWindowReadsAsSeatTurns();
   checkDeterminism();
+  checkGoldenLogs();
 
   console.log('\nverify:engine');
   console.log('─'.repeat(72));

@@ -420,11 +420,17 @@ function wipeTile(card: Scorecard): Tile {
   const wipes = card.wipes ?? [];
   if (wipes.length === 0) return { label: 'WIPE RECOVERY', value: 'no wipe', sub: 'none faced' };
 
-  const landed = wipes.filter((w) => !w.negated);
-  if (landed.length === 0) {
-    return { label: 'WIPE RECOVERY', value: '0', sub: `${wipes.length} negated` };
+  // Same reading as the panel's tile: the first wrath that landed and took
+  // something is the one measured. A wrath that swept nothing has nothing to
+  // rebuild and is neither a recovery nor a failure to recover.
+  const measured = wipes.filter((w) => !w.negated && w.mvLost > 0);
+  if (measured.length === 0) {
+    const tookNothing = wipes.some((w) => !w.negated);
+    return tookNothing
+      ? { label: 'WIPE RECOVERY', value: 'nothing', sub: `${wipes.length} faced · nothing to rebuild` }
+      : { label: 'WIPE RECOVERY', value: '0', sub: `${wipes.length} negated` };
   }
-  const first = landed[0];
+  const first = measured[0];
   const turns = first.turnsToRecover;
   return {
     label: 'WIPE RECOVERY',

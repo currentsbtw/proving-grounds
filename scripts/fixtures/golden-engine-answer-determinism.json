@@ -1,0 +1,2111 @@
+[
+  {
+    "seq": 1,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "run",
+    "message": "Run started: Engine Verification (stack) (seed engine-answer-determinism)",
+    "payload": {
+      "runId": "<runId>",
+      "deckId": "verify-engine-stack-deck",
+      "deckName": "Engine Verification (stack)",
+      "seed": "engine-answer-determinism",
+      "bracket": 4,
+      "librarySize": 119,
+      "commanders": [
+        "cmd-warlord"
+      ],
+      "pressureVersion": 7,
+      "shotClockSeconds": null
+    },
+    "at": 0
+  },
+  {
+    "seq": 2,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "threat",
+    "message": "Seats seated: A combo 1.0, B tokens 1.8, C stax 1.9",
+    "payload": {
+      "seats": [
+        {
+          "id": "A",
+          "threat": 1,
+          "silhouette": {
+            "creatures": 0,
+            "power": 0,
+            "artifacts": 0,
+            "openMana": 1,
+            "bonusMana": 0
+          },
+          "profile": "combo"
+        },
+        {
+          "id": "B",
+          "threat": 1.8,
+          "silhouette": {
+            "creatures": 0,
+            "power": 0,
+            "artifacts": 0,
+            "openMana": 1,
+            "bonusMana": 0
+          },
+          "profile": "tokens"
+        },
+        {
+          "id": "C",
+          "threat": 1.9,
+          "silhouette": {
+            "creatures": 0,
+            "power": 0,
+            "artifacts": 0,
+            "openMana": 1,
+            "bonusMana": 0
+          },
+          "profile": "stax"
+        }
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 3,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "shuffle",
+    "message": "Library shuffled (119 cards)",
+    "payload": {
+      "size": 119,
+      "seed": "engine-answer-determinism"
+    },
+    "at": 0
+  },
+  {
+    "seq": 4,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Opening hand: 7 cards",
+    "payload": {
+      "count": 7,
+      "iids": [
+        "#7",
+        "#20",
+        "#2",
+        "#83",
+        "#6",
+        "#35",
+        "#34"
+      ],
+      "opening": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 5,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "mull",
+    "message": "Kept 7; 0 to the bottom",
+    "payload": {
+      "mulliganCount": 0,
+      "bottomIids": [],
+      "bottomNames": []
+    },
+    "at": 0
+  },
+  {
+    "seq": 6,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#89",
+        "#118"
+      ],
+      "names": [
+        "Grounds Signet",
+        "Grounds Passage"
+      ],
+      "libraryRemaining": 110
+    },
+    "at": 0
+  },
+  {
+    "seq": 7,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#7",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 8,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Colossus: hand → battlefield",
+    "payload": {
+      "iid": "#83",
+      "name": "Grounds Colossus",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 9,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 2 · A: builds (1.0→1.4, 0c/1p) · B: builds (1.8→2.2, 1c/1p) · C: casts Deadly Rollick on Grounds Colossus",
+    "payload": {
+      "window": 1,
+      "windowBeforeTurn": 2,
+      "bracket": 4,
+      "playerThreat": 2,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 1.4,
+          "silhouette": {
+            "creatures": 0,
+            "power": 1,
+            "artifacts": 0,
+            "openMana": 2,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 2.2,
+          "silhouette": {
+            "creatures": 1,
+            "power": 1,
+            "artifacts": 0,
+            "openMana": 2,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 3.2,
+          "silhouette": {
+            "creatures": 0,
+            "power": 1,
+            "artifacts": 0,
+            "openMana": 2,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [
+        "removal"
+      ],
+      "counterArmed": null,
+      "clock": null,
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 1,
+          "threatTo": 1.4,
+          "creaturesFrom": 0,
+          "creaturesTo": 0,
+          "powerFrom": 0,
+          "powerTo": 1,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 1.8,
+          "threatTo": 2.2,
+          "creaturesFrom": 0,
+          "creaturesTo": 1,
+          "powerFrom": 0,
+          "powerTo": 1,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [
+            "removal"
+          ],
+          "podHit": null,
+          "threatFrom": 1.9,
+          "threatTo": 3.2,
+          "creaturesFrom": 0,
+          "creaturesTo": 0,
+          "powerFrom": 0,
+          "powerTo": 1,
+          "armed": false,
+          "clockOwner": false
+        }
+      ],
+      "notes": [
+        "removal:C:permanent:Deadly Rollick"
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 10,
+    "turn": 1,
+    "phase": "main1",
+    "kind": "event",
+    "message": "Seat C casts Deadly Rollick on Grounds Colossus.",
+    "payload": {
+      "eventId": "w1-removal-C-1",
+      "eventType": "removal",
+      "seatId": "C",
+      "eventTurn": 2,
+      "severity": {
+        "turn": 2,
+        "bracket": 4,
+        "targetMv": 6,
+        "playerThreat": 2,
+        "commander": 0
+      },
+      "targetIid": "#83",
+      "state": "pending",
+      "card": "Deadly Rollick",
+      "cardMv": 4,
+      "cardEffect": "Exile target creature. Free with their commander out.",
+      "cardZone": "exile",
+      "queued": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 11,
+    "turn": 2,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 2 begins",
+    "payload": {
+      "turn": 2,
+      "previousTurn": 1,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 12,
+    "turn": 2,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 13,
+    "turn": 2,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#117"
+      ],
+      "names": [
+        "Grounds Passage"
+      ],
+      "libraryRemaining": 109
+    },
+    "at": 0
+  },
+  {
+    "seq": 14,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 2
+    },
+    "at": 0
+  },
+  {
+    "seq": 15,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Plain: hand → battlefield",
+    "payload": {
+      "iid": "#20",
+      "name": "Training Plain",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false,
+      "reason": "answered w1-removal-C-1"
+    },
+    "at": 0
+  },
+  {
+    "seq": 16,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Answered removal with Training Plain: Seat C casts Deadly Rollick on Grounds Colossus. · \"answered\"",
+    "payload": {
+      "eventId": "w1-removal-C-1",
+      "eventType": "removal",
+      "seatId": "C",
+      "eventTurn": 2,
+      "severity": {
+        "turn": 2,
+        "bracket": 4,
+        "targetMv": 6,
+        "playerThreat": 2,
+        "commander": 0
+      },
+      "targetIid": "#83",
+      "state": "negated",
+      "card": "Deadly Rollick",
+      "cardMv": 4,
+      "cardEffect": "Exile target creature. Free with their commander out.",
+      "cardZone": "exile",
+      "responded": true,
+      "negated": true,
+      "answerIid": "#20",
+      "answerName": "Training Plain",
+      "answerZone": "hand",
+      "answerTo": "battlefield",
+      "answerMv": 0,
+      "bound": true,
+      "note": "answered"
+    },
+    "at": 0
+  },
+  {
+    "seq": 17,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#43",
+        "#84"
+      ],
+      "names": [
+        "Grounds Scout",
+        "Grounds Titan"
+      ],
+      "libraryRemaining": 107
+    },
+    "at": 0
+  },
+  {
+    "seq": 18,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#2",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 19,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Titan: hand → battlefield",
+    "payload": {
+      "iid": "#84",
+      "name": "Grounds Titan",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 20,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 3 · A: builds (1.4→1.8, 1c/2p) · B: builds (2.2→2.5, 1c/2p) · C: hits B for 2",
+    "payload": {
+      "window": 2,
+      "windowBeforeTurn": 3,
+      "bracket": 4,
+      "playerThreat": 3.8,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 1.8,
+          "silhouette": {
+            "creatures": 1,
+            "power": 2,
+            "artifacts": 0,
+            "openMana": 3,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 2.5,
+          "silhouette": {
+            "creatures": 1,
+            "power": 2,
+            "artifacts": 1,
+            "openMana": 3,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 3.9,
+          "silhouette": {
+            "creatures": 0,
+            "power": 3,
+            "artifacts": 0,
+            "openMana": 3,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [],
+      "counterArmed": null,
+      "clock": null,
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [
+        {
+          "attackerId": "C",
+          "defenderId": "B",
+          "damage": 2
+        }
+      ],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 1.4,
+          "threatTo": 1.8,
+          "creaturesFrom": 0,
+          "creaturesTo": 1,
+          "powerFrom": 1,
+          "powerTo": 2,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 2.2,
+          "threatTo": 2.5,
+          "creaturesFrom": 1,
+          "creaturesTo": 1,
+          "powerFrom": 1,
+          "powerTo": 2,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [],
+          "podHit": {
+            "defenderId": "B",
+            "damage": 2
+          },
+          "threatFrom": 3.2,
+          "threatTo": 3.9,
+          "creaturesFrom": 0,
+          "creaturesTo": 0,
+          "powerFrom": 1,
+          "powerTo": 3,
+          "armed": false,
+          "clockOwner": false
+        }
+      ],
+      "notes": [
+        "pod:C>B:2"
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 21,
+    "turn": 2,
+    "phase": "main1",
+    "kind": "damage",
+    "message": "Seat C attacks Seat B for 2",
+    "payload": {
+      "seatId": "B",
+      "attackerId": "C",
+      "amount": 2,
+      "podCombat": true,
+      "before": 40,
+      "after": 38,
+      "threatBefore": 2.2,
+      "threatAfter": 2.5
+    },
+    "at": 0
+  },
+  {
+    "seq": 22,
+    "turn": 3,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 3 begins",
+    "payload": {
+      "turn": 3,
+      "previousTurn": 2,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 23,
+    "turn": 3,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 24,
+    "turn": 3,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#69"
+      ],
+      "names": [
+        "Grounds Sentinel"
+      ],
+      "libraryRemaining": 106
+    },
+    "at": 0
+  },
+  {
+    "seq": 25,
+    "turn": 3,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 3
+    },
+    "at": 0
+  },
+  {
+    "seq": 26,
+    "turn": 3,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#14",
+        "#4"
+      ],
+      "names": [
+        "Training Forest",
+        "Training Forest"
+      ],
+      "libraryRemaining": 104
+    },
+    "at": 0
+  },
+  {
+    "seq": 27,
+    "turn": 3,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#6",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 28,
+    "turn": 3,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Sentinel: hand → battlefield",
+    "payload": {
+      "iid": "#69",
+      "name": "Grounds Sentinel",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 29,
+    "turn": 3,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 4 · A: builds (1.8→2.2, 1c/3p) · B: builds (2.5→2.3, 2c/3p) · C: hits B for 4 · C holds up counters at 4+",
+    "payload": {
+      "window": 3,
+      "windowBeforeTurn": 4,
+      "bracket": 4,
+      "playerThreat": 4.5,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 2.2,
+          "silhouette": {
+            "creatures": 1,
+            "power": 3,
+            "artifacts": 0,
+            "openMana": 4,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 2.3,
+          "silhouette": {
+            "creatures": 2,
+            "power": 3,
+            "artifacts": 1,
+            "openMana": 4,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 4.5,
+          "silhouette": {
+            "creatures": 1,
+            "power": 5,
+            "artifacts": 0,
+            "openMana": 4,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [],
+      "counterArmed": {
+        "seatId": "C",
+        "threshold": 4
+      },
+      "clock": null,
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [
+        {
+          "attackerId": "C",
+          "defenderId": "B",
+          "damage": 4
+        }
+      ],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 1.8,
+          "threatTo": 2.2,
+          "creaturesFrom": 1,
+          "creaturesTo": 1,
+          "powerFrom": 2,
+          "powerTo": 3,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 2.5,
+          "threatTo": 2.3,
+          "creaturesFrom": 1,
+          "creaturesTo": 2,
+          "powerFrom": 2,
+          "powerTo": 3,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [],
+          "podHit": {
+            "defenderId": "B",
+            "damage": 4
+          },
+          "threatFrom": 3.9,
+          "threatTo": 4.5,
+          "creaturesFrom": 0,
+          "creaturesTo": 1,
+          "powerFrom": 3,
+          "powerTo": 5,
+          "armed": true,
+          "clockOwner": false
+        }
+      ],
+      "notes": [
+        "pod:C>B:4",
+        "armed:C:4"
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 30,
+    "turn": 3,
+    "phase": "main1",
+    "kind": "damage",
+    "message": "Seat C attacks Seat B for 4",
+    "payload": {
+      "seatId": "B",
+      "attackerId": "C",
+      "amount": 4,
+      "podCombat": true,
+      "before": 38,
+      "after": 34,
+      "threatBefore": 2.5,
+      "threatAfter": 2.3
+    },
+    "at": 0
+  },
+  {
+    "seq": 31,
+    "turn": 4,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 4 begins",
+    "payload": {
+      "turn": 4,
+      "previousTurn": 3,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 32,
+    "turn": 4,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 33,
+    "turn": 4,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#48"
+      ],
+      "names": [
+        "Grounds Warden"
+      ],
+      "libraryRemaining": 103
+    },
+    "at": 0
+  },
+  {
+    "seq": 34,
+    "turn": 4,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 4
+    },
+    "at": 0
+  },
+  {
+    "seq": 35,
+    "turn": 4,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#94",
+        "#115"
+      ],
+      "names": [
+        "Grounds Altar",
+        "Grounds Passage"
+      ],
+      "libraryRemaining": 101
+    },
+    "at": 0
+  },
+  {
+    "seq": 36,
+    "turn": 4,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Proving Gate: hand → battlefield",
+    "payload": {
+      "iid": "#35",
+      "name": "Proving Gate",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 37,
+    "turn": 4,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Altar: hand → battlefield",
+    "payload": {
+      "iid": "#94",
+      "name": "Grounds Altar",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 38,
+    "turn": 4,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 5 · A: builds (2.2→2.8, 1c/4p) · B: builds (2.3→2.7, 2c/4p) · C: casts Aven Mindcensor",
+    "payload": {
+      "window": 4,
+      "windowBeforeTurn": 5,
+      "bracket": 4,
+      "playerThreat": 4.5,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 2.8,
+          "silhouette": {
+            "creatures": 1,
+            "power": 4,
+            "artifacts": 0,
+            "openMana": 5,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 2.7,
+          "silhouette": {
+            "creatures": 2,
+            "power": 4,
+            "artifacts": 1,
+            "openMana": 5,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 5.6,
+          "silhouette": {
+            "creatures": 1,
+            "power": 7,
+            "artifacts": 0,
+            "openMana": 5,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [
+        "hate"
+      ],
+      "counterArmed": null,
+      "clock": null,
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 2.2,
+          "threatTo": 2.8,
+          "creaturesFrom": 1,
+          "creaturesTo": 1,
+          "powerFrom": 3,
+          "powerTo": 4,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 2.3,
+          "threatTo": 2.7,
+          "creaturesFrom": 2,
+          "creaturesTo": 2,
+          "powerFrom": 3,
+          "powerTo": 4,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [
+            "hate"
+          ],
+          "podHit": null,
+          "threatFrom": 4.5,
+          "threatTo": 5.6,
+          "creaturesFrom": 1,
+          "creaturesTo": 1,
+          "powerFrom": 5,
+          "powerTo": 7,
+          "armed": false,
+          "clockOwner": false
+        }
+      ],
+      "notes": [
+        "hate:C:Aven Mindcensor"
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 39,
+    "turn": 4,
+    "phase": "main1",
+    "kind": "event",
+    "message": "Seat C casts Aven Mindcensor. When you search a library, you see only its top four cards. Respond or it stands.",
+    "payload": {
+      "eventId": "w4-hate-C-2",
+      "eventType": "hate",
+      "seatId": "C",
+      "eventTurn": 5,
+      "severity": {
+        "turn": 5,
+        "bracket": 4
+      },
+      "state": "pending",
+      "card": "Aven Mindcensor",
+      "cardMv": 3,
+      "cardEffect": "Opponents who search a library look at only the top four cards of it.",
+      "queued": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 40,
+    "turn": 5,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 5 begins",
+    "payload": {
+      "turn": 5,
+      "previousTurn": 4,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 41,
+    "turn": 5,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 42,
+    "turn": 5,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#81"
+      ],
+      "names": [
+        "Grounds Colossus"
+      ],
+      "libraryRemaining": 100
+    },
+    "at": 0
+  },
+  {
+    "seq": 43,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 5
+    },
+    "at": 0
+  },
+  {
+    "seq": 44,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Proving Gate: hand → battlefield",
+    "payload": {
+      "iid": "#34",
+      "name": "Proving Gate",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false,
+      "reason": "answered w4-hate-C-2"
+    },
+    "at": 0
+  },
+  {
+    "seq": 45,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Answered hate with Proving Gate: Seat C casts Aven Mindcensor. When you search a library, you see only its top four cards. Respond or it stands. · \"answered\"",
+    "payload": {
+      "eventId": "w4-hate-C-2",
+      "eventType": "hate",
+      "seatId": "C",
+      "eventTurn": 5,
+      "severity": {
+        "turn": 5,
+        "bracket": 4
+      },
+      "state": "negated",
+      "card": "Aven Mindcensor",
+      "cardMv": 3,
+      "cardEffect": "Opponents who search a library look at only the top four cards of it.",
+      "responded": true,
+      "negated": true,
+      "answerIid": "#34",
+      "answerName": "Proving Gate",
+      "answerZone": "hand",
+      "answerTo": "battlefield",
+      "answerMv": 0,
+      "bound": true,
+      "note": "answered"
+    },
+    "at": 0
+  },
+  {
+    "seq": 46,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#40",
+        "#77"
+      ],
+      "names": [
+        "Grounds Scout",
+        "Grounds Behemoth"
+      ],
+      "libraryRemaining": 98
+    },
+    "at": 0
+  },
+  {
+    "seq": 47,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#14",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 48,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Colossus: hand → battlefield",
+    "payload": {
+      "iid": "#81",
+      "name": "Grounds Colossus",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 49,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 6 · A: builds (2.8→3.3, 0c/0p) · B: casts Sunfall · C: sets up Aetherflux Reservoir (win after turn 8)",
+    "payload": {
+      "window": 5,
+      "windowBeforeTurn": 6,
+      "bracket": 4,
+      "playerThreat": 4.5,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 3.3,
+          "silhouette": {
+            "creatures": 0,
+            "power": 0,
+            "artifacts": 0,
+            "openMana": 6,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 4.7,
+          "silhouette": {
+            "creatures": 0,
+            "power": 0,
+            "artifacts": 1,
+            "openMana": 6,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 7.3,
+          "silhouette": {
+            "creatures": 0,
+            "power": 0,
+            "artifacts": 1,
+            "openMana": 6,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [
+        "wipe",
+        "clock"
+      ],
+      "counterArmed": null,
+      "clock": {
+        "seatId": "C",
+        "deadlineTurn": 8,
+        "spawnedTurn": 6
+      },
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 2.8,
+          "threatTo": 3.3,
+          "creaturesFrom": 1,
+          "creaturesTo": 0,
+          "powerFrom": 4,
+          "powerTo": 0,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [
+            "wipe"
+          ],
+          "podHit": null,
+          "threatFrom": 2.7,
+          "threatTo": 4.7,
+          "creaturesFrom": 2,
+          "creaturesTo": 0,
+          "powerFrom": 4,
+          "powerTo": 0,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [
+            "clock"
+          ],
+          "podHit": null,
+          "threatFrom": 5.6,
+          "threatTo": 7.3,
+          "creaturesFrom": 1,
+          "creaturesTo": 0,
+          "powerFrom": 7,
+          "powerTo": 0,
+          "armed": false,
+          "clockOwner": true
+        }
+      ],
+      "notes": [
+        "wipe:B:creatures:Sunfall",
+        "clock:C:8:Aetherflux Reservoir"
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 50,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "event",
+    "message": "Seat B casts Sunfall.",
+    "payload": {
+      "eventId": "w5-wipe-B-3",
+      "eventType": "wipe",
+      "seatId": "B",
+      "eventTurn": 6,
+      "severity": {
+        "turn": 6,
+        "bracket": 4,
+        "podCreatures": 7,
+        "podPower": 21
+      },
+      "variant": "creatures",
+      "state": "pending",
+      "card": "Sunfall",
+      "cardMv": 5,
+      "cardEffect": "Exile all creatures. The caster gets an Incubator token as big as the pile.",
+      "cardZone": "exile",
+      "queued": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 51,
+    "turn": 5,
+    "phase": "main1",
+    "kind": "event",
+    "message": "Seat C is setting up Aetherflux Reservoir. They win on their turn after your turn 8. Win first, eliminate Seat C, or declare held interaction.",
+    "payload": {
+      "eventId": "w5-clock-C-4",
+      "eventType": "clock",
+      "seatId": "C",
+      "eventTurn": 6,
+      "severity": {
+        "turn": 6,
+        "bracket": 4,
+        "deadlineTurn": 8,
+        "windows": 2
+      },
+      "state": "pending",
+      "card": "Aetherflux Reservoir",
+      "cardMv": 4,
+      "cardEffect": "A long storm turn, then 50 life paid to deal 50 damage.",
+      "queued": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 52,
+    "turn": 6,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 6 begins",
+    "payload": {
+      "turn": 6,
+      "previousTurn": 5,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 53,
+    "turn": 6,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 54,
+    "turn": 6,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#50"
+      ],
+      "names": [
+        "Grounds Warden"
+      ],
+      "libraryRemaining": 97
+    },
+    "at": 0
+  },
+  {
+    "seq": 55,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 6
+    },
+    "at": 0
+  },
+  {
+    "seq": 56,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Declared held interaction. Seat C's clock is answered.",
+    "payload": {
+      "seatId": "C",
+      "deadlineTurn": 8,
+      "spawnedTurn": 6,
+      "canceled": true,
+      "reason": "declared-interaction",
+      "bound": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 57,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Signet: hand → battlefield",
+    "payload": {
+      "iid": "#89",
+      "name": "Grounds Signet",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false,
+      "reason": "answered w5-wipe-B-3"
+    },
+    "at": 0
+  },
+  {
+    "seq": 58,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Answered wipe with Grounds Signet: Seat B casts Sunfall. · \"answered\"",
+    "payload": {
+      "eventId": "w5-wipe-B-3",
+      "eventType": "wipe",
+      "seatId": "B",
+      "eventTurn": 6,
+      "severity": {
+        "turn": 6,
+        "bracket": 4,
+        "podCreatures": 7,
+        "podPower": 21
+      },
+      "variant": "creatures",
+      "state": "negated",
+      "card": "Sunfall",
+      "cardMv": 5,
+      "cardEffect": "Exile all creatures. The caster gets an Incubator token as big as the pile.",
+      "cardZone": "exile",
+      "responded": true,
+      "negated": true,
+      "answerIid": "#89",
+      "answerName": "Grounds Signet",
+      "answerZone": "hand",
+      "answerTo": "battlefield",
+      "answerMv": 2,
+      "bound": true,
+      "note": "answered"
+    },
+    "at": 0
+  },
+  {
+    "seq": 59,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "event",
+    "message": "Next: Seat C is setting up Aetherflux Reservoir. They win on their turn after your turn 8. Win first, eliminate Seat C, or declare held interaction.",
+    "payload": {
+      "eventId": "w5-clock-C-4",
+      "eventType": "clock",
+      "seatId": "C",
+      "eventTurn": 6,
+      "severity": {
+        "turn": 6,
+        "bracket": 4,
+        "deadlineTurn": 8,
+        "windows": 2
+      },
+      "state": "pending",
+      "card": "Aetherflux Reservoir",
+      "cardMv": 4,
+      "cardEffect": "A long storm turn, then 50 life paid to deal 50 damage.",
+      "activated": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 60,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Passage: hand → graveyard",
+    "payload": {
+      "iid": "#118",
+      "name": "Grounds Passage",
+      "from": "hand",
+      "to": "graveyard",
+      "isCommander": false,
+      "reason": "answered w5-clock-C-4"
+    },
+    "at": 0
+  },
+  {
+    "seq": 61,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Answered clock with Grounds Passage: Seat C is setting up Aetherflux Reservoir. They win on their turn after your turn 8. Win first, eliminate Seat C, or declare held interaction. · \"answered\"",
+    "payload": {
+      "eventId": "w5-clock-C-4",
+      "eventType": "clock",
+      "seatId": "C",
+      "eventTurn": 6,
+      "severity": {
+        "turn": 6,
+        "bracket": 4,
+        "deadlineTurn": 8,
+        "windows": 2
+      },
+      "state": "negated",
+      "card": "Aetherflux Reservoir",
+      "cardMv": 4,
+      "cardEffect": "A long storm turn, then 50 life paid to deal 50 damage.",
+      "responded": true,
+      "negated": true,
+      "answerIid": "#118",
+      "answerName": "Grounds Passage",
+      "answerZone": "hand",
+      "answerTo": "graveyard",
+      "answerMv": 2,
+      "bound": true,
+      "note": "answered"
+    },
+    "at": 0
+  },
+  {
+    "seq": 62,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#10",
+        "#100"
+      ],
+      "names": [
+        "Training Forest",
+        "Grounds Volley"
+      ],
+      "libraryRemaining": 95
+    },
+    "at": 0
+  },
+  {
+    "seq": 63,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#4",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 64,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Behemoth: hand → battlefield",
+    "payload": {
+      "iid": "#77",
+      "name": "Grounds Behemoth",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 65,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 7 · A: builds (3.3→3.9, 1c/2p) · B: builds (4.7→5.2, 1c/2p) · C: sets up Expropriate (win after turn 9)",
+    "payload": {
+      "window": 6,
+      "windowBeforeTurn": 7,
+      "bracket": 4,
+      "playerThreat": 4.5,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 3.9,
+          "silhouette": {
+            "creatures": 1,
+            "power": 2,
+            "artifacts": 0,
+            "openMana": 7,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 5.2,
+          "silhouette": {
+            "creatures": 1,
+            "power": 2,
+            "artifacts": 1,
+            "openMana": 7,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 9,
+          "silhouette": {
+            "creatures": 1,
+            "power": 4,
+            "artifacts": 1,
+            "openMana": 7,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [
+        "clock"
+      ],
+      "counterArmed": null,
+      "clock": {
+        "seatId": "C",
+        "deadlineTurn": 9,
+        "spawnedTurn": 7
+      },
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 3.3,
+          "threatTo": 3.9,
+          "creaturesFrom": 0,
+          "creaturesTo": 1,
+          "powerFrom": 0,
+          "powerTo": 2,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 4.7,
+          "threatTo": 5.2,
+          "creaturesFrom": 0,
+          "creaturesTo": 1,
+          "powerFrom": 0,
+          "powerTo": 2,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [
+            "clock"
+          ],
+          "podHit": null,
+          "threatFrom": 7.3,
+          "threatTo": 9,
+          "creaturesFrom": 0,
+          "creaturesTo": 1,
+          "powerFrom": 0,
+          "powerTo": 4,
+          "armed": false,
+          "clockOwner": true
+        }
+      ],
+      "notes": [
+        "clock:C:9:Expropriate"
+      ]
+    },
+    "at": 0
+  },
+  {
+    "seq": 66,
+    "turn": 6,
+    "phase": "main1",
+    "kind": "event",
+    "message": "Seat C is setting up Expropriate. They win on their turn after your turn 9. Win first, eliminate Seat C, or declare held interaction.",
+    "payload": {
+      "eventId": "w6-clock-C-5",
+      "eventType": "clock",
+      "seatId": "C",
+      "eventTurn": 7,
+      "severity": {
+        "turn": 7,
+        "bracket": 4,
+        "deadlineTurn": 9,
+        "windows": 2
+      },
+      "state": "pending",
+      "card": "Expropriate",
+      "cardMv": 9,
+      "cardEffect": "The table votes; they take extra turns and your best permanents.",
+      "queued": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 67,
+    "turn": 7,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 7 begins",
+    "payload": {
+      "turn": 7,
+      "previousTurn": 6,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 68,
+    "turn": 7,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 69,
+    "turn": 7,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#11"
+      ],
+      "names": [
+        "Training Forest"
+      ],
+      "libraryRemaining": 94
+    },
+    "at": 0
+  },
+  {
+    "seq": 70,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 7
+    },
+    "at": 0
+  },
+  {
+    "seq": 71,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Declared held interaction. Seat C's clock is answered.",
+    "payload": {
+      "seatId": "C",
+      "deadlineTurn": 9,
+      "spawnedTurn": 7,
+      "canceled": true,
+      "reason": "declared-interaction"
+    },
+    "at": 0
+  },
+  {
+    "seq": 72,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "respond",
+    "message": "Answered clock: Seat C is setting up Expropriate. They win on their turn after your turn 9. Win first, eliminate Seat C, or declare held interaction.",
+    "payload": {
+      "eventId": "w6-clock-C-5",
+      "eventType": "clock",
+      "seatId": "C",
+      "eventTurn": 7,
+      "severity": {
+        "turn": 7,
+        "bracket": 4,
+        "deadlineTurn": 9,
+        "windows": 2
+      },
+      "state": "negated",
+      "card": "Expropriate",
+      "cardMv": 9,
+      "cardEffect": "The table votes; they take extra turns and your best permanents.",
+      "responded": true,
+      "negated": true,
+      "bound": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 73,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#93",
+        "#26"
+      ],
+      "names": [
+        "Grounds Signet",
+        "Training Plain"
+      ],
+      "libraryRemaining": 92
+    },
+    "at": 0
+  },
+  {
+    "seq": 74,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#10",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 75,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Passage: hand → battlefield",
+    "payload": {
+      "iid": "#117",
+      "name": "Grounds Passage",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 76,
+    "turn": 7,
+    "phase": "main1",
+    "kind": "window",
+    "message": "Before turn 8 · A: builds (3.9→4.3, 1c/4p) · B: builds (5.2→5.7, 3c/5p) · C: builds (9.0→9.4, 2c/9p)",
+    "payload": {
+      "window": 7,
+      "windowBeforeTurn": 8,
+      "bracket": 4,
+      "playerThreat": 4.5,
+      "seats": [
+        {
+          "id": "A",
+          "threat": 4.3,
+          "silhouette": {
+            "creatures": 1,
+            "power": 4,
+            "artifacts": 0,
+            "openMana": 8,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "B",
+          "threat": 5.7,
+          "silhouette": {
+            "creatures": 3,
+            "power": 5,
+            "artifacts": 1,
+            "openMana": 8,
+            "bonusMana": 0
+          }
+        },
+        {
+          "id": "C",
+          "threat": 9.4,
+          "silhouette": {
+            "creatures": 2,
+            "power": 9,
+            "artifacts": 1,
+            "openMana": 8,
+            "bonusMana": 0
+          }
+        }
+      ],
+      "eventTypes": [],
+      "counterArmed": null,
+      "clock": null,
+      "hazards": [],
+      "queuedHate": [],
+      "podHits": [],
+      "seatTurns": [
+        {
+          "seatId": "A",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 3.9,
+          "threatTo": 4.3,
+          "creaturesFrom": 1,
+          "creaturesTo": 1,
+          "powerFrom": 2,
+          "powerTo": 4,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "B",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 5.2,
+          "threatTo": 5.7,
+          "creaturesFrom": 1,
+          "creaturesTo": 3,
+          "powerFrom": 2,
+          "powerTo": 5,
+          "armed": false,
+          "clockOwner": false
+        },
+        {
+          "seatId": "C",
+          "eventTypes": [],
+          "podHit": null,
+          "threatFrom": 9,
+          "threatTo": 9.4,
+          "creaturesFrom": 1,
+          "creaturesTo": 2,
+          "powerFrom": 4,
+          "powerTo": 9,
+          "armed": false,
+          "clockOwner": false
+        }
+      ],
+      "notes": []
+    },
+    "at": 0
+  },
+  {
+    "seq": 77,
+    "turn": 8,
+    "phase": "untap",
+    "kind": "turn",
+    "message": "Turn 8 begins",
+    "payload": {
+      "turn": 8,
+      "previousTurn": 7,
+      "previousTurnSeconds": 0,
+      "skipped": true
+    },
+    "at": 0
+  },
+  {
+    "seq": 78,
+    "turn": 8,
+    "phase": "untap",
+    "kind": "tap",
+    "message": "Untap step: 0 permanents untapped",
+    "payload": {
+      "count": 0
+    },
+    "at": 0
+  },
+  {
+    "seq": 79,
+    "turn": 8,
+    "phase": "draw",
+    "kind": "draw",
+    "message": "Drew 1 card",
+    "payload": {
+      "count": 1,
+      "requested": 1,
+      "iids": [
+        "#98"
+      ],
+      "names": [
+        "Grounds Altar"
+      ],
+      "libraryRemaining": 91
+    },
+    "at": 0
+  },
+  {
+    "seq": 80,
+    "turn": 8,
+    "phase": "main1",
+    "kind": "phase",
+    "message": "Phase: main1",
+    "payload": {
+      "from": "draw",
+      "to": "main1",
+      "turn": 8
+    },
+    "at": 0
+  },
+  {
+    "seq": 81,
+    "turn": 8,
+    "phase": "main1",
+    "kind": "draw",
+    "message": "Drew 2 cards",
+    "payload": {
+      "count": 2,
+      "requested": 2,
+      "iids": [
+        "#29",
+        "#42"
+      ],
+      "names": [
+        "Proving Gate",
+        "Grounds Scout"
+      ],
+      "libraryRemaining": 89
+    },
+    "at": 0
+  },
+  {
+    "seq": 82,
+    "turn": 8,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Training Forest: hand → battlefield",
+    "payload": {
+      "iid": "#11",
+      "name": "Training Forest",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  },
+  {
+    "seq": 83,
+    "turn": 8,
+    "phase": "main1",
+    "kind": "move",
+    "message": "Grounds Altar: hand → battlefield",
+    "payload": {
+      "iid": "#98",
+      "name": "Grounds Altar",
+      "from": "hand",
+      "to": "battlefield",
+      "isCommander": false
+    },
+    "at": 0
+  }
+]

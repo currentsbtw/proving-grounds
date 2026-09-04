@@ -52,7 +52,10 @@ export function verdictOf(card: Scorecard): { text: string; clear: boolean } {
   const t = SCORING.tags;
   const found: Finding[] = [];
 
-  const landed = card.wipes.filter((w) => !w.negated);
+  // The same wrath the panel's tile reads: answered wraths were not rebuilt
+  // from, and a wrath that took nothing measurable left nothing to rebuild, so
+  // neither can make the run's worst line.
+  const landed = card.wipes.filter((w) => !w.negated && w.mvLost > 0);
   const firstWipe = landed[0];
   if (firstWipe) {
     if (firstWipe.turnsToRecover === null) {

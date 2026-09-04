@@ -50,6 +50,28 @@ function manaCostOf(state: GameState, card: CardInstance): string {
   return state.cardData[card.scryfallId]?.manaCost ?? '';
 }
 
+/**
+ * The printed box: power, toughness and starting loyalty as Scryfall's strings,
+ * so `*` and `1+*` survive. Base values only — counters travel separately and
+ * the judge is the one who adds them up.
+ *
+ * A token reads its own spec the way `typeLineOf` does, since a token has no
+ * cached card and its size is the whole of what it is. Loyalty comes from the
+ * cache alone: a token spec has no field for one. Every part is absent rather
+ * than blank when the card has no box.
+ */
+function boxOf(
+  state: GameState,
+  card: CardInstance,
+): { power?: string; toughness?: string; loyalty?: string } {
+  if (card.isToken) {
+    const spec = card.tokenSpec;
+    return { power: spec?.power, toughness: spec?.toughness };
+  }
+  const data = card.scryfallId ? state.cardData[card.scryfallId] : undefined;
+  return { power: data?.power, toughness: data?.toughness, loyalty: data?.loyalty };
+}
+
 /** Oracle text from the card cache. Tokens have none. */
 function oracleOf(state: GameState, card: CardInstance): string {
   if (card.isToken || !card.scryfallId) return '';
@@ -84,6 +106,10 @@ function toCardContext(
   if (typeLine) entry.typeLine = typeLine;
   const manaCost = manaCostOf(state, card);
   if (manaCost) entry.manaCost = manaCost;
+  const box = boxOf(state, card);
+  if (box.power !== undefined) entry.power = box.power;
+  if (box.toughness !== undefined) entry.toughness = box.toughness;
+  if (box.loyalty !== undefined) entry.loyalty = box.loyalty;
 
   if (WITH_ORACLE.has(zone)) {
     const oracle = oracleOf(state, card);
@@ -181,6 +207,10 @@ export function buildTableContext(state: GameState): JudgeTableContext {
         if (typeLine) out.typeLine = typeLine;
         const manaCost = manaCostOf(state, card);
         if (manaCost) out.manaCost = manaCost;
+        const box = boxOf(state, card);
+        if (box.power !== undefined) out.power = box.power;
+        if (box.toughness !== undefined) out.toughness = box.toughness;
+        if (box.loyalty !== undefined) out.loyalty = box.loyalty;
         const oracle = oracleOf(state, card);
         if (oracle) out.oracleText = oracle;
         if (card.isCommander) out.isCommander = true;

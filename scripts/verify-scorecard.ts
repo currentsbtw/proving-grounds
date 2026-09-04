@@ -110,10 +110,8 @@ const CARD_DATA_BY_NAME = new Map<string, CardData>(
   Object.values(CARD_DATA).map((data) => [data.name, data]),
 );
 
-/** The legacy fallback the UI will supply: card facts resolved by display name. */
-function factsByName(name: string): RosterEntry | undefined {
-  const data = CARD_DATA_BY_NAME.get(name);
-  if (!data) return undefined;
+/** One card's facts as `RunRecord.roster` carries them. */
+function rosterEntry(data: CardData): RosterEntry {
   return {
     scryfallId: data.scryfallId,
     name: data.name,
@@ -121,6 +119,12 @@ function factsByName(name: string): RosterEntry | undefined {
     typeLine: data.typeLine,
     isCommander: data.scryfallId === COMMANDER.scryfallId,
   };
+}
+
+/** The legacy fallback the UI will supply: card facts resolved by display name. */
+function factsByName(name: string): RosterEntry | undefined {
+  const data = CARD_DATA_BY_NAME.get(name);
+  return data ? rosterEntry(data) : undefined;
 }
 
 const DECK: Deck = {
@@ -928,6 +932,168 @@ function hazardRun(): RunRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Wraths with nothing behind them, written by hand
+// ---------------------------------------------------------------------------
+
+const WIPE_LAND = CARD_DATA['land-forest'];
+const WIPE_FATTY = CARD_DATA['cr-colossus'];
+const WIPE_RUN_TURNS = 7;
+const WIPE_LAND_IIDS = ['wv-l1', 'wv-l2', 'wv-l3', 'wv-l4', 'wv-l5'];
+
+type WipeShape = 'empty' | 'negated-first';
+
+/**
+ * Two wraths no seed can be relied on to stage, in the store's own payload
+ * shapes, hand-written for the reason the hate fixture above is: what the pod
+ * casts and what is standing when it does is the pod's business.
+ *
+ *  - `empty` — a wrath on T3 that found an empty table and swept nothing, with a
+ *    six-drop played on T4. It took no mana value, so there is nothing to
+ *    rebuild and the run must score no recovery at all. The T4 six-drop is the
+ *    point: the recovery target is 70% of what the sweep found, and 70% of
+ *    nothing is met by playing anything, so a run like this used to score a
+ *    one-turn rebuild nobody rebuilt in.
+ *  - `negated-first` — a wrath answered on T2 and a real one on T4 that took a
+ *    six-drop, rebuilt on T5. The answered wrath is first in the list, so it is
+ *    the one the comparison's "turns to rebuild after the first wrath" has to
+ *    look past.
+ */
+function wipeRun(shape: WipeShape): RunRecord {
+  const id = `wipe-${shape}`;
+  const log: LogEntry[] = [];
+  let turn = 1;
+
+  function add(
+    at: number,
+    kind: LogEntry['kind'],
+    message: string,
+    payload: Record<string, unknown>,
+  ): void {
+    turn = at;
+    log.push({ seq: log.length + 1, turn, phase: 'main1', kind, message, payload, at: 0 });
+  }
+
+  function play(at: number, iid: string, data: CardData): void {
+    add(at, 'move', `${data.name} → battlefield`, {
+      iid,
+      name: data.name,
+      from: 'hand',
+      to: 'battlefield',
+    });
+  }
+
+  /** The entry a wrath writes when the player lets it resolve, and what it took. */
+  function wrath(at: number, eventId: string, swept: { iid: string; data: CardData }[]): void {
+    // The sweep's moves are written before the event's own entry, the order
+    // `resolveActiveEvent` writes them in, so the board is already empty by the
+    // time the outcome names its victims.
+    for (const victim of swept) {
+      add(at, 'move', `${victim.data.name} → graveyard`, {
+        iid: victim.iid,
+        name: victim.data.name,
+        from: 'battlefield',
+        to: 'graveyard',
+        byEventId: eventId,
+      });
+    }
+    add(at, 'event', `Seat B casts Wrath of God. (${swept.length} swept)`, {
+      eventId,
+      eventType: 'wipe',
+      seatId: 'B',
+      eventTurn: at,
+      card: 'Wrath of God',
+      cardEffect: 'Destroy all creatures.',
+      variant: 'creatures',
+      severity: {},
+      resolved: true,
+      outcome: {
+        scope: 'creatures',
+        zone: 'graveyard',
+        swept: swept.length,
+        iids: swept.map((victim) => victim.iid),
+      },
+    });
+  }
+
+  add(1, 'run', 'Run started', {
+    runId: id,
+    deckId: DECK.id,
+    deckName: DECK.name,
+    seed: `wipe-fixture-${shape}`,
+    bracket: BRACKET,
+    pressureVersion: 7,
+  });
+  const opening = [...WIPE_LAND_IIDS, 'wv-c1', 'wv-c2'];
+  add(1, 'draw', 'Opening hand', {
+    iids: opening,
+    names: opening.map((iid) => (iid.startsWith('wv-l') ? WIPE_LAND.name : WIPE_FATTY.name)),
+    count: opening.length,
+    opening: true,
+  });
+
+  // A land every turn under everything else: lands count 0 toward board value,
+  // so the wrath below still finds a board worth nothing.
+  for (let i = 0; i < WIPE_LAND_IIDS.length; i++) play(i + 1, WIPE_LAND_IIDS[i], WIPE_LAND);
+
+  if (shape === 'empty') {
+    wrath(3, 'evt-wipe-empty', []);
+    play(4, 'wv-c1', WIPE_FATTY);
+  } else {
+    add(2, 'event', 'Seat B casts Wrath of God. Respond or it resolves.', {
+      eventId: 'evt-wipe-answered',
+      eventType: 'wipe',
+      seatId: 'B',
+      eventTurn: 2,
+      card: 'Wrath of God',
+      variant: 'creatures',
+      severity: {},
+      queued: true,
+    });
+    add(2, 'respond', 'Answered with Swan Song', {
+      eventId: 'evt-wipe-answered',
+      eventType: 'wipe',
+      seatId: 'B',
+      eventTurn: 2,
+      card: 'Wrath of God',
+      variant: 'creatures',
+      severity: {},
+      answerIid: 'ans-swan',
+      answerName: 'Swan Song',
+      answerZone: 'hand',
+      answerTo: 'graveyard',
+      answerMv: 2,
+      bound: true,
+    });
+    play(3, 'wv-c1', WIPE_FATTY);
+    wrath(4, 'evt-wipe-landed', [{ iid: 'wv-c1', data: WIPE_FATTY }]);
+    play(5, 'wv-c2', WIPE_FATTY);
+  }
+
+  add(WIPE_RUN_TURNS, 'run', 'Run ended: loss', {
+    result: 'loss',
+    endedAt: 0,
+    turns: WIPE_RUN_TURNS,
+  });
+
+  return {
+    id,
+    deckId: DECK.id,
+    deckName: DECK.name,
+    seed: `wipe-fixture-${shape}`,
+    bracket: BRACKET,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'loss',
+    roster: {
+      ...Object.fromEntries(WIPE_LAND_IIDS.map((iid) => [iid, rosterEntry(WIPE_LAND)])),
+      'wv-c1': rosterEntry(WIPE_FATTY),
+      'wv-c2': rosterEntry(WIPE_FATTY),
+    },
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
 
@@ -1298,6 +1464,50 @@ function main(): void {
     compareScorecards(hazardCard, scorecard).metrics.some((m) => m.key === 'hateRemovedRate'),
   );
 
+  // --- a wrath that took nothing -------------------------------------------
+  const emptyWipeCard = scoreRun(wipeRun('empty'));
+  const emptyWipe = emptyWipeCard.wipes[0];
+  checkEqual('a wrath over an empty board is still a wipe faced', emptyWipeCard.wipes.length, 1);
+  checkEqual('it swept nothing measurable', emptyWipe?.mvLost, 0);
+  checkEqual('so it never recovered', emptyWipe?.turnsToRecover, null);
+  checkEqual('and names no turn it recovered on', emptyWipe?.recoveredTurn, null);
+  // Without this the fixture proves nothing: the turn after the sweep really does
+  // clear 70% of the nothing it took, which is what used to score as a rebuild.
+  check(
+    'a six-drop really did land the turn after it',
+    (emptyWipeCard.timeline[3]?.boardValueEnd ?? 0) >= WIPE_FATTY.manaValue,
+    `T4 board value ${emptyWipeCard.timeline[3]?.boardValueEnd ?? 0}`,
+  );
+
+  const emptyWipeProfile = aggregateProfile([emptyWipeCard, emptyWipeCard]);
+  checkEqual('both wipes are still counted as faced', emptyWipeProfile.wipesFaced, 2);
+  checkEqual('but out of the recovery average', emptyWipeProfile.avgTurnsToRecover, null);
+  checkEqual('and out of the unrecovered rate', emptyWipeProfile.unrecoveredWipeRate, null);
+  check(
+    'a wrath that took nothing earns no resilient tag on its own',
+    !emptyWipeProfile.tags.includes(SCORING.tagLabels.resilient),
+    emptyWipeProfile.tags.join(', ') || '(no tags)',
+  );
+  checkEqual(
+    'and the comparison has no first-wrath recovery to print',
+    compareScorecards(emptyWipeCard, emptyWipeCard).metrics.find((m) => m.key === 'turnsToRecover')
+      ?.a,
+    null,
+  );
+
+  // --- the first wrath the comparison means --------------------------------
+  const negatedFirstCard = scoreRun(wipeRun('negated-first'));
+  checkEqual('the answered wrath is first in the list', negatedFirstCard.wipes[0]?.negated, true);
+  checkEqual('the second one took the six-drop', negatedFirstCard.wipes[1]?.mvLost, WIPE_FATTY.manaValue);
+  checkEqual('and was rebuilt from in one turn', negatedFirstCard.wipes[1]?.turnsToRecover, 1);
+  checkEqual(
+    'the comparison reads the first wrath that landed, not the answered one',
+    compareScorecards(negatedFirstCard, negatedFirstCard).metrics.find(
+      (m) => m.key === 'turnsToRecover',
+    )?.a,
+    1,
+  );
+
   // The same reading off the real store, whatever the seed did. It is 0 today
   // because the store's pod-combat entries have not landed; the moment they do,
   // this is the check that says the scorer and the store agree about them.
@@ -1412,6 +1622,9 @@ function main(): void {
     `wipes               ${scorecard.wipes.length} (${negated.length} negated, ${recovered.length} rebuilt) ${scorecard.wipes
       .map((w) => `T${w.turn} ${w.boardValueBefore}→${w.boardValueAfter}${w.negated ? ' negated' : ` recovered ${w.recoveredTurn ?? 'never'}`}`)
       .join('; ')}`,
+  );
+  summary.push(
+    `empty wrath         fixture: T${emptyWipe?.turn} took ${emptyWipe?.mvLost} MV, recovery ${emptyWipe?.turnsToRecover ?? 'none to make'} · negated-first fixture: comparison reads T${negatedFirstCard.wipes[1]?.turn} at ${negatedFirstCard.wipes[1]?.turnsToRecover} turn(s)`,
   );
   summary.push(
     `seats               ${scorecard.seats

@@ -27,6 +27,24 @@ export interface JudgeCardContext {
    * memory and get it wrong. Absent on lands and tokens, which have no cost.
    */
   manaCost?: string;
+  /**
+   * Printed power and toughness as Scryfall writes them, so `*` and `1+*` travel
+   * as themselves rather than as a number they are not. These are the BASE
+   * values off the card: the snapshot already sends counters, and the judge is
+   * the one who works out what the creature is right now. Sent together with the
+   * type line and for the same reason -- "does my 3/3 survive this?" cannot be
+   * answered from a type line, and a judge given neither reconstructs the box
+   * from memory. Absent on anything with no printed box.
+   */
+  power?: string;
+  toughness?: string;
+  /**
+   * Printed starting loyalty, again as Scryfall's string. A planeswalker enters
+   * with this many counters, so it is the base value and not a count of what is
+   * on the card now, which travels in `counters` like every other counter.
+   * Absent on everything that is not a planeswalker.
+   */
+  loyalty?: string;
   /** Sent for battlefield, hand and command cards; omitted for graveyard and exile. A cast spell travels as a stack item instead. */
   oracleText?: string;
 }
@@ -81,6 +99,15 @@ export interface JudgeTableContext {
      * none. Absent on abilities and triggers, which have no printed cost.
      */
     manaCost?: string;
+    /**
+     * Printed power, toughness and starting loyalty, same strings and same
+     * reason as on `JudgeCardContext`. A cast spell only ever travels here, so a
+     * question about the creature or planeswalker that is about to resolve --
+     * what it enters as, what it enters with -- has nowhere else to read them.
+     */
+    power?: string;
+    toughness?: string;
+    loyalty?: string;
     oracleText?: string;
     isCommander?: boolean;
     tapped?: boolean;
@@ -93,6 +120,40 @@ export interface JudgeTableContext {
     card?: { name: string; effect: string };
   };
   seats: JudgeSeatContext[];
+}
+
+/**
+ * The printed box as text, for every renderer that writes a card out: `3/3`, a
+ * Tarmogoyf's star over `1+*`, `starting loyalty 4`. Lives here rather than in
+ * a renderer because three of them write cards -- the table snapshot's cards
+ * and its stack tray (`server/judge/core.ts`) and the eval harness's reference
+ * block (`scripts/eval-run.ts`) -- and a judge that reads one wording on the
+ * table and another in the reference block is reading two different formats.
+ *
+ * Base values off the card, never a current size: the counters follow in the
+ * status words, and working out what the permanent is right now is the judge's
+ * job rather than the renderer's.
+ *
+ * Power and toughness print together or not at all: half a box is not a fact a
+ * question can be answered from, and Scryfall never prints one without the
+ * other. `'0'` is a real power, so this tests the string and not its number.
+ *
+ * Loyalty carries the word `starting` and the P/T box does not, because the two
+ * read differently against the counters printed after them. `3/3 | 2 +1/+1
+ * counters` is a sum the judge is meant to do. Loyalty counters are not added
+ * to a printed loyalty -- they ARE the walker's loyalty -- so a bare `loyalty 3
+ * | 5 loyalty counters` invites the answer 8. The label says which number is
+ * the base one and cannot be summed with what follows it.
+ */
+export function printedParts(object: {
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
+}): string[] {
+  const parts: string[] = [];
+  if (object.power && object.toughness) parts.push(`${object.power}/${object.toughness}`);
+  if (object.loyalty) parts.push(`starting loyalty ${object.loyalty}`);
+  return parts;
 }
 
 export interface JudgeRequest {

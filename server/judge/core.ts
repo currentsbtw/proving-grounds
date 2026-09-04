@@ -28,6 +28,7 @@ import type {
   JudgeTableContext,
   JudgeUsage,
 } from '../../src/domain/judge.ts';
+import { printedParts } from '../../src/domain/judge.ts';
 import { type Corpus, resolveRule } from './corpus.ts';
 import type { JudgeModel, SystemBlock } from './model.ts';
 import {
@@ -136,6 +137,13 @@ function describeCard(card: JudgeCardContext): string {
   // is printed: name, type, cost, text. Empty for a land or a token, and an
   // empty field would read as a cost of nothing rather than as no cost at all.
   if (card.manaCost) parts.push(card.manaCost);
+  // Then the box, still following the printed order, and before the status words
+  // so the base size reads next to the cost and the counters read after it: "3/3
+  // | 2 +1/+1 counters" is the sum the judge is being asked to do. Loyalty is
+  // the one that is not a sum -- loyalty counters are the walker's loyalty
+  // rather than a bonus on top of the printed number -- which is why
+  // `printedParts` labels that one "starting loyalty" and the P/T box not at all.
+  parts.push(...printedParts(card));
   parts.push(...statusParts(card));
   if (card.oracleText) parts.push(card.oracleText.replace(/\n+/g, ' / '));
   return `- ${parts.join(' | ')}`;
@@ -188,6 +196,10 @@ export function renderTableContext(table: JudgeTableContext): string {
       // Same place as in `describeCard`: name, type, cost, text. An ability or a
       // trigger has no printed cost and prints no field for one.
       if (item.manaCost) parts.push(item.manaCost);
+      // Same place as in `describeCard`. A creature or planeswalker on the tray
+      // is about to resolve, so what it enters as and what it enters with is
+      // exactly the question, and an ability prints no box at all.
+      parts.push(...printedParts(item));
       parts.push(...statusParts(item));
       if (item.oracleText) parts.push(item.oracleText.replace(/\n+/g, ' / '));
       const body = parts.length > 1 ? parts.join(' | ') : `${item.kind}: ${item.label}`;

@@ -37,7 +37,15 @@ import type {
  */
 
 /**
- * 5 — `ClockStats.clearedTurn`, the turn the race clock left the table. The
+ * 6 — `WipeRecovery.mvLost`, the mana value a sweep actually took off the table.
+ * A wrath that took nothing measurable — an empty board, or only tokens and
+ * lands, which contribute 0 to board value — has nothing to recover, so it is no
+ * longer scored as a recovery: `turnsToRecover` stays null and the wipe sits out
+ * of the recovered and unrecovered pools the way a negated one does. Before the
+ * field existed the recovery target was 70% of a board value of 0, which the
+ * first later turn met by standing still, and a one-turn "rebuild" nobody
+ * rebuilt anything in went into `avgTurnsToRecover` and could earn the deck
+ * `resilient`. 5 — `ClockStats.clearedTurn`, the turn the race clock left the table. The
  * review clamps the span it reads damage over to that turn, so a card scored
  * before the field existed would have the review counting damage sent after the
  * clock was already gone; the bump is what keeps such a card from being fed to
@@ -51,7 +59,7 @@ import type {
  * `EventTally.named`, `AnswerRate.namedRate` and the ledger's `answerCard`, when
  * answers first bound to the card that made them.
  */
-export const SCORECARD_VERSION = 5;
+export const SCORECARD_VERSION = 6;
 
 export interface TurnRow {
   turn: number;
@@ -87,7 +95,25 @@ export interface WipeRecovery {
   variant: string;
   boardValueBefore: number;
   boardValueAfter: number;
-  /** First turn after the wipe whose end-of-turn board value ≥ 70% of boardValueBefore, or null if never. */
+  /**
+   * Mana value the sweep actually took off the table: before minus after. Tokens
+   * and lands count 0 toward board value, so a wrath that found an empty board —
+   * or one holding only those — took nothing measurable, and `mvLost === 0` is
+   * the scorecard's word for "nothing to recover": `turnsToRecover` stays null
+   * and the wipe is neither recovered nor unrecovered. The threshold is exactly
+   * 0 because that is a fact about the board rather than a judgement. How much
+   * a sweep has to take before rebuilding from it is an *achievement* is a
+   * tuning question, and it is answered where it belongs, in
+   * `REVIEW.fastRebuild.minMvLost`. A negated wipe took nothing either and
+   * carries 0; it keeps the trivial recovery it always had, because every reader
+   * skips `negated` before it looks at anything else.
+   */
+  mvLost: number;
+  /**
+   * First turn after the wipe whose end-of-turn board value ≥ 70% of
+   * boardValueBefore, or null if never — and always null when `mvLost` is 0,
+   * where 70% of what was taken is nothing at all.
+   */
   recoveredTurn: number | null;
   turnsToRecover: number | null;
   /** True if the player negated it (responded) — then before/after are equal and recovery is trivially 0. */
@@ -911,6 +937,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
             variant: normalizeSweep(readString(outcome, 'scope') ?? row.variant),
             boardValueBefore: boardValue + lost,
             boardValueAfter: boardValue,
+            mvLost: lost,
             recoveredTurn: null,
             turnsToRecover: null,
             negated: false,
@@ -1019,6 +1046,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
             variant: normalizeSweep(row.variant),
             boardValueBefore: boardValue,
             boardValueAfter: boardValue,
+            mvLost: 0,
             recoveredTurn: entry.turn,
             turnsToRecover: 0,
             negated: true,
@@ -1179,6 +1207,10 @@ export function scoreRun(run: RunRecord, options?: ScoreOptions): Scorecard {
   // --- wipe recovery --------------------------------------------------------
   for (const wipe of replay.wipes) {
     if (wipe.negated) continue;
+    // A sweep that took nothing measurable has nothing to recover: the target
+    // below would be 70% of what it found, which the next row meets by standing
+    // still, and "rebuilt in one turn" would name a turn nobody rebuilt in.
+    if (wipe.mvLost === 0) continue;
     const target = wipe.boardValueBefore * SCORING.wipe.recoveryShare;
     for (const row of timeline) {
       if (row.turn <= wipe.turn) continue;
@@ -1364,10 +1396,12 @@ export function aggregateProfile(cards: Scorecard[]): DeckProfile {
   const concedes = cards.filter((c) => c.result === 'concede').length;
 
   // Negated wraths are not "faced and rebuilt from" — they were answered, so
-  // they say nothing about recovery. They still count as wipes faced.
+  // they say nothing about recovery. Neither does a wrath that took nothing
+  // measurable off the table: there was nothing to rebuild, so it is neither
+  // recovered nor unrecovered. Both still count as wipes faced.
   const allWipes = cards.flatMap((c) => c.wipes);
-  const landedWipes = allWipes.filter((w) => !w.negated);
-  const recovered = landedWipes.filter((w) => w.turnsToRecover !== null);
+  const measuredWipes = allWipes.filter((w) => !w.negated && w.mvLost > 0);
+  const recovered = measuredWipes.filter((w) => w.turnsToRecover !== null);
 
   const responded = cards.reduce((n, c) => n + c.answers.total.responded, 0);
   const resolved = cards.reduce((n, c) => n + c.answers.total.resolved, 0);
@@ -1403,8 +1437,8 @@ export function aggregateProfile(cards: Scorecard[]): DeckProfile {
     wipesFaced: allWipes.length,
     avgTurnsToRecover: mean(recovered.map((w) => w.turnsToRecover as number)),
     unrecoveredWipeRate:
-      landedWipes.length > 0
-        ? (landedWipes.length - recovered.length) / landedWipes.length
+      measuredWipes.length > 0
+        ? (measuredWipes.length - recovered.length) / measuredWipes.length
         : null,
     avgCommanderDowntime: mean(cards.map((c) => c.commander.downtimeTurns)),
     answerRate: responded + resolved > 0 ? responded / (responded + resolved) : null,
@@ -1510,8 +1544,15 @@ function resultScore(card: Scorecard): number {
   return card.result === 'win' ? 1 : 0;
 }
 
+/**
+ * The first wrath the run has a recovery reading for — the same one the panel's
+ * wipe tile prints. A negated wrath was answered rather than rebuilt from, and a
+ * wrath that took nothing measurable left nothing to rebuild, so neither is the
+ * "first wipe" this metric means. A run with only those prints n/a rather than a
+ * zero the other column can beat.
+ */
 function firstWipeRecovery(card: Scorecard): number | null {
-  return card.wipes[0]?.turnsToRecover ?? null;
+  return card.wipes.find((w) => !w.negated && w.mvLost > 0)?.turnsToRecover ?? null;
 }
 
 function totalDamage(card: Scorecard): number {

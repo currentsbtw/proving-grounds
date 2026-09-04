@@ -24,6 +24,10 @@
  *       the tax suppressed that turn's mana-left finding.
  *   E — stopped mid-turn, the way a concede or lethal damage stops one. The last
  *       turn is still owed its land drop and its mana, so nothing may name it.
+ *   F — a hate piece on T2 and the four ways it can leave: never, to the
+ *       player's answer the next turn, to that answer five turns later, and to a
+ *       wrath on T7. Hand-written like D: whether a seed offers a hate piece is
+ *       the pod's business, and one run cannot meet all four fates.
  *   G — a race clock, and where the damage went while it ran. Five of them: one
  *       raced against the wrong seat, one left alone until it expired, one
  *       turned on and won, one cleared by declaring held interaction and one
@@ -35,6 +39,12 @@
  *   H — spells cast into a seat's open counters, twice and then once.
  *   I — a seat at 9.2 threat across three windows, once with nothing sent at it
  *       and once with damage in the middle window that breaks the run.
+ *   J — a wrath on T6 and the same rebuild on T7, over three boards: nothing, a
+ *       five-mana-value board and a six. The empty one has no recovery at all —
+ *       nothing was taken, so the scorecard leaves `turnsToRecover` null — while
+ *       the other two rebuild in one turn and only the mana value the sweep took
+ *       separates them, so the good is owed to the last one alone. Hand-written
+ *       like D, F and G — the pod decides when it wraths and what is standing.
  *
  * `reviewPatterns` is exercised last, over hand-built reviews: it reads finished
  * reviews and never a log, so a run is the wrong fixture for it.
@@ -1129,6 +1139,179 @@ function playThreatRun(seed: string, hitMiddle: boolean): RunRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Run J — a wrath, and how much it actually took
+// ---------------------------------------------------------------------------
+
+const WIPE_LANDS = ['wp-l1', 'wp-l2', 'wp-l3', 'wp-l4', 'wp-l5', 'wp-l6', 'wp-l7'];
+const WIPE_TURNS = WIPE_LANDS.length;
+/** The turn the wrath resolves, and the turn the rebuild lands. */
+const WIPE_TURN = 6;
+const WIPE_BUILD_TURN = WIPE_TURN - 1;
+const WIPE_EVENT_ID = 'evt-wipe-j';
+/** The permanent replayed the turn after the sweep, in every size. */
+const WIPE_REBUILD = { iid: 'wp-rebuild', data: COLOSSUS };
+
+type WipeSize = 'empty' | 'small' | 'big';
+
+/**
+ * What stood in front of the wrath. `empty` gives it nothing, `small` five mana
+ * value — one under `REVIEW.fastRebuild.minMvLost` — and `big` exactly the
+ * threshold, so the pair either side of six tests the comparison rather than
+ * some number far from it.
+ */
+const WIPE_BOARDS: Record<WipeSize, { iid: string; data: CardData }[]> = {
+  empty: [],
+  small: [
+    { iid: 'wp-warden', data: WARDEN },
+    { iid: 'wp-ranger', data: RANGER },
+  ],
+  big: [{ iid: 'wp-colossus', data: COLOSSUS }],
+};
+
+const WIPE_ROSTER: Record<string, RosterEntry> = {
+  ...Object.fromEntries(WIPE_LANDS.map((iid) => [iid, rosterEntry(LAND)])),
+  ...Object.fromEntries(
+    Object.values(WIPE_BOARDS)
+      .flat()
+      .map((c) => [c.iid, rosterEntry(c.data)]),
+  ),
+  [WIPE_REBUILD.iid]: rosterEntry(WIPE_REBUILD.data),
+};
+
+/** Mana value the sweep of this size takes off the table. */
+function wipeMvLost(size: WipeSize): number {
+  return WIPE_BOARDS[size].reduce((sum, c) => sum + c.data.manaValue, 0);
+}
+
+/**
+ * Seven land drops, a board deployed on T5, a wrath on T6 and a six-drop
+ * replayed on T7. The board is the only variable, and the rebuild is a Colossus
+ * in all three. The empty sweep took nothing, so there is nothing to recover and
+ * the scorecard scores no recovery for it; `small` and `big` both rebuild in one
+ * turn, so the only thing that can separate *them* is how much the wrath took.
+ *
+ * Hand-written for the reason D, F and G are: whether a seed casts a wrath at
+ * all, and what is standing when it does, is the pod's business, and no scripted
+ * run can put the same rebuild behind three different sweeps.
+ */
+function playWipeRun(seed: string, size: WipeSize): RunRecord {
+  const id = `verify-review-wipe-${size}`;
+  const log: LogEntry[] = [];
+  let turn = 1;
+  const board = WIPE_BOARDS[size];
+
+  function add(kind: LogKind, message: string, payload: Record<string, unknown>, phase: Phase = 'main1'): void {
+    log.push({ seq: log.length + 1, turn, phase, kind, message, payload, at: 0 });
+  }
+
+  add('run', `Run started: Wrath Rebuild (seed ${seed})`, {
+    runId: id,
+    deckId: 'verify-review-deck',
+    deckName: 'Wrath Rebuild',
+    seed,
+    bracket: 3,
+    librarySize: WIPE_LANDS.length,
+  });
+  add('draw', `Drew ${WIPE_LANDS.length}`, {
+    iids: [...WIPE_LANDS],
+    names: WIPE_LANDS.map(() => LAND.name),
+    count: WIPE_LANDS.length,
+  });
+
+  for (let i = 0; i < WIPE_TURNS; i++) {
+    if (i > 0) {
+      turn = i + 1;
+      add('turn', `Turn ${turn}`, { turn, previousTurn: turn - 1 });
+    }
+    add('move', `${LAND.name} → battlefield`, {
+      iid: WIPE_LANDS[i],
+      name: LAND.name,
+      from: 'hand',
+      to: 'battlefield',
+    });
+
+    // Drawn and played inside the turn, so nothing is ever held: a card sitting
+    // in hand would earn misses this run has nothing to say about.
+    if (turn === WIPE_BUILD_TURN && board.length > 0) {
+      add('draw', `Drew ${board.length}`, {
+        iids: board.map((c) => c.iid),
+        names: board.map((c) => c.data.name),
+        count: board.length,
+      });
+      for (const c of board) {
+        add('move', `${c.data.name} → battlefield`, {
+          iid: c.iid,
+          name: c.data.name,
+          from: 'hand',
+          to: 'battlefield',
+        });
+      }
+    }
+
+    if (turn === WIPE_TURN) {
+      // The sweep's moves are written before the event's own entry, the order
+      // `resolveActiveEvent` writes them in, so the board is already empty by the
+      // time the outcome names its victims.
+      for (const c of board) {
+        add('move', `${c.data.name} → graveyard`, {
+          iid: c.iid,
+          name: c.data.name,
+          from: 'battlefield',
+          to: 'graveyard',
+          byEventId: WIPE_EVENT_ID,
+        });
+      }
+      add('event', `Seat B casts Wrath of God. (${board.length} swept)`, {
+        eventId: WIPE_EVENT_ID,
+        eventType: 'wipe',
+        seatId: 'B',
+        eventTurn: WIPE_TURN,
+        card: 'Wrath of God',
+        cardEffect: 'Destroy all creatures.',
+        variant: 'creatures',
+        severity: {},
+        resolved: true,
+        outcome: {
+          scope: 'creatures',
+          zone: 'graveyard',
+          swept: board.length,
+          iids: board.map((c) => c.iid),
+        },
+      });
+    }
+
+    if (turn === WIPE_TURN + 1) {
+      add('draw', `Drew ${WIPE_REBUILD.data.name}`, {
+        iids: [WIPE_REBUILD.iid],
+        names: [WIPE_REBUILD.data.name],
+        count: 1,
+      });
+      add('move', `${WIPE_REBUILD.data.name} → battlefield`, {
+        iid: WIPE_REBUILD.iid,
+        name: WIPE_REBUILD.data.name,
+        from: 'hand',
+        to: 'battlefield',
+      });
+    }
+  }
+
+  add('run', 'Run ended: loss', { result: 'loss', endedAt: 0, turns: turn }, 'end');
+
+  return {
+    id,
+    deckId: 'verify-review-deck',
+    deckName: 'Wrath Rebuild',
+    seed,
+    bracket: 3,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'loss',
+    roster: WIPE_ROSTER,
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Patterns across runs
 // ---------------------------------------------------------------------------
 
@@ -1777,6 +1960,71 @@ function main(): void {
     find(iHit, 'seat-unchecked') === undefined,
     'seat-unchecked across a window the seat took damage in',
   );
+
+  // --- run J: the wrath, and how much it took ------------------------------
+  for (const size of ['empty', 'small', 'big'] as const) {
+    const wipeRecord = playWipeRun(`${SEED}-j`, size);
+    const wipeCard = scoreRun(wipeRecord);
+    const j = review(wipeRecord);
+    const landed = wipeCard.wipes.find((w) => !w.negated);
+    const lost = wipeMvLost(size);
+    const earned = lost >= REVIEW.fastRebuild.minMvLost;
+
+    summary.push('');
+    summary.push(
+      `run J/${size} (hand-written log, wrath on T${WIPE_TURN} over a ${lost} MV board, ` +
+        `${WIPE_REBUILD.data.manaValue} MV replayed on T${WIPE_TURN + 1})`,
+    );
+    summary.push(...describe(j));
+
+    // Without this the fixture proves nothing: `small` and `big` are two runs the
+    // recovery metric cannot tell apart, and `empty` is the one it must not
+    // measure at all.
+    check(`J/${size}: the wrath resolved`, landed !== undefined, 'no wipe on the scorecard');
+    checkEqual(`J/${size}: it landed on T${WIPE_TURN}`, landed?.turn, WIPE_TURN);
+    checkEqual(`J/${size}: it took ${lost} MV`, landed?.mvLost, lost);
+    checkEqual(
+      `J/${size}: it took ${lost} MV by the board values too`,
+      (landed?.boardValueBefore ?? 0) - (landed?.boardValueAfter ?? 0),
+      lost,
+    );
+    if (lost === 0) {
+      checkEqual(
+        `J/${size}: a wrath that took nothing has nothing to recover`,
+        landed?.turnsToRecover,
+        null,
+      );
+      checkEqual(`J/${size}: and no turn it recovered on`, landed?.recoveredTurn, null);
+    } else {
+      checkEqual(`J/${size}: the scorecard reads a one-turn recovery`, landed?.turnsToRecover, 1);
+    }
+
+    const rebuilt = find(j, 'fast-rebuild');
+    if (earned) {
+      check(
+        `J/${size}: ${lost} MV swept and rebuilt next turn is credited`,
+        rebuilt !== undefined,
+        'no fast-rebuild finding',
+      );
+      checkEqual(`J/${size}: it is a good`, rebuilt?.kind, 'good');
+      checkEqual(`J/${size}: it spans the wrath and the rebuild`, rebuilt?.turns, [
+        WIPE_TURN,
+        WIPE_TURN + 1,
+      ]);
+      check(
+        `J/${size}: the detail quotes the board it came back from`,
+        rebuilt?.detail.includes(`${landed?.boardValueBefore} MV`) ?? false,
+        rebuilt?.detail ?? '',
+      );
+    } else {
+      check(
+        `J/${size}: a wrath that took only ${lost} MV earns no rebuild`,
+        rebuilt === undefined,
+        `fast-rebuild — ${rebuilt?.detail ?? ''}`,
+      );
+    }
+    checkEvidence(`J/${size}`, j, wipeRecord);
+  }
 
   // --- patterns across runs -------------------------------------------------
   // Newest first, the order `useDeckScorecards` hands its runs over in.

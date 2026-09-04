@@ -69,6 +69,10 @@ export async function probeApiCredentials(client?: Anthropic): Promise<boolean |
 export function createApiModel(opts?: { client?: Anthropic; model?: string }): JudgeModel {
   // Zero args on purpose: the SDK resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN
   // or a stored profile itself, so no credential passes through this file.
+  // The zero-arg client also keeps the SDK's default of two retries on 408, 409,
+  // 429, 5xx and connection errors, so transient upstream failures are already
+  // waited out here; the refresh-collision retry on the other driver has no
+  // analogue on this one.
   const client = opts?.client ?? new Anthropic();
   const defaultModel = opts?.model ?? API_DEFAULT_MODEL;
 

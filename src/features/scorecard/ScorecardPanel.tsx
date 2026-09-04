@@ -169,20 +169,29 @@ function Tile({ label, value, sub }: { label: string; value: string; sub: string
 }
 
 function MetricTiles({ card }: { card: Scorecard }) {
-  const landed = card.wipes.filter((w) => !w.negated);
-  const first = landed[0];
-  const wipeValue = !first
-    ? card.wipes.length > 0
-      ? 'answered'
-      : 'none'
-    : first.turnsToRecover === null
+  // A wrath is only worth a recovery reading if it took something: a negated one
+  // was answered, and one that swept an empty board (or only tokens and lands,
+  // which count 0) left nothing to rebuild. Either way the tile says what
+  // happened instead of printing a number nobody earned.
+  const measured = card.wipes.filter((w) => !w.negated && w.mvLost > 0);
+  const first = measured[0];
+  const tookNothing = card.wipes.some((w) => !w.negated && w.mvLost === 0);
+  const wipeValue = first
+    ? first.turnsToRecover === null
       ? 'never'
-      : String(first.turnsToRecover);
-  const wipeSub = !first
-    ? card.wipes.length > 0
-      ? 'every wrath was answered on the table'
-      : 'no wrath was cast this run'
-    : 'turns to return to 70% of the pre-wipe board';
+      : String(first.turnsToRecover)
+    : card.wipes.length === 0
+      ? 'none'
+      : tookNothing
+        ? 'nothing'
+        : 'answered';
+  const wipeSub = first
+    ? 'turns to return to 70% of the pre-wipe board'
+    : card.wipes.length === 0
+      ? 'no wrath was cast this run'
+      : tookNothing
+        ? 'no wrath took anything off the table to rebuild'
+        : 'every wrath was answered on the table';
 
   const damage = card.seats.reduce((sum, seat) => sum + seat.damageDealt, 0);
   const killed = card.seats.filter((seat) => seat.eliminatedTurn !== null).length;
@@ -196,6 +205,15 @@ function MetricTiles({ card }: { card: Scorecard }) {
     hazards.turnsStanding.length > 0
       ? hazards.turnsStanding.reduce((a, b) => a + b, 0) / hazards.turnsStanding.length
       : null;
+  // A piece the run ended on top of was never answered and never stood: it is in
+  // `faced` and in the tally's `unresolved`, and in neither `stood` nor
+  // `responded`. Read the answer counts off the tally rather than inferring them
+  // from `faced - stood`, which cannot tell an answer from a run that stopped.
+  // Scorecards written before the per-type tallies existed carry no `hate` entry;
+  // a zeroed tally leaves the sentence where it was.
+  const hate = card.answers.byType?.hate;
+  const hateAnswered = hate?.responded ?? 0;
+  const hateOpen = hate?.unresolved ?? 0;
 
   return (
     <div className="sc-tiles">
@@ -237,13 +255,17 @@ function MetricTiles({ card }: { card: Scorecard }) {
       />
       <Tile
         label="Hate pieces"
-        value={hazards.faced === 0 ? 'none' : `${hazards.faced} faced · ${hazards.removed} removed`}
+        value={hazards.faced === 0 ? 'none' : `${hazards.faced} faced`}
         sub={
           hazards.faced === 0
             ? 'no seat cast a persistent piece this run'
             : hazards.stood === 0
-              ? 'every one was answered on the stack'
-              : `${hazards.stood} stood · ${turns(avgStanding)} on average · ${hazards.swept} swept`
+              ? hateOpen === 0
+                ? 'every one was answered on the stack'
+                : `${hateAnswered === 0 ? 'none' : hateAnswered} answered on the stack · ${hateOpen} still open when the run ended`
+              : `${hazards.stood} stood · ${turns(avgStanding)} on average · ${hazards.removed} removed · ${hazards.swept} swept${
+                  hateOpen > 0 ? ` · ${hateOpen} open at the end` : ''
+                }`
         }
       />
       <Tile
