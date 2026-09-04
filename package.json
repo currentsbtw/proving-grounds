@@ -17,7 +17,8 @@
     "judge:corpus": "tsx scripts/judge-corpus.ts",
     "verify:judge": "tsx scripts/verify-judge.ts",
     "eval:build": "tsx scripts/eval-build.ts",
-    "eval:judge": "tsx scripts/eval-run.ts"
+    "eval:judge": "tsx scripts/eval-run.ts",
+    "play": "powershell -ExecutionPolicy Bypass -File scripts/play.ps1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
