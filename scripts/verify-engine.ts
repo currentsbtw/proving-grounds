@@ -1,6 +1,8 @@
 /**
  * Verification harness for the M1 pressure store.
  *
+ * Twenty-one checks, each labelled below.
+ *
  * `verify-scorecard.ts` checks that the scorer agrees with the store about a run
  * that went normally. This script checks the seams that only open when the table
  * goes wrong: a seat dies mid-conversation, the player dies, or the pod does.
@@ -10,7 +12,7 @@
  *
  *   npm run verify:engine
  *
- * Twenty checks, each labelled:
+ * The checks:
  *
  *   (a) a seat with a queued event is eliminated — the event leaves the queue,
  *       the log says it was canceled, and the scorecard never lists it
@@ -84,8 +86,14 @@
  *       as a resolved piece does: the seat is dealt no second piece while the
  *       first waits, the windows that open meanwhile say they counted it, and a
  *       seat that owes nothing can still be dealt one
+ *   (u) a window reads and drains as seat turns rather than as a heap of
+ *       hazards: the queue comes out in seat order A, B, C, the window entry
+ *       lists exactly the living seats in that order, each seat turn carries its
+ *       own seat's events in the order they will be asked, and a pod hit lands
+ *       on the attacker's turn with the defender and the damage the 'damage'
+ *       entry claims
  *
- * (a) to (c), (h), (i), (k), (l), (o) and (r) to (t) need a run where the pod actually did the thing
+ * (a) to (c), (h), (i), (k), (l), (o) and (r) to (u) need a run where the pod actually did the thing
  * being tested, so each one searches seeds until it finds one and prints which
  * it used. Failures are collected rather than thrown, so one execution reports
  * everything.
@@ -119,6 +127,7 @@ import {
   zeroLastFiredWindow,
   type PermanentSummary,
   type SeatSnapshot,
+  type SeatTurn,
 } from '../src/engine/pressure.ts';
 import {
   cardStats,
@@ -2914,9 +2923,22 @@ function scriptedRun(seed: string): RunRecord {
  * run's own nanoid, and card instance ids. Instances are rewritten to their
  * position in the roster, which `startRun` builds in deck order, so the aliasing
  * is stable across executions.
+ *
+ * A turn's own duration is wall clock too, and so is the overtime flag read off
+ * it. A scripted turn takes about a millisecond, so both passes almost always
+ * agree at zero — but "almost always" is not what a determinism check is for,
+ * and a turn that happened to straddle a second boundary would fail it for a
+ * reason that has nothing to do with the seed.
  */
 function normalizeLog(record: RunRecord): string {
-  const stripped = record.log.map((entry) => ({ ...entry, at: 0 }));
+  const stripped = record.log.map((entry) => ({
+    ...entry,
+    at: 0,
+    payload:
+      entry.kind === 'turn'
+        ? { ...entry.payload, previousTurnSeconds: 0, overtime: undefined }
+        : entry.payload,
+  }));
   const aliases = new Map<string, string>([[record.id, '<runId>']]);
   for (const iid of Object.keys(record.roster ?? {})) aliases.set(iid, `#${aliases.size}`);
   for (const entry of record.log) {
@@ -3691,6 +3713,139 @@ function checkQueuedHateHoldsTheSeatsSlot(): void {
   );
 }
 
+// ---------------------------------------------------------------------------
+// (u) a window reads and drains as seat turns
+// ---------------------------------------------------------------------------
+
+/** The `seatTurns` a 'window' entry carries, or an empty list. */
+function seatTurnsOf(entry: LogEntry | undefined): SeatTurn[] {
+  return (entry?.payload.seatTurns as SeatTurn[] | undefined) ?? [];
+}
+
+/** The newest 'window' entry written before `seq`. */
+function windowEntryBefore(seq: number): LogEntry | undefined {
+  return (store().run?.log ?? []).filter((e) => e.kind === 'window' && e.seq < seq).pop();
+}
+
+/**
+ * The window rolls hazard by hazard, but a pod's turns go round the table, and
+ * the player answers them that way round: everything seat A did, then B, then C.
+ * The queue's order is the engine's alone — the store enqueues what it is handed
+ * — so what this proves is that the engine hands it over sorted, that the log
+ * payload says the same thing in machine-readable form, and that the pod's swing
+ * at another seat is filed under the seat that swung it.
+ */
+function checkWindowReadsAsSeatTurns(): void {
+  const found = search('engine-turns', (seed) => {
+    freshRun(seed);
+    for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+      store().nextTurn();
+      if (!store().run) return null;
+      // Two seats in one window is the case worth holding out for: a single-seat
+      // window is in seat order however the hazards fell.
+      const queued = queuedEvents();
+      if (new Set(queued.map((e) => e.seatId)).size >= 2) {
+        const windows = (store().run?.log ?? []).filter((e) => e.kind === 'window');
+        return {
+          seed,
+          queued,
+          entry: windows[windows.length - 1],
+          living: store()
+            .seats.filter((s) => !s.eliminated)
+            .map((s) => s.id),
+        };
+      }
+      // Drained every turn, so the queue holds one window's events and no
+      // leftovers from the last one.
+      drainTurnWithoutDamage();
+      if (!store().run) return null;
+    }
+    return null;
+  });
+
+  if (!found) {
+    failures.push('(u) no seed produced a window with events from two seats');
+    return;
+  }
+
+  const order = found.queued.map((e) => e.seatId);
+  check(
+    '(u) the queue comes out in seat order',
+    order.join('') === [...order].sort().join(''),
+    order.join(''),
+  );
+
+  const turns = seatTurnsOf(found.entry);
+  check(
+    '(u) the window entry lists exactly the living seats, in turn order',
+    turns.map((t) => t.seatId).join('') === [...found.living].sort().join(''),
+    `${turns.map((t) => t.seatId).join('')} vs ${found.living.join('')}`,
+  );
+
+  const mismatched = turns.filter(
+    (t) =>
+      t.eventTypes.join(',') !==
+      found.queued
+        .filter((e) => e.seatId === t.seatId)
+        .map((e) => e.type)
+        .join(','),
+  );
+  check(
+    "(u) each seat turn carries its own seat's events, in order",
+    mismatched.length === 0,
+    mismatched.map((t) => `${t.seatId}: ${t.eventTypes.join(',')}`).join(' | '),
+  );
+
+  summary.push(
+    `(u) seed ${found.seed}: window before turn ${found.entry?.payload.windowBeforeTurn} drained as ` +
+      turns.map((t) => `${t.seatId}[${t.eventTypes.join(',') || '—'}]`).join(' '),
+  );
+
+  // The pod's swing belongs to the seat that swung it, and the seat that
+  // attacked the player is never the one that swings, so no turn carries two.
+  const hit = search('engine-turns-pod', (seed) => {
+    freshRun(seed);
+    for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+      const seen = podEntriesSoFar().length;
+      store().nextTurn();
+      if (!store().run) return null;
+      const entries = podEntriesSoFar();
+      if (entries.length > seen) {
+        const entry = entries[seen];
+        return { seed, entry, turns: seatTurnsOf(windowEntryBefore(entry.seq)) };
+      }
+      drainTurnWithoutDamage();
+      if (!store().run) return null;
+    }
+    return null;
+  });
+
+  if (!hit) {
+    failures.push('(u) no seed had the seats swing at each other');
+    return;
+  }
+
+  const attacker = hit.entry.payload.attackerId as SeatId;
+  const defender = hit.entry.payload.seatId as SeatId;
+  const amount = hit.entry.payload.amount as number;
+  const attackerTurn = hit.turns.find((t) => t.seatId === attacker);
+  check(
+    "(u) the pod hit is on the attacker's seat turn",
+    JSON.stringify(attackerTurn?.podHit) === JSON.stringify({ defenderId: defender, damage: amount }),
+    `${attacker}: ${JSON.stringify(attackerTurn?.podHit)} vs ${defender} for ${amount}`,
+  );
+  const others = hit.turns.filter((t) => t.seatId !== attacker && t.podHit !== null);
+  check(
+    '(u) and on no other seat turn',
+    others.length === 0,
+    others.map((t) => t.seatId).join(', '),
+  );
+
+  summary.push(
+    `(u) seed ${hit.seed}: seat ${attacker} hit seat ${defender} for ${amount} on its own turn`,
+  );
+}
+
 function checkDeterminism(): void {
   const seed = 'engine-determinism';
   const first = normalizeLog(scriptedRun(seed));
@@ -3745,6 +3900,7 @@ async function main(): Promise<void> {
   checkPodCombatHits();
   checkPodCombatNeverKills();
   checkQueuedHateHoldsTheSeatsSlot();
+  checkWindowReadsAsSeatTurns();
   checkDeterminism();
 
   console.log('\nverify:engine');

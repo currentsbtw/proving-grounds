@@ -557,10 +557,21 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
       <div className="pgp-say" role="status">
         {standing && (
           <>
-            {/* Whatever is waiting behind this one is printed under the seat
-                that will throw it, so the head no longer carries a count. */}
+            {/* A window is three seat turns, drained in turn order, so the head
+                names whose turn the thing in front of the player belongs to
+                rather than calling it "the active event". Whatever is waiting
+                behind this one is printed under the seat that will throw it, so
+                the head still carries no count. */}
             <div className="pgp-dock-head">
-              <span className="pgp-head-label">{event ? 'active event' : 'race clock'}</span>
+              <span className="pgp-head-label">
+                {event
+                  ? event.type === 'counter'
+                    ? // A counter is raised on the player's own cast, outside any
+                      // window, so it is the one event that is not a seat's turn.
+                      `your turn · ${EVENT_LABEL[event.type]}`
+                    : `${seatLabel(event.seatId)}'s turn · ${EVENT_LABEL[event.type]}`
+                  : 'race clock'}
+              </span>
             </div>
 
             <div className="pgp-dock-main">

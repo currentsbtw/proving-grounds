@@ -12,9 +12,23 @@
  * These are starting values, not measurements. Bump `version` whenever a number
  * here changes, so reviews produced under different tunings stay
  * distinguishable.
+ *
+ * 3 — the pod. The first twelve findings all read the player's own curve; these
+ * read how the pod was handled (`clock`, `counters`, `threat`) and how often a
+ * finding comes back across a deck's history (`patterns`). Every one of them is
+ * still a count: damage per seat and per turn off the scorecard's timeline,
+ * threat per seat off the window entries, countered spells off the ledger. None
+ * of them knows whether the seat *could* have been hit, or what else was
+ * castable, and the copy stops where the counting does.
+ *
+ * 4 — the shot clock. One finding, and the only one in the file that reads a
+ * wall clock rather than the board: how long each turn took, against the limit
+ * the run was started under. It is still a count, and it is still not a
+ * judgement — a long turn is a long turn, not a bad one, and nothing here knows
+ * whether the player was thinking, reading a card or answering the door.
  */
 export const REVIEW = {
-  version: 2,
+  version: 4,
 
   /** Hard cap on findings shown. A debrief nobody reads changes no decklist. */
   maxFindings: 8,
@@ -80,6 +94,59 @@ export const REVIEW = {
     minMvDeployed: 6,
     /** Nonland cards still in hand at the end of that turn. */
     minCardsInHand: 2,
+  },
+
+  clock: {
+    /**
+     * Damage sent at seats other than the clock's owner while the clock ran,
+     * before the split is worth naming. Eight is about one Commander combat
+     * step: below that the swing pointed elsewhere, above it the race was being
+     * run against the wrong seat. It says nothing about whether the owner
+     * *could* have been attacked — evasion, blockers and colours are not read.
+     */
+    wrongSeatMinDamage: 8,
+  },
+
+  counters: {
+    /**
+     * Spells the pod countered before it reads as a habit rather than a tax.
+     * Two is the smallest number that can be a pattern; one countered spell is
+     * a seat having the card, which is what a counter event is.
+     */
+    minCountered: 2,
+  },
+
+  threat: {
+    /**
+     * Threat a seat has to be showing before "unchecked" describes anything. The
+     * meter is 0-10, so nine is a seat one window from the top of it.
+     */
+    uncheckedMin: 9.0,
+    /**
+     * Consecutive opponent windows it has to hold that while taking nothing from
+     * the player. Three windows is a full cycle of the table.
+     */
+    uncheckedWindows: 3,
+  },
+
+  shotClock: {
+    /**
+     * Turns over the limit before the run is worth telling about it. One is
+     * enough: a player who asked for a clock asked to be told, and the finding
+     * names the turns rather than grading them.
+     */
+    minOvertimeTurns: 1,
+  },
+
+  patterns: {
+    /**
+     * Runs a finding has to appear in before it is a tendency of the deck rather
+     * than a thing that happened once. Matches `SCORING.tags.minRuns` in spirit:
+     * one game is a story.
+     */
+    minRuns: 3,
+    /** And the share of the runs looked at, so a long history cannot coast. */
+    minShare: 0.5,
   },
 
   /** The honest-limits line, printed under the list rather than as a finding. */

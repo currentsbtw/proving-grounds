@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import DeckPanel from './features/decks/DeckPanel';
+import HandDrill from './features/drill/HandDrill';
 import TablePanel from './features/table/TablePanel';
 import HotkeyHelp from './features/hotkeys/HotkeyHelp';
 import LiveHud from './features/readout/LiveHud';
@@ -96,7 +97,12 @@ export default function App() {
   // empty state before that.
   const runActive = useGameStore((s) => s.run !== null);
   const selectedRunId = useUiStore((s) => s.selectedRunId);
+  const drillDeckId = useUiStore((s) => s.drill?.deckId ?? null);
   const showScorecard = !runActive && selectedRunId !== null;
+  // The centre panel holds one thing. A scorecard wins over a drill, and a
+  // drill over the table's empty state; opening either closes the other, so the
+  // question only ever comes up between a stale drill and a fresh selection.
+  const showDrill = !showScorecard && !runActive && drillDeckId !== null;
 
   return (
     <div className="pg-app">
@@ -130,8 +136,16 @@ export default function App() {
         ) : (
           <>
             <DeckPanel />
-            {/* Keyed by run so switching runs remounts with clean local UI state. */}
-            {showScorecard ? <ScorecardPanel key={selectedRunId} /> : <TablePanel />}
+            {/* Keyed by run so switching runs remounts with clean local UI state;
+                the drill is keyed by deck for the same reason, and deliberately
+                not by seed — taking a new seed keeps the session's tally. */}
+            {showScorecard ? (
+              <ScorecardPanel key={selectedRunId} />
+            ) : showDrill ? (
+              <HandDrill key={drillDeckId} />
+            ) : (
+              <TablePanel />
+            )}
           </>
         )}
       </main>

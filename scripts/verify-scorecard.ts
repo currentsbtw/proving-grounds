@@ -1345,6 +1345,29 @@ function main(): void {
     'no pod combat in this run — pick another seed',
   );
 
+  // --- the clock's exit ----------------------------------------------------
+  // The scripted run answers every clock it is offered, so the card has to say
+  // which turn each one left the table on, not just that one did: the review
+  // clamps the span it reads damage over to that turn, and a null would send it
+  // back to reading all the way to the deadline.
+  if (scorecard.clock.outcome === 'declared-interaction' || scorecard.clock.outcome === 'eliminated-seat') {
+    check(
+      'a clock that left the table records the turn it left on',
+      typeof scorecard.clock.clearedTurn === 'number',
+      `outcome ${scorecard.clock.outcome} with clearedTurn ${scorecard.clock.clearedTurn}`,
+    );
+    check(
+      'and that turn is inside the run',
+      (scorecard.clock.clearedTurn ?? 0) >= (scorecard.clock.spawnedTurn ?? 1) &&
+        (scorecard.clock.clearedTurn ?? 0) <= scorecard.turns,
+      `cleared T${scorecard.clock.clearedTurn} against spawn T${scorecard.clock.spawnedTurn} and ${scorecard.turns} turns`,
+    );
+  } else {
+    summary.push(
+      `  (no clock was cleared on this seed — outcome ${scorecard.clock.outcome ?? 'none'}; clearedTurn is untested here)`,
+    );
+  }
+
   // --- mulligans -----------------------------------------------------------
   // The first mulligan is free in Commander (CR 103.5c): it keeps seven. The
   // second bottoms one.
@@ -1396,7 +1419,7 @@ function main(): void {
       .join(', ')}`,
   );
   summary.push(
-    `clock               faced ${scorecard.clock.faced}, outcome ${scorecard.clock.outcome ?? 'none'}, beaten ${scorecard.clock.beatClock}`,
+    `clock               faced ${scorecard.clock.faced}, outcome ${scorecard.clock.outcome ?? 'none'}, beaten ${scorecard.clock.beatClock}, cleared ${scorecard.clock.clearedTurn === null ? 'never' : `T${scorecard.clock.clearedTurn}`}`,
   );
   summary.push(
     `keep                ${scorecard.keep.keptHandSize} cards, ${scorecard.keep.landsInKeptHand} lands, ${scorecard.keep.mulligans} mulligans`,

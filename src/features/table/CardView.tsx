@@ -40,6 +40,13 @@ function manaValueBadge(
 
 export interface CardViewProps {
   card: CardInstance;
+  /**
+   * Card facts to print, for a caller holding its own. The live table leaves
+   * this off and the run's own `cardData` answers; the hand drill supplies it,
+   * because it deals hands with no run open and the store's cache is empty
+   * between runs.
+   */
+  data?: CardData;
   /** Rendered width in px; height is derived from the card aspect. */
   width?: number;
   /** Prefer the small Scryfall image (stack previews, dense grids). */
@@ -139,6 +146,7 @@ function CardArt({
 function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
   const {
     card,
+    data: suppliedData,
     width = 140,
     small,
     faceDown,
@@ -153,7 +161,8 @@ function CardFrame({ props, dnd }: { props: CardViewProps; dnd?: DndBits }) {
     title,
   } = props;
 
-  const data = useGameStore((s) => (card.scryfallId ? s.cardData[card.scryfallId] : undefined));
+  const cached = useGameStore((s) => (card.scryfallId ? s.cardData[card.scryfallId] : undefined));
+  const data = suppliedData ?? cached;
   const openMenu = useCardMenu();
 
   // The panel sits beside this element, so the preview needs the node the drag

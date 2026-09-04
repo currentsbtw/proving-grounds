@@ -1,13 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { deleteDeck, getCachedCardsByIds, listDecks } from '../../db/db';
+import { deleteDeck, getCachedCardsByIds, getSetting, listDecks, setSetting } from '../../db/db';
 import type { Deck } from '../../domain/types';
+
+/**
+ * The key the last shot-clock choice is remembered under. One setting for the
+ * rail rather than one per deck: it is how the player wants to practise today,
+ * not a property of a list.
+ */
+const SHOT_CLOCK_KEY = 'shotClockSeconds';
+
+/** Off, then the three lengths a Commander turn is worth timing against. */
+const SHOT_CLOCKS: { value: number | null; label: string }[] = [
+  { value: null, label: 'no clock' },
+  { value: 60, label: '60 s' },
+  { value: 90, label: '90 s' },
+  { value: 120, label: '120 s' },
+];
 
 export interface DeckListProps {
   onImport: () => void;
   onEdit: (deck: Deck) => void;
-  onStart: (deck: Deck, seed: string) => void;
+  onStart: (deck: Deck, seed: string, shotClockSeconds: number | null) => void;
+  onDrill: (deck: Deck, seed: string) => void;
   startingDeckId: string | null;
+  drillingDeckId: string | null;
   busy: boolean;
   error: string | null;
 }
@@ -16,9 +33,39 @@ function deckSize(deck: Deck): number {
   return deck.cards.reduce((sum, ref) => sum + ref.qty, 0) + deck.commanderIds.length;
 }
 
-export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, error }: DeckListProps) {
+export function DeckList({
+  onImport,
+  onEdit,
+  onStart,
+  onDrill,
+  startingDeckId,
+  drillingDeckId,
+  busy,
+  error,
+}: DeckListProps) {
   const [seeds, setSeeds] = useState<Record<string, string>>({});
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [shotClock, setShotClock] = useState<number | null>(null);
+
+  // The remembered choice arrives after the first paint, so the select opens on
+  // "no clock" and corrects itself. Storage being refused is not worth a
+  // message: the rail simply does not remember between sessions.
+  useEffect(() => {
+    let live = true;
+    void getSetting<number | null>(SHOT_CLOCK_KEY)
+      .then((stored) => {
+        if (live && typeof stored === 'number') setShotClock(stored);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  function chooseShotClock(seconds: number | null): void {
+    setShotClock(seconds);
+    void setSetting(SHOT_CLOCK_KEY, seconds).catch(() => {});
+  }
 
   const data = useLiveQuery(async () => {
     const decks = await listDecks();
@@ -71,6 +118,7 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
       {data?.decks.map((deck) => {
         const commanders = deck.commanderIds.map((id) => data.names[id] ?? 'Unknown commander');
         const starting = startingDeckId === deck.id;
+        const drilling = drillingDeckId === deck.id;
         return (
           <article className="dk-deck" key={deck.id}>
             <div className="dk-deck-title">
@@ -88,7 +136,7 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
                 type="button"
                 className="dk-btn-primary"
                 disabled={busy}
-                onClick={() => onStart(deck, seeds[deck.id] ?? '')}
+                onClick={() => onStart(deck, seeds[deck.id] ?? '', shotClock)}
               >
                 {starting ? 'Starting…' : 'Start run'}
               </button>
@@ -100,6 +148,37 @@ export function DeckList({ onImport, onEdit, onStart, startingDeckId, busy, erro
                 value={seeds[deck.id] ?? ''}
                 onChange={(e) => setSeeds((prev) => ({ ...prev, [deck.id]: e.target.value }))}
               />
+              {/* The clock is a way to practise, not part of the seed, so it is
+                  one choice for the rail and every row shows the same one. */}
+              <select
+                className="dk-select dk-clock"
+                aria-label={`Shot clock for ${deck.name}`}
+                value={shotClock === null ? 'off' : String(shotClock)}
+                onChange={(e) =>
+                  chooseShotClock(e.target.value === 'off' ? null : Number(e.target.value))
+                }
+              >
+                {SHOT_CLOCKS.map((option) => (
+                  <option
+                    key={option.label}
+                    value={option.value === null ? 'off' : String(option.value)}
+                  >
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {/* Opening hands with no run behind them: the seed field above is
+                  the drill's starting seed too, so a hand worth keeping can be
+                  started for real without retyping anything. */}
+              <button
+                type="button"
+                className="dk-btn-quiet"
+                disabled={busy}
+                title="Deal opening hands off this seed and practise the keep/mull call"
+                onClick={() => onDrill(deck, seeds[deck.id] ?? '')}
+              >
+                {drilling ? 'Dealing…' : 'Drill hands'}
+              </button>
             </div>
 
             <div className="dk-deck-secondary">

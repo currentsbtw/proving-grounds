@@ -135,15 +135,27 @@
   overflow-wrap: anywhere;
 }
 
+/* Four controls in a 280px rail: the row wraps rather than squeezing the seed
+   field down to nothing, so a narrow rail reads as two lines instead of one
+   unusable one. */
 .dk-deck-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }
 
 .dk-seed {
   flex: 1;
-  min-width: 0;
+  min-width: 5.5rem;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+/* Narrow enough to sit beside the seed field; the reading is three characters
+   and a unit, never a sentence. */
+.dk-clock {
+  width: auto;
   font-size: 12px;
   padding: 4px 6px;
 }

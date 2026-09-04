@@ -219,6 +219,15 @@
   border-color: var(--ink);
 }
 
+/* The seat whose turn the player is answering, marked the way a tell is: one
+   2px rule down the inside edge, drawn as an inset shadow so a seat taking its
+   turn never moves by the pixel a thicker border would cost. It is quiet on
+   purpose — the TURN chip is what says it, and the accent stays spent on the
+   seat to hit. */
+.hud-frame.is-acting {
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+
 /* The accent is spent on the seat to hit, on the frame's own border as well as
    on its chip: the answer to "who do I attack" is the loudest thing up there. */
 .hud-frame.is-hit {
@@ -636,6 +645,14 @@
   color: var(--mana-c);
 }
 
+/* Whose turn is in front of the player. Ink rather than the accent — the seat to
+   hit still owns that — and a word rather than the frame's rule alone, so it
+   survives greyscale like every other state on the row. */
+.rd-chip.is-turn {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
 /* The accent is spent on one chip only: the seat to hit is the answer to "who
    do I attack", and it has to be the loudest word on the frame. */
 .rd-chip.is-hit {
@@ -842,6 +859,23 @@
    and weight only underline it. */
 .hud-stat-value.is-urgent {
   color: var(--danger);
+  font-weight: 600;
+}
+
+/* The shot clock, riding in the TURN caption. Ink rather than the caption's
+   muted grey so a countdown can be read at a glance; a fixed minimum so the
+   reading does not shove the phase name as the digits change. Over the limit
+   the reading already says OVER; the R combat ink only underlines it, and it is
+   held away from `danger` so a turn running long never
+   reads as life leaving. */
+.hud-shot {
+  display: inline-block;
+  min-width: 4ch;
+  color: var(--ink);
+}
+
+.hud-shot.is-over {
+  color: var(--mana-r);
   font-weight: 600;
 }
 

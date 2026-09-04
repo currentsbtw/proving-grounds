@@ -9,23 +9,52 @@ import { useGameStore } from './gameStore';
  * scorecard" stays a UI one. The bridge between the two is the subscription at
  * the bottom of this file.
  */
+/** Which deck and seed the keep/mull drill is running on, or null for no drill. */
+export interface DrillTarget {
+  deckId: string;
+  /** The seed hand 1 starts from. Blank means the drill picks a random one. */
+  seed: string;
+}
+
 export interface UiState {
   /** Persisted run whose scorecard the centre panel shows, or null for the table. */
   selectedRunId: string | null;
   /** Second run in the A/B view, or null. Always cleared when the selection moves. */
   compareRunId: string | null;
+  /**
+   * The hand drill in the centre panel, or null. Like the selection, this is a
+   * UI concern and not the game store's: the drill deals hands off a seed
+   * without a run existing, and the store must not learn about it.
+   */
+  drill: DrillTarget | null;
   selectRun: (id: string | null) => void;
   setCompare: (id: string | null) => void;
+  openDrill: (target: DrillTarget) => void;
+  closeDrill: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
   selectedRunId: null,
   compareRunId: null,
+  drill: null,
 
   selectRun(id) {
     // A new selection invalidates the comparison — B is only meaningful next to
-    // the A it was picked for.
-    set({ selectedRunId: id, compareRunId: null });
+    // the A it was picked for. The centre panel holds one thing at a time, so
+    // asking for a scorecard is also asking for the drill to stand down.
+    set((state) => ({
+      selectedRunId: id,
+      compareRunId: null,
+      drill: id === null ? state.drill : null,
+    }));
+  },
+
+  openDrill(target) {
+    set({ drill: target, selectedRunId: null, compareRunId: null });
+  },
+
+  closeDrill() {
+    set({ drill: null });
   },
 
   setCompare(id) {
@@ -49,4 +78,7 @@ useGameStore.subscribe((state, prev) => {
   // `endRun` awaits the Dexie write before clearing `run`, so by the time this
   // fires the record the scorecard is about to read is already persisted.
   useUiStore.getState().selectRun(now === null ? before : null);
+  // A live run takes the centre panel, so a drill left open behind it stands
+  // down rather than waiting to reappear when the run ends.
+  if (now !== null) useUiStore.getState().closeDrill();
 });

@@ -72,6 +72,12 @@ export function mulliganBottomCount(mulliganCount: number): number {
 
 export type LifeTarget = 'player' | SeatId;
 
+/** Everything a run can be started with that is not the deck, the cards or the seed. */
+export interface StartRunOptions {
+  /** Seconds on the shot clock, or null/undefined for no clock. */
+  shotClockSeconds?: number | null;
+}
+
 /** Extra options for `moveCard`. The bare 'top' | 'bottom' form is still accepted. */
 export interface MoveOptions {
   /** Only meaningful when moving to the library. Defaults to 'top'. */
@@ -350,6 +356,20 @@ export interface GameState {
   playerLife: number;
   /** Player life as the current turn began, so the readout can show this turn's swing. */
   turnStartLife: number;
+  /**
+   * The shot clock this run is being played under, in seconds, or null for no
+   * clock. A drill setting rather than part of the run: nothing about it reaches
+   * the rng, so the same seed deals the same run whether it is on or off, and a
+   * same-seed replay is still like for like against a run that was timed.
+   */
+  shotClockSeconds: number | null;
+  /**
+   * Wall clock at the moment the current turn became the player's, set after the
+   * opponent window resolved. The pod's window and the player's answers to its
+   * events are the player's own time to spend, so they are inside the turn the
+   * shot clock is measuring rather than dead time in front of it.
+   */
+  turnStartedAt: number;
   seats: Seat[];
   /**
    * Each seat's threat as it stood before the most recent opponent window, so a
@@ -429,7 +449,12 @@ export interface GameState {
    */
   ending: boolean;
 
-  startRun: (deck: Deck, cardData: Record<string, CardData>, seed?: string) => void;
+  startRun: (
+    deck: Deck,
+    cardData: Record<string, CardData>,
+    seed?: string,
+    options?: StartRunOptions,
+  ) => void;
   takeMulligan: () => void;
   resolveMulligan: (bottomIids: string[]) => void;
   moveCard: (iid: string, toZone: ZoneId, options?: MoveArg) => void;
@@ -1445,10 +1470,25 @@ export const useGameStore = create<GameState>((set, get) => {
 
     if (!runOpponentWindow(upcoming)) return;
 
-    set({ turn: upcoming, phase: 'untap', turnStartLife: get().playerLife });
+    // The window is over, so the turn that just ended is finally finished and
+    // the new one starts here. Timing is read off the wall clock and written
+    // once per turn: nothing about it reaches the rng, so a seed replays the
+    // same run whether it was played against a clock or not.
+    const startedAt = Date.now();
+    const previousTurnSeconds = Math.round((startedAt - state.turnStartedAt) / 1000);
+    const limit = state.shotClockSeconds;
+
+    set({
+      turn: upcoming,
+      phase: 'untap',
+      turnStartLife: get().playerLife,
+      turnStartedAt: startedAt,
+    });
     appendLog('turn', `Turn ${upcoming} begins`, {
       turn: upcoming,
       previousTurn: upcoming - 1,
+      previousTurnSeconds,
+      overtime: limit !== null && previousTurnSeconds > limit ? true : undefined,
       from: via === 'phase' ? 'end' : undefined,
       skipped: via === 'skip' || undefined,
     });
@@ -1570,6 +1610,9 @@ export const useGameStore = create<GameState>((set, get) => {
       /** Hate events still unanswered as the window opened; they held a seat's slot too. */
       queuedHate: provisional.map((h) => h.eventId),
       podHits: result.podHits,
+      // The same window read as turns round the table, which is the order the
+      // events below are queued in.
+      seatTurns: result.seatTurns,
       notes: result.notes,
     });
 
@@ -1682,6 +1725,8 @@ export const useGameStore = create<GameState>((set, get) => {
     turn: 1,
     playerLife: STARTING_LIFE,
     turnStartLife: STARTING_LIFE,
+    shotClockSeconds: null,
+    turnStartedAt: 0,
     seats: freshSeats(),
     previousThreat: threatBySeat(freshSeats()),
     cards: {},
@@ -1710,9 +1755,10 @@ export const useGameStore = create<GameState>((set, get) => {
     deathNoticed: false,
     ending: false,
 
-    startRun(deck, cardData, seed) {
+    startRun(deck, cardData, seed, options) {
       const runSeed = seed ?? randomSeed();
       const rng = createRng(runSeed);
+      const shotClockSeconds = options?.shotClockSeconds ?? null;
 
       const cards: Record<string, CardInstance> = {};
       const libraryOrder: string[] = [];
@@ -1769,6 +1815,8 @@ export const useGameStore = create<GameState>((set, get) => {
         turn: 1,
         playerLife: STARTING_LIFE,
         turnStartLife: STARTING_LIFE,
+        shotClockSeconds,
+        turnStartedAt: Date.now(),
         seats,
         previousThreat: threatBySeat(seats),
         cards,
@@ -1805,6 +1853,7 @@ export const useGameStore = create<GameState>((set, get) => {
         librarySize: libraryOrder.length,
         commanders: deck.commanderIds,
         pressureVersion: PRESSURE.version,
+        shotClockSeconds,
       });
       appendLog(
         'threat',
@@ -2461,6 +2510,8 @@ export const useGameStore = create<GameState>((set, get) => {
         turn: 1,
         playerLife: STARTING_LIFE,
         turnStartLife: STARTING_LIFE,
+        shotClockSeconds: null,
+        turnStartedAt: 0,
         seats: freshSeats(),
         previousThreat: threatBySeat(freshSeats()),
         cards: {},

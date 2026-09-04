@@ -495,7 +495,14 @@ function emptyScorecard(): Scorecard {
       { seatId: 'B', damageDealt: 0, commanderDamageDealt: 0, podDamageTaken: 0, eliminatedTurn: null, eliminationReason: null },
       { seatId: 'C', damageDealt: 0, commanderDamageDealt: 0, podDamageTaken: 0, eliminatedTurn: null, eliminationReason: null },
     ],
-    clock: { faced: false, spawnedTurn: null, deadlineTurn: null, outcome: null, beatClock: false },
+    clock: {
+      faced: false,
+      spawnedTurn: null,
+      deadlineTurn: null,
+      outcome: null,
+      clearedTurn: null,
+      beatClock: false,
+    },
     keep: { mulligans: 0, keptHandSize: 0, landsInKeptHand: 0, landsInOpeningSeven: 0 },
     events: [],
   };

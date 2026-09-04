@@ -212,6 +212,9 @@ export default function LiveHud() {
                 hasClock={clock?.seatId === seat.id}
                 armedThreshold={armed?.seatId === seat.id ? armed.threshold : null}
                 hit={hit === seat.id}
+                // A counter is raised on the player's cast, not in a window: no seat
+                // is taking a turn while it stands.
+                acting={activeEvent?.seatId === seat.id && activeEvent.type !== 'counter'}
                 showHit={!tightChips}
                 pinned={pinned === seat.id}
                 onTogglePin={() =>

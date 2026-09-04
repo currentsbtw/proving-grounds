@@ -169,15 +169,22 @@ export function useScorecard(runId: string | null): ScoredLookup | undefined {
 export interface DeckScorecards {
   runs: RunRecord[];
   cards: Scorecard[];
+  /**
+   * One review per run, in the same order as `cards` — newest first, which is
+   * the order `reviewPatterns` quotes its sample line from. They come through
+   * the same cache the run detail view reads, so a deck's history is replayed
+   * once for its reviews however many surfaces ask for them.
+   */
+  reviews: Review[];
   /** Per-card tallies across those same runs. */
   cardStats: CardStats;
 }
 
 /**
- * Every run of a deck, newest first, with its scorecard and the deck's per-card
- * tallies. `undefined` while loading.
+ * Every run of a deck, newest first, with its scorecard, its review and the
+ * deck's per-card tallies. `undefined` while loading.
  *
- * The three readings come off one subscription on purpose: they are all derived
+ * The readings come off one subscription on purpose: they are all derived
  * from the same `listRuns(deckId)`, and a second live query for the card table
  * would clone every log of the deck out of IndexedDB a second time on open and
  * again on every write to `runs`.
@@ -190,12 +197,14 @@ export interface DeckScorecards {
  */
 export function useDeckScorecards(deckId: string | null): DeckScorecards | undefined {
   return useLiveQuery(async (): Promise<DeckScorecards> => {
-    if (!deckId) return { runs: [], cards: [], cardStats: NO_CARD_STATS };
+    if (!deckId) return { runs: [], cards: [], reviews: [], cardStats: NO_CARD_STATS };
     const runs = await listRuns(deckId);
     const facts = await factsForLegacy(runs);
+    const cards = runs.map((run) => scoreCached(run, facts));
     return {
       runs,
-      cards: runs.map((run) => scoreCached(run, facts)),
+      cards,
+      reviews: runs.map((run, i) => reviewCached(run, cards[i], facts)),
       cardStats: cardStatsCached(runs),
     };
   }, [deckId]);

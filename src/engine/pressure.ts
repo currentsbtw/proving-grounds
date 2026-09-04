@@ -130,11 +130,45 @@ export interface SeatUpdate {
   silhouette: Silhouette;
 }
 
+/**
+ * One seat's turn inside the window, as the player reads it. The window rolls
+ * hazard by hazard, but a pod's turns go round the table, so this is the shape
+ * the readout and the log payload use: seat A's turn, then B's, then C's.
+ *
+ * Plain JSON — it goes straight into a log entry, and anything reading a run
+ * back has only what is written here.
+ */
+export interface SeatTurn {
+  seatId: SeatId;
+  /** This seat's events, in the order the player will answer them. */
+  eventTypes: EventType[];
+  /**
+   * The swing this seat took at another seat. It belongs to the attacker's
+   * turn: the seat that attacked the player is never the pod attacker, so no
+   * seat's turn ever carries two attacks.
+   */
+  podHit: { defenderId: SeatId; damage: number } | null;
+  /** Threat as the window opened, before this window's growth. */
+  threatFrom: number;
+  /** Threat after everything this window did, the wrath's aftermath included. */
+  threatTo: number;
+  creaturesFrom: number;
+  creaturesTo: number;
+  powerFrom: number;
+  powerTo: number;
+  /** This is the seat holding up a counterspell after this window. */
+  armed: boolean;
+  /** This is the seat running the race clock after this window. */
+  clockOwner: boolean;
+}
+
 export interface WindowResult {
   /** Replacement threat/silhouette for every seat, eliminated ones included. */
   seats: SeatUpdate[];
-  /** Events to enqueue, in the order they should be shown. */
+  /** Events to enqueue, in the order they should be shown: seat order, A to C. */
   events: PressureEvent[];
+  /** The window read as seat turns — one per living seat, in seat order. */
+  seatTurns: SeatTurn[];
   clock: ClockState | null;
   counterArmed: CounterArmed | null;
   /**
@@ -836,6 +870,9 @@ export function resolveWindow(input: WindowInput): WindowResult {
     return {
       seats: input.seats.map((s) => ({ id: s.id, threat: s.threat, silhouette: s.silhouette })),
       events: [],
+      // Nobody took a turn: the run ended on the deadline, and nothing below the
+      // short-circuit was computed.
+      seatTurns: [],
       clock: input.clock,
       counterArmed: null,
       podHits: [],
@@ -1317,11 +1354,28 @@ export function resolveWindow(input: WindowInput): WindowResult {
     }
   }
 
-  const summary = buildSummary(turn, working, events, counterArmed, clock, podHits);
+  // --- the window, read back as seat turns ---------------------------------
+  //
+  // The hazards roll in hazard order and always will. The pod's turns go round
+  // the table, so that is the order the player answers them in: everything seat
+  // A did, then B, then C.
+  //
+  // This runs after the last rng draw of the window, and it has to: the draw
+  // order is the whole of what makes a seed replay, so how a window *reads* may
+  // never feed back into how it rolled. Nothing below this line touches `rng`.
+  const seatIndex = new Map(working.map((s, i) => [s.id, i]));
+  events.sort((a, b) => {
+    const bySeat = (seatIndex.get(a.seatId) ?? 0) - (seatIndex.get(b.seatId) ?? 0);
+    return bySeat !== 0 ? bySeat : eventTurnOrder(a.type) - eventTurnOrder(b.type);
+  });
+
+  const seatTurns = buildSeatTurns(input.seats, working, events, podHits, counterArmed, clock);
+  const summary = buildSummary(turn, seatTurns, events, target?.name, counterArmed, clock);
 
   return {
     seats: working.map((s) => ({ id: s.id, threat: s.threat, silhouette: s.silhouette })),
     events,
+    seatTurns,
     clock,
     counterArmed,
     podHits,
@@ -1332,27 +1386,135 @@ export function resolveWindow(input: WindowInput): WindowResult {
   };
 }
 
-function buildSummary(
-  turn: number,
-  seats: SeatSnapshot[],
+/**
+ * The order one seat's own events read in: what it cast first, the attack after,
+ * and the clock last, because a clock is something the seat is setting up rather
+ * than something it did to you this window. A counter is not in the list — the
+ * store raises those on the player's cast, outside any window — so it sorts to
+ * the end rather than to the front if one ever arrives here.
+ */
+const SEAT_TURN_EVENT_ORDER: EventType[] = [
+  'wipe',
+  'removal',
+  'hate',
+  'resource',
+  'combat',
+  'clock',
+];
+
+function eventTurnOrder(type: EventType): number {
+  const at = SEAT_TURN_EVENT_ORDER.indexOf(type);
+  return at === -1 ? SEAT_TURN_EVENT_ORDER.length : at;
+}
+
+/**
+ * One entry per living seat, in seat order, whether or not the seat did
+ * anything: a seat that only grew still took a turn, and the readout says so.
+ * `events` must already be sorted, because each seat's `eventTypes` is the order
+ * the player will actually be asked in.
+ */
+function buildSeatTurns(
+  before: SeatSnapshot[],
+  after: SeatSnapshot[],
   events: PressureEvent[],
+  podHits: PodHit[],
   counterArmed: CounterArmed | null,
   clock: ClockState | null,
-  podHits: PodHit[],
+): SeatTurn[] {
+  return livingSeats(after).map((seat) => {
+    const opening = before.find((s) => s.id === seat.id) ?? seat;
+    const hit = podHits.find((h) => h.attackerId === seat.id);
+    return {
+      seatId: seat.id,
+      eventTypes: events.filter((e) => e.seatId === seat.id).map((e) => e.type),
+      podHit: hit ? { defenderId: hit.defenderId, damage: hit.damage } : null,
+      threatFrom: opening.threat,
+      threatTo: seat.threat,
+      creaturesFrom: opening.silhouette.creatures,
+      creaturesTo: seat.silhouette.creatures,
+      powerFrom: opening.silhouette.power,
+      powerTo: seat.silhouette.power,
+      armed: counterArmed?.seatId === seat.id,
+      clockOwner: clock?.seatId === seat.id,
+    };
+  });
+}
+
+/**
+ * What one seat did, in the voice the table would use. The card is the fact
+ * worth carrying: "casts Toxic Deluge" tells a reader more than "wipe" does, and
+ * the machine-readable version of the same window is in `notes` and `seatTurns`.
+ */
+function eventPhrase(event: PressureEvent, removalTarget: string | undefined): string {
+  const name = event.card?.name ?? event.type;
+  switch (event.type) {
+    case 'combat':
+      return `attacks for ${event.severity.damage}`;
+    case 'clock':
+      return `sets up ${name} (win after turn ${event.severity.deadlineTurn})`;
+    case 'removal':
+      return removalTarget ? `casts ${name} on ${removalTarget}` : `casts ${name}`;
+    // A tax is already on the table by the time it costs anything, so a seat
+    // does not "cast" it at you.
+    case 'resource':
+      return event.variant === 'tax' ? `taxes with ${name}` : `casts ${name}`;
+    default:
+      return `casts ${name}`;
+  }
+}
+
+/** A seat that asked nothing of the player: it either grew, or it did not. */
+function idlePhrase(seatTurn: SeatTurn): string {
+  if (
+    seatTurn.threatTo === seatTurn.threatFrom &&
+    seatTurn.creaturesTo === seatTurn.creaturesFrom &&
+    seatTurn.powerTo === seatTurn.powerFrom
+  ) {
+    return 'passes';
+  }
+  return (
+    `builds (${seatTurn.threatFrom.toFixed(1)}→${seatTurn.threatTo.toFixed(1)}, ` +
+    `${seatTurn.creaturesTo}c/${seatTurn.powerTo}p)`
+  );
+}
+
+/**
+ * The window as one line of table-talk: the turn it precedes, then each living
+ * seat's turn in order, then what the pod is still representing. Segments are
+ * joined with ` · `, which is what the run log splits on to print the cycle a
+ * turn per line.
+ */
+function buildSummary(
+  turn: number,
+  seatTurns: SeatTurn[],
+  events: PressureEvent[],
+  removalTarget: string | undefined,
+  counterArmed: CounterArmed | null,
+  clock: ClockState | null,
 ): string {
-  const boards = livingSeats(seats)
-    .map((s) => `${s.id} ${s.threat.toFixed(1)}/${s.silhouette.creatures}c ${s.silhouette.power}p`)
-    .join(', ');
-  const parts = [`Opponent window before turn ${turn}: ${boards || 'no seats left'}`];
-  if (events.length > 0) parts.push(events.map((e) => e.type).join(' + '));
-  else parts.push('no events');
-  for (const hit of podHits) {
-    parts.push(`${hit.attackerId} hits ${hit.defenderId} for ${hit.damage}`);
+  const parts = [`Before turn ${turn}`];
+  if (seatTurns.length === 0) parts.push('no seats left');
+
+  for (const seatTurn of seatTurns) {
+    const did = events
+      .filter((e) => e.seatId === seatTurn.seatId)
+      .map((e) => eventPhrase(e, removalTarget));
+    if (seatTurn.podHit) {
+      did.push(`hits ${seatTurn.podHit.defenderId} for ${seatTurn.podHit.damage}`);
+    }
+    if (did.length === 0) did.push(idlePhrase(seatTurn));
+    parts.push(`${seatTurn.seatId}: ${did.join(', ')}`);
   }
+
   if (counterArmed) {
-    parts.push(`Seat ${counterArmed.seatId} counters at ${counterArmed.threshold}+ mana`);
+    parts.push(`${counterArmed.seatId} holds up counters at ${counterArmed.threshold}+`);
   }
-  if (clock) parts.push(`clock: Seat ${clock.seatId} by turn ${clock.deadlineTurn}`);
+  // Only for a clock that was already ticking. A clock that spawned this window
+  // is in its owner's turn above, with the same deadline on it, and printing it
+  // twice reads as two clocks.
+  if (clock && !events.some((e) => e.type === 'clock')) {
+    parts.push(`clock: ${clock.seatId} by turn ${clock.deadlineTurn}`);
+  }
   return parts.join(' · ');
 }
 

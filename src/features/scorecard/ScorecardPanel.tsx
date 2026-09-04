@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { getDeck } from '../../db/db';
 import { aggregateProfile, compareScorecards } from '../../engine/scorecard';
 import type { EventLedgerRow, Scorecard } from '../../engine/scorecard';
+import { reviewPatterns } from '../../engine/review';
+import type { FindingKind, Review } from '../../engine/review';
 import type { Deck, RunResult } from '../../domain/types';
 import { useUiStore } from '../../state/uiStore';
 import { normalizeSweep, sweepWord } from '../pressure/pressureUi';
@@ -35,6 +37,17 @@ const RESULT_CLASS: Record<RunResult, string> = {
   loss: 'is-loss',
   concede: 'is-concede',
   abandoned: 'is-abandoned',
+};
+
+/**
+ * The same three words `ReviewSection` prints, for the same reason: the kind is
+ * a word before it is a colour. Declared here rather than imported from that
+ * file, which exports a component and nothing else.
+ */
+const KIND_WORD: Record<FindingKind, string> = {
+  miss: 'MISS',
+  good: 'GOOD',
+  note: 'NOTE',
 };
 
 const CLOCK_WORD: Record<string, string> = {
@@ -325,8 +338,11 @@ function Seats({ card }: { card: Scorecard }) {
   );
 }
 
-function Profile({ cards }: { cards: Scorecard[] }) {
+function Profile({ cards, reviews }: { cards: Scorecard[]; reviews: Review[] }) {
   const profile = useMemo(() => aggregateProfile(cards), [cards]);
+  // What the runs keep saying, as opposed to what they averaged. The figures
+  // above are the deck's shape; this is the sentence that repeats.
+  const patterns = useMemo(() => reviewPatterns(reviews), [reviews]);
 
   if (cards.length < 2) {
     return (
@@ -436,6 +452,34 @@ function Profile({ cards }: { cards: Scorecard[] }) {
               {tag}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Nothing at all when no code recurs: "play more runs for a profile"
+          already covers a history too short to have a tendency, and an empty
+          heading would read as a deck with no problems rather than as a deck
+          with too little evidence. */}
+      {patterns.length > 0 && (
+        <div className="sc-patterns">
+          <h4 className="panel-heading">
+            Patterns · {reviews.length} {reviews.length === 1 ? 'run' : 'runs'}
+          </h4>
+          <ul className="sc-review-list">
+            {patterns.map((pattern) => (
+              <li key={pattern.code} className={`sc-review-row is-${pattern.kind}`}>
+                <span className="sc-review-kind">{KIND_WORD[pattern.kind]}</span>
+                <span className="sc-review-body">
+                  <span className="sc-review-title">
+                    {pattern.title}{' '}
+                    <span className="sc-dim num">
+                      · {pattern.runs} of {pattern.of} runs
+                    </span>
+                  </span>
+                  <span className="sc-review-detail">{pattern.sampleDetail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </>
@@ -776,7 +820,11 @@ export default function ScorecardPanel() {
 
       <section className="sc-section">
         <h3 className="panel-heading">Deck profile</h3>
-        {deckRuns ? <Profile cards={deckRuns.cards} /> : <p className="sc-empty">Scoring…</p>}
+        {deckRuns ? (
+          <Profile cards={deckRuns.cards} reviews={deckRuns.reviews} />
+        ) : (
+          <p className="sc-empty">Scoring…</p>
+        )}
         <p className="sc-hint">Replay the seed after a deck edit to compare like for like.</p>
       </section>
 

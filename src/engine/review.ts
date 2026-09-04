@@ -1,7 +1,8 @@
 import { REVIEW } from '../data/review';
+import { formatDuration } from '../domain/duration';
 import { isLandTypeLine } from '../domain/typeLine';
-import type { Scorecard } from './scorecard';
-import type { LogEntry, RosterEntry, RunRecord, ZoneId } from '../domain/types';
+import type { EventLedgerRow, Scorecard } from './scorecard';
+import type { LogEntry, RosterEntry, RunRecord, SeatId, ZoneId } from '../domain/types';
 
 /**
  * The review engine: what the run did right and wrong, read off the log by
@@ -26,7 +27,11 @@ import type { LogEntry, RosterEntry, RunRecord, ZoneId } from '../domain/types';
  * is not shared with `scoreRun`: the scorer tracks board value and never needs
  * to know what sat in hand or which lands were untapped, and this needs both.
  * What is *not* re-derived is anything the scorecard already computed — wipes,
- * per-turn deployment and the commander's first cast turn come off the card.
+ * per-turn deployment, per-seat damage and the commander's first cast turn come
+ * off the card. The pod findings follow the same split: the arithmetic is the
+ * card's `timeline[].damageBySeat` and its event ledger, and the log is read
+ * only for what the card does not carry — which seat held the clock, what threat
+ * each seat was showing, and the `seq` numbers to point at.
  */
 
 export type FindingKind = 'miss' | 'good' | 'note';
@@ -38,11 +43,17 @@ export type FindingCode =
   | 'commander-late'
   | 'overextended'
   | 'hate-stood'
+  | 'wrong-seat'
+  | 'clock-ignored'
+  | 'fed-counters'
+  | 'seat-unchecked'
+  | 'over-clock'
   | 'land-drops-hit'
   | 'commander-on-time'
   | 'fast-rebuild'
   | 'answered-under-pressure'
   | 'clock-beaten'
+  | 'clock-answered-with-damage'
   | 'hate-removed-fast';
 
 export interface ReviewFinding {
@@ -168,6 +179,28 @@ interface HazardSpan {
   seqs: number[];
 }
 
+/**
+ * One opponent window, as the log wrote it down. The pod's own numbers live
+ * nowhere else: the scorecard keeps what the seats *did*, and this keeps what
+ * they were showing while they did it.
+ */
+interface WindowRow {
+  /** The player turn the window sat immediately before. */
+  turn: number;
+  seq: number;
+  /** Threat per seat as the window closed. Empty on a log that wrote none. */
+  threatBySeat: Map<string, number>;
+}
+
+/** A turn the player spent longer over than the shot clock allowed. */
+interface OvertimeTurn {
+  /** The turn that ran long — the one the timing was recorded against. */
+  turn: number;
+  /** Wall-clock seconds it took, as the store rounded them. */
+  seconds: number;
+  seq: number;
+}
+
 interface Replay {
   /** Indexed by turn, 1-based; index 0 is unused. Sparse only before turn 1. */
   snapshots: (TurnSnapshot | undefined)[];
@@ -193,10 +226,31 @@ interface Replay {
   wipeSeqs: Map<number, number>;
   /** Every hate piece that stood, in the order the pieces landed. */
   hazards: HazardSpan[];
+  /** Every opponent window, in the order they resolved. */
+  windows: WindowRow[];
+  /** Per turn: the `seq` of the window that ran immediately before it. */
+  windowSeqByTurn: Map<number, number>;
+  /** Per turn: the seat holding the race clock through it, when one held it. */
+  clockOwnerByTurn: Map<number, string>;
+  /**
+   * Per turn, then per seat: `seq` of every entry that took life off that seat.
+   * Evidence only. Bucketed by seat rather than kept as one list per turn
+   * because the clock findings are each about one seat: "nothing was sent at it"
+   * pointing at the hits on the other two seats is not evidence of anything.
+   */
+  damageSeqsBySeat: Map<number, Map<SeatId, number[]>>;
+  /** Per event id: `seq` of every entry that event wrote. */
+  eventSeqs: Map<string, number[]>;
+  /** Turns the player declared held interaction against a clock, to their `seq`. */
+  interactionSeqs: Map<number, number>;
   /** `seq` of the first entry that put a commander on the battlefield. */
   firstCommanderSeq: number | null;
   /** Printed mana value of the cheapest commander in the roster. */
   commanderMv: number | null;
+  /** The shot clock the run was started under, in seconds, or null for none. */
+  shotClockSeconds: number | null;
+  /** Turns the 'turn' entries flagged as over that clock, in the order they ran. */
+  overtimeTurns: OvertimeTurn[];
   factsFor: (iid: string) => RosterEntry | null;
 }
 
@@ -283,6 +337,21 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
   const respondSeqs = new Map<number, number[]>();
   const wipeSeqs = new Map<number, number>();
   const hazardById = new Map<string, HazardSpan>();
+  const windows: WindowRow[] = [];
+  const windowSeqByTurn = new Map<number, number>();
+  const clockOwnerByTurn = new Map<number, string>();
+  const damageSeqsBySeat = new Map<number, Map<SeatId, number[]>>();
+  const eventSeqs = new Map<string, number[]>();
+  const interactionSeqs = new Map<number, number>();
+  let shotClockSeconds: number | null = null;
+  const overtimeTurns: OvertimeTurn[] = [];
+  // A life change some later entry took back never happened, exactly as the
+  // scorer reads it — so it is not evidence of damage either.
+  const undone = new Set<number>();
+  for (const entry of log) {
+    const of = readNumber(entry.payload, 'undoOf');
+    if (of !== undefined) undone.add(of);
+  }
   let firstCommanderSeq: number | null = null;
   let lastTurn = 1;
   let lastSeq = 0;
@@ -291,10 +360,21 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
   /** Phase the run's own end entry was written in, `null` for a record with none. */
   let endPhase: string | null = null;
 
-  function push(map: Map<number, number[]>, turn: number, seq: number): void {
-    const list = map.get(turn);
+  /** Append a `seq` to a bucket, keyed by turn or by event id. */
+  function push<K>(map: Map<K, number[]>, key: K, seq: number): void {
+    const list = map.get(key);
     if (list) list.push(seq);
-    else map.set(turn, [seq]);
+    else map.set(key, [seq]);
+  }
+
+  /** The same, one level deeper: a hit on one seat, on one turn. */
+  function pushDamage(turn: number, seatId: SeatId, seq: number): void {
+    let bySeat = damageSeqsBySeat.get(turn);
+    if (!bySeat) {
+      bySeat = new Map();
+      damageSeqsBySeat.set(turn, bySeat);
+    }
+    push(bySeat, seatId, seq);
   }
 
   function takeSnapshot(turn: number, seq: number): void {
@@ -414,25 +494,86 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
         const previous = readNumber(p, 'previousTurn') ?? entry.turn - 1;
         takeSnapshot(previous, entry.seq);
         if (previous >= 1) closedTurns.add(previous);
+        // Timing rides on the same entry, and for the same reason: the turn is
+        // only over once the next one begins. The store writes `overtime` only
+        // when a clock was on and the turn beat it, so no comparison is redone
+        // here — the reading is the one the player watched on the bar.
+        if (previous >= 1 && isTrue(p, 'overtime')) {
+          overtimeTurns.push({
+            turn: previous,
+            seconds: readNumber(p, 'previousTurnSeconds') ?? 0,
+            seq: entry.seq,
+          });
+        }
         break;
       }
 
       case 'window': {
+        const beforeTurn = readNumber(p, 'windowBeforeTurn') ?? entry.turn + 1;
         // A seat holding up interaction taxes the turn that is about to begin.
         if (hasObject(p, 'counterArmed')) {
-          const turn = readNumber(p, 'windowBeforeTurn') ?? entry.turn + 1;
-          windowTaxedTurns.add(turn);
-          armedWindowTurn = turn;
+          windowTaxedTurns.add(beforeTurn);
+          armedWindowTurn = beforeTurn;
         } else {
           // The window reported nothing held up, so there is no live arm left to
           // take back if a seat dies later.
           armedWindowTurn = null;
+        }
+        // What the seats were showing going into that turn, and who was holding
+        // the race clock over it. Both are written only here.
+        const threatBySeat = new Map<string, number>();
+        const seated = p.seats;
+        if (Array.isArray(seated)) {
+          for (const item of seated) {
+            if (item === null || typeof item !== 'object' || Array.isArray(item)) continue;
+            const bag = item as Payload;
+            const id = readString(bag, 'id');
+            const threat = readNumber(bag, 'threat');
+            if (id !== undefined && threat !== undefined) threatBySeat.set(id, threat);
+          }
+        }
+        windows.push({ turn: beforeTurn, seq: entry.seq, threatBySeat });
+        windowSeqByTurn.set(beforeTurn, entry.seq);
+        const clockPayload = readObject(p, 'clock');
+        const clockSeat = clockPayload && readString(clockPayload, 'seatId');
+        if (clockSeat) clockOwnerByTurn.set(beforeTurn, clockSeat);
+        break;
+      }
+
+      case 'life': {
+        // Evidence for the damage the scorecard already tallied: the entries the
+        // player's own hits were logged as, per turn.
+        if (readNumber(p, 'undoOf') !== undefined || undone.has(entry.seq)) break;
+        // A hit the seat cannot be named for is dropped rather than filed under
+        // the turn at large: unattributed, it could only ever be cited as damage
+        // at some seat or other, which is the reading this bucketing exists to
+        // stop. The scorer reads the same two keys the same way.
+        const seatId = readString(p, 'seatId') ?? readString(p, 'target');
+        const delta = readNumber(p, 'delta');
+        if (isSeatId(seatId) && delta !== undefined && delta < 0) {
+          pushDamage(entry.turn, seatId, entry.seq);
+        }
+        break;
+      }
+
+      case 'damage': {
+        // A seat swinging at another seat is not the player's damage, and the
+        // scorecard keeps it out of `damageBySeat`; it is not evidence here.
+        if (isTrue(p, 'podCombat') || undone.has(entry.seq)) break;
+        const reason = readString(p, 'reason');
+        if (reason === 'life' || reason === 'commander-damage') break;
+        const hitSeat = readString(p, 'seatId');
+        if (isSeatId(hitSeat) && (readNumber(p, 'amount') ?? 0) > 0) {
+          pushDamage(entry.turn, hitSeat, entry.seq);
         }
         break;
       }
 
       case 'event': {
         const eventId = readString(p, 'eventId');
+        // An event is logged more than once — queued, intercepted, resolved — so
+        // its evidence is every entry it wrote, not the first one.
+        if (eventId) push(eventSeqs, eventId, entry.seq);
         // A canceled event belonged to a seat that was eliminated before the
         // player was ever asked to answer it. `engine/scorecard.ts` drops it from
         // the ledger for that reason, and a turn cannot be taxed by it either.
@@ -506,6 +647,10 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
         // The end entry carries the phase the run stopped in; a run that reached
         // 'end' played its last turn out.
         if (readString(p, 'result') !== undefined) endPhase = entry.phase;
+        // The start entry carries the shot clock the run was played under. A
+        // record written before the clock existed has none, and the finding
+        // below has nothing to say about it.
+        else shotClockSeconds = readNumber(p, 'shotClockSeconds') ?? null;
         break;
       }
 
@@ -524,6 +669,13 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
             span.seqs.push(entry.seq);
           }
           break;
+        }
+        // The one answer aimed at the clock itself rather than at a prompt. It
+        // is still interaction spent on the table, so it stays in `respondSeqs`;
+        // it is kept apart as well because "nothing was sent at the clock" has
+        // to mean nothing at all, declarations included.
+        if (readString(p, 'reason') === 'declared-interaction' && !interactionSeqs.has(entry.turn)) {
+          interactionSeqs.set(entry.turn, entry.seq);
         }
         push(respondSeqs, entry.turn, entry.seq);
         break;
@@ -551,8 +703,16 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
     respondSeqs,
     wipeSeqs,
     hazards: [...hazardById.values()],
+    windows,
+    windowSeqByTurn,
+    clockOwnerByTurn,
+    damageSeqsBySeat,
+    eventSeqs,
+    interactionSeqs,
     firstCommanderSeq,
     commanderMv,
+    shotClockSeconds,
+    overtimeTurns,
     factsFor,
   };
 }
@@ -578,6 +738,26 @@ function plural(n: number, one: string, many: string): string {
 
 function uniqueSorted(values: number[]): number[] {
   return [...new Set(values)].sort((a, b) => a - b);
+}
+
+const SEAT_IDS: SeatId[] = ['A', 'B', 'C'];
+
+function isSeatId(value: string | undefined): value is SeatId {
+  return value === 'A' || value === 'B' || value === 'C';
+}
+
+/** "Seat C", "Seat B and Seat C". */
+function seatList(ids: SeatId[]): string {
+  if (ids.length === 0) return 'no other seat';
+  if (ids.length === 1) return `Seat ${ids[0]}`;
+  const head = ids.slice(0, -1).map((id) => `Seat ${id}`);
+  return `${head.join(', ')} and Seat ${ids[ids.length - 1]}`;
+}
+
+/** The spell a counter event took, when the ledger row says which. */
+function counteredName(row: EventLedgerRow): string | null {
+  const value = row.outcome?.counteredName;
+  return typeof value === 'string' ? value : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -911,6 +1091,247 @@ export function reviewRun(run: RunRecord, card: Scorecard, options?: ReviewOptio
     });
   }
 
+  // --- the race clock, and where the damage went ----------------------------
+  // The miss and the good come out of one span because they are one reading:
+  // over the turns the clock was live, how much of what the deck dealt reached
+  // the seat that was about to win. Damage is the card's, per turn and per seat;
+  // the log supplies only the owner and the seqs. Nothing here claims the owner
+  // was reachable — evasion, blockers and colours are not counted.
+  const clockSpan = (() => {
+    const c = card.clock;
+    if (!c.faced || c.spawnedTurn === null) return null;
+    const from = c.spawnedTurn;
+    // The span ends where the clock did, not where its deadline said it would.
+    // A clock cleared on T5 with a deadline of T7 was gone for T6 and T7, and
+    // damage sent then was not damage sent under it.
+    //
+    // The clearing turn itself is *inside* the span: the clock stood for the
+    // part of that turn before the elimination or the declaration, and the log
+    // does not order a turn's hits finely enough to split it. So the choice is
+    // the generous one, and it is the same choice everywhere — the miss, the
+    // good and the ignored reading all run to the same `to`.
+    //
+    // `clearedTurn` arrived in scorecard version 5; the type guard is what keeps
+    // an older card from turning the whole span into NaN.
+    const cleared = typeof c.clearedTurn === 'number' ? c.clearedTurn : null;
+    const to = Math.min(c.deadlineTurn ?? lastTurn, lastTurn, cleared ?? Infinity);
+    if (to < from) return null;
+
+    let owner: SeatId | null = null;
+    for (let turn = from; turn <= to && owner === null; turn++) {
+      const seat = replay.clockOwnerByTurn.get(turn);
+      if (isSeatId(seat)) owner = seat;
+    }
+    // Only the window entries say whose clock it was. A log without them (an
+    // older run, an imported one) leaves the span unreadable, and a finding
+    // about "the wrong seat" that cannot name the right one is not a finding.
+    if (owner === null) return null;
+
+    const damage: Record<SeatId, number> = { A: 0, B: 0, C: 0 };
+    // Three buckets rather than one, because the three findings below are about
+    // three different things and each may only point at its own.
+    const windowSeqs: number[] = [];
+    const ownerDamageSeqs: number[] = [];
+    const offDamageSeqs: number[] = [];
+    let interactionSeq: number | null = null;
+    for (let turn = from; turn <= to; turn++) {
+      const row = card.timeline[turn - 1];
+      if (row) for (const id of SEAT_IDS) damage[id] += row.damageBySeat[id] ?? 0;
+      const windowSeq = replay.windowSeqByTurn.get(turn);
+      if (windowSeq !== undefined) windowSeqs.push(windowSeq);
+      for (const [id, seqs] of replay.damageSeqsBySeat.get(turn) ?? []) {
+        if (id === owner) ownerDamageSeqs.push(...seqs);
+        else offDamageSeqs.push(...seqs);
+      }
+      const declared = replay.interactionSeqs.get(turn);
+      if (declared !== undefined && interactionSeq === null) interactionSeq = declared;
+    }
+    const off = SEAT_IDS.filter((id) => id !== owner);
+    return {
+      from,
+      to,
+      owner,
+      damage,
+      ownerDamage: damage[owner],
+      offDamage: off.reduce((sum, id) => sum + damage[id], 0),
+      offSeats: off.filter((id) => damage[id] > 0),
+      interactionSeq,
+      windowSeqs,
+      ownerDamageSeqs,
+      offDamageSeqs,
+    };
+  })();
+
+  if (clockSpan) {
+    const { from, to, owner, ownerDamage, offDamage, offSeats } = clockSpan;
+    const { windowSeqs, ownerDamageSeqs, offDamageSeqs } = clockSpan;
+    const outcome = card.clock.outcome;
+
+    if (outcome === 'expired' && ownerDamage === 0 && clockSpan.interactionSeq === null) {
+      drafts.push({
+        code: 'clock-ignored',
+        kind: 'miss',
+        turns: [from, to],
+        title: 'Let the clock run out untouched',
+        detail:
+          `Seat ${owner} spawned the clock on T${from} with a deadline of T${to}. ` +
+          `Nothing was sent at it in that span and no interaction was declared.`,
+        // The windows the clock ran through, and the owner's own damage — of
+        // which the gate above guarantees there is none. It is cited anyway
+        // because the citation is defined by the seat the finding is about, not
+        // by the gate that happens to keep it empty.
+        evidence: [...windowSeqs, ...ownerDamageSeqs],
+        impact: 12,
+      });
+    } else if (
+      // A run that was won answered the race, whatever the damage split looked
+      // like on the way, and so did one where the owner left the table — by the
+      // player's damage or by the interaction they held up for it. Only a clock
+      // still standing or already run out can have been raced at the wrong seat.
+      // `clock-ignored` wins over this one outright: a clock that ran out is the
+      // whole story of the run, not a split of the damage.
+      card.result !== 'win' &&
+      outcome !== 'won' &&
+      outcome !== 'eliminated-seat' &&
+      outcome !== 'declared-interaction' &&
+      offDamage >= REVIEW.clock.wrongSeatMinDamage
+    ) {
+      drafts.push({
+        code: 'wrong-seat',
+        kind: 'miss',
+        turns: [from, to],
+        title: 'Hit the wrong seat under the clock',
+        detail:
+          `Seat ${owner} held the clock from T${from}; ${offDamage} damage went to ` +
+          `${seatList(offSeats)} in that span, ${ownerDamage} to Seat ${owner}.`,
+        evidence: [...offDamageSeqs, ...windowSeqs],
+        impact: 9,
+      });
+    }
+
+    const dealt = ownerDamage + offDamage;
+    if (
+      outcome === 'eliminated-seat' ||
+      (outcome === 'won' && ownerDamage > 0 && ownerDamage * 2 >= dealt)
+    ) {
+      const seat = card.seats.find((s) => s.seatId === owner);
+      const killedTurn = seat?.eliminatedTurn ?? null;
+      drafts.push({
+        code: 'clock-answered-with-damage',
+        kind: 'good',
+        turns: [from, to],
+        title: `Turned on the clock's owner`,
+        detail:
+          killedTurn !== null
+            ? `Seat ${owner} held the clock from T${from} and was gone by T${killedTurn}.`
+            : dealt > 0
+              ? `Seat ${owner} held the clock from T${from} and took ${ownerDamage} of the ${dealt} damage dealt in that span.`
+              : // A seat the log says was eliminated without recording the hits.
+                `Seat ${owner} held the clock from T${from} and did not survive it.`,
+        evidence: [...ownerDamageSeqs, ...windowSeqs],
+        impact: 6,
+      });
+    }
+  }
+
+  // --- cast into open counters ----------------------------------------------
+  // What the seat was showing and what it took, both off the ledger. The log
+  // records the counter and the spell, never the hand it was cast out of, so
+  // the finding stops at the count and says so.
+  const countered = card.events
+    .filter((row) => row.type === 'counter' && row.terminal === 'resolved')
+    .sort((a, b) => a.turn - b.turn || a.eventId.localeCompare(b.eventId));
+  if (countered.length >= REVIEW.counters.minCountered) {
+    const counteredTurns = countered.map((row) => row.turn);
+    const seats = [...new Set(countered.map((row) => row.seatId))].sort();
+    const thresholds = [...new Set(countered.map((row) => row.severity.threshold ?? 0))].sort(
+      (a, b) => a - b,
+    );
+    const names = [...new Set(countered.map(counteredName).filter((n): n is string => n !== null))];
+    const shown =
+      thresholds.length === 1
+        ? `${thresholds[0]}+`
+        : `${thresholds[0]}+ to ${thresholds[thresholds.length - 1]}+`;
+    drafts.push({
+      code: 'fed-counters',
+      kind: 'miss',
+      turns: counteredTurns,
+      title: `Cast into open counters ${countered.length} times`,
+      detail:
+        `${turnListCapped(counteredTurns)}${names.length > 0 ? ` — ${names.join(', ')}` : ''}. ` +
+        `${seats.length === 1 ? `Seat ${seats[0]} was` : 'The seats were'} showing ${shown} mana up ` +
+        `${countered.length === 2 ? 'both times' : 'each time'}. ` +
+        `The log does not know what else was castable.`,
+      evidence: countered.flatMap((row) => replay.eventSeqs.get(row.eventId) ?? []),
+      impact: countered.length * 3,
+    });
+  }
+
+  // --- a seat nobody touched ------------------------------------------------
+  // A note, not a miss. A seat left alone may have been the right read — the
+  // clock was elsewhere, or its board was the one the deck could not answer —
+  // and the log knows only that it was showing a big number and took nothing.
+  for (const seatId of SEAT_IDS) {
+    const spans: WindowRow[][] = [];
+    let current: WindowRow[] = [];
+    for (const window of replay.windows) {
+      const threat = window.threatBySeat.get(seatId);
+      const damage = card.timeline[window.turn - 1]?.damageBySeat[seatId] ?? 0;
+      if (threat !== undefined && threat >= REVIEW.threat.uncheckedMin && damage === 0) {
+        current.push(window);
+        continue;
+      }
+      if (current.length > 0) spans.push(current);
+      current = [];
+    }
+    if (current.length > 0) spans.push(current);
+
+    const longest = spans
+      .filter((span) => span.length >= REVIEW.threat.uncheckedWindows)
+      .sort((a, b) => b.length - a.length || a[0].turn - b[0].turn)[0];
+    if (!longest) continue;
+    const from = longest[0].turn;
+    const to = longest[longest.length - 1].turn;
+    drafts.push({
+      code: 'seat-unchecked',
+      kind: 'note',
+      turns: [from, to],
+      title: `Seat ${seatId} ran away with it`,
+      detail:
+        `Threat ${REVIEW.threat.uncheckedMin}+ for ${longest.length} windows from T${from} ` +
+        `with nothing sent its way.`,
+      evidence: longest.map((window) => window.seq),
+      impact: longest.length * 2,
+      suffix: seatId,
+    });
+  }
+
+  // --- turns that ran long --------------------------------------------------
+  // A note, and never a miss. The shot clock is a drill the player asked for,
+  // and a turn that beat it is a fact about the clock rather than a mistake at
+  // the table: the log knows how long the turn took and nothing whatever about
+  // why. So this names the turns, quotes the worst one against the limit, and
+  // stops. The clock never touched the rng, so nothing about the run itself
+  // reads differently for having been timed.
+  if (
+    replay.shotClockSeconds !== null &&
+    replay.overtimeTurns.length >= REVIEW.shotClock.minOvertimeTurns
+  ) {
+    const limit = replay.shotClockSeconds;
+    const over = replay.overtimeTurns;
+    const worst = over.reduce((a, b) => (b.seconds > a.seconds ? b : a));
+    const turns = over.map((t) => t.turn);
+    drafts.push({
+      code: 'over-clock',
+      kind: 'note',
+      turns,
+      title: `Over the shot clock on ${turnListCapped(turns)}`,
+      detail: `Worst T${worst.turn} at ${formatDuration(worst.seconds)} against ${formatDuration(limit)}.`,
+      evidence: over.map((t) => t.seq),
+      impact: over.length,
+    });
+  }
+
   // --- the goods ------------------------------------------------------------
   const through = Math.min(REVIEW.landDrop.goodThroughTurn, gradedThrough);
   let allHit = through >= 1;
@@ -1046,4 +1467,105 @@ export function reviewRun(run: RunRecord, card: Scorecard, options?: ReviewOptio
     })),
     footer: REVIEW.footer,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Patterns across runs
+// ---------------------------------------------------------------------------
+
+/**
+ * A finding code that keeps coming back. One run's review says what happened;
+ * this says what keeps happening, which is the only reading a deck profile can
+ * act on — a missed land drop is a game, four of them in six games is a curve.
+ *
+ * Deliberately not weighted by impact. A pattern is a count of runs, and
+ * comparing "how bad" across runs would need a scale the review does not have.
+ */
+export interface ReviewPattern {
+  code: FindingCode;
+  kind: FindingKind;
+  /** The generic phrase for the code, not any one run's title. */
+  title: string;
+  /** Reviews the code appeared in. */
+  runs: number;
+  /** Reviews looked at. */
+  of: number;
+  /** The most recent run's line for it, so the pattern still points at a game. */
+  sampleDetail: string;
+}
+
+/**
+ * The generic form of each finding, in the present tense of a deck rather than
+ * the past tense of a run. Every code has one, so a new code cannot quietly
+ * appear in a profile as an empty string.
+ */
+const PATTERN_TITLE: Record<FindingCode, string> = {
+  'land-drop': 'Misses land drops',
+  'mana-left': 'Leaves mana up',
+  'stuck-hand': 'Sits on cards in hand',
+  'commander-late': 'Commander lands late',
+  overextended: 'Deploys into wraths',
+  'hate-stood': 'Leaves hate pieces standing',
+  'wrong-seat': 'Hits the wrong seat under the clock',
+  'clock-ignored': 'Lets the clock run out',
+  'fed-counters': 'Casts into open counters',
+  'seat-unchecked': 'Leaves a seat unchecked',
+  'over-clock': 'Runs over the shot clock',
+  'land-drops-hit': 'Hits its land drops',
+  'commander-on-time': 'Commander lands on time',
+  'fast-rebuild': 'Rebuilds after a wrath',
+  'answered-under-pressure': 'Answers under pressure',
+  'clock-beaten': 'Beats the race clock',
+  'clock-answered-with-damage': "Turns on the clock's owner",
+  'hate-removed-fast': 'Removes hate pieces fast',
+};
+
+/** Misses first: what keeps going wrong is the reading a brewer acts on. */
+const KIND_RANK: Record<FindingKind, number> = { miss: 0, note: 1, good: 2 };
+
+/**
+ * Roll a deck's reviews into the codes that recur. Pure, and cheap: it reads the
+ * finished reviews, never the logs.
+ *
+ * `reviews` is expected newest first, the order `useDeckScorecards` hands its
+ * runs over in, because `sampleDetail` is the first occurrence found — the most
+ * recent run that produced the finding. A caller passing them oldest first gets
+ * the same patterns with the oldest line quoted.
+ *
+ * A review votes once per code however many findings of it it carries: two
+ * cards stuck in hand in one game is one game with a hand problem.
+ */
+export function reviewPatterns(reviews: Review[]): ReviewPattern[] {
+  const of = reviews.length;
+  if (of < REVIEW.patterns.minRuns) return [];
+
+  const seen = new Map<FindingCode, { kind: FindingKind; runs: number; sampleDetail: string }>();
+  for (const review of reviews) {
+    const counted = new Set<FindingCode>();
+    for (const finding of review.findings) {
+      if (counted.has(finding.code)) continue;
+      counted.add(finding.code);
+      const entry = seen.get(finding.code);
+      if (entry) entry.runs += 1;
+      else seen.set(finding.code, { kind: finding.kind, runs: 1, sampleDetail: finding.detail });
+    }
+  }
+
+  return [...seen]
+    .filter(
+      ([, entry]) =>
+        entry.runs >= REVIEW.patterns.minRuns && entry.runs / of >= REVIEW.patterns.minShare,
+    )
+    .map(([code, entry]) => ({
+      code,
+      kind: entry.kind,
+      title: PATTERN_TITLE[code],
+      runs: entry.runs,
+      of,
+      sampleDetail: entry.sampleDetail,
+    }))
+    .sort(
+      (a, b) =>
+        KIND_RANK[a.kind] - KIND_RANK[b.kind] || b.runs - a.runs || a.code.localeCompare(b.code),
+    );
 }

@@ -13,6 +13,7 @@
     "verify:review": "tsx scripts/verify-review.ts",
     "verify:share-image": "tsx scripts/verify-share-image.ts",
     "verify:engine": "tsx scripts/verify-engine.ts",
+    "verify:drill": "tsx scripts/verify-drill.ts",
     "probe:pressure": "tsx scripts/probe-pressure.ts",
     "judge": "tsx server/judge.ts",
     "judge:corpus": "tsx scripts/judge-corpus.ts",

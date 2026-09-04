@@ -37,7 +37,11 @@ import type {
  */
 
 /**
- * 4 — standing hate pieces and pod combat. `Scorecard.hazards` counts the pieces
+ * 5 — `ClockStats.clearedTurn`, the turn the race clock left the table. The
+ * review clamps the span it reads damage over to that turn, so a card scored
+ * before the field existed would have the review counting damage sent after the
+ * clock was already gone; the bump is what keeps such a card from being fed to
+ * it. 4 — standing hate pieces and pod combat. `Scorecard.hazards` counts the pieces
  * a run faced and how long each one stood, the ledger's hate rows say how each
  * one left the table, and `SeatOutcome.podDamageTaken` holds the damage seats
  * dealt each other — which is deliberately *not* damage the player dealt. 3
@@ -47,7 +51,7 @@ import type {
  * `EventTally.named`, `AnswerRate.namedRate` and the ledger's `answerCard`, when
  * answers first bound to the card that made them.
  */
-export const SCORECARD_VERSION = 4;
+export const SCORECARD_VERSION = 5;
 
 export interface TurnRow {
   turn: number;
@@ -186,6 +190,17 @@ export interface ClockStats {
   spawnedTurn: number | null;
   deadlineTurn: number | null;
   outcome: ClockOutcome | null;
+  /**
+   * The turn the clock left the table, by whichever route took it: the owner
+   * eliminated, held interaction declared, or the run won. `null` while it is
+   * still standing and on a clock that expired — neither of those ever left.
+   *
+   * It is here because the deadline is not the same fact: a clock cleared on T5
+   * with a deadline of T7 was gone for two of the turns the deadline covers, and
+   * anything reading "under the clock" off the deadline alone reads those two
+   * turns as pressure that was not there.
+   */
+  clearedTurn: number | null;
   beatClock: boolean;
 }
 
@@ -529,6 +544,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
     spawnedTurn: null,
     deadlineTurn: null,
     outcome: null,
+    clearedTurn: null,
     beatClock: false,
   };
   /** How the last clock left the table, if it did. */
@@ -1086,6 +1102,13 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
       clock.outcome === 'won' ||
       ((clock.outcome === 'eliminated-seat' || clock.outcome === 'declared-interaction') &&
         clearedInTime);
+    // Winning takes the clock off the table as surely as the other two routes,
+    // and it is the one route the log writes no turn for — the run's own last
+    // turn stands in for it.
+    clock.clearedTurn =
+      clock.outcome === 'expired' || clock.outcome === 'standing'
+        ? null
+        : (clockClearedTurn ?? readNumber(endPayload ?? {}, 'turns') ?? lastTurn);
   }
 
   return {

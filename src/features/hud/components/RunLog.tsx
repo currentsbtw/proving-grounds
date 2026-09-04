@@ -33,6 +33,11 @@ function eventClassOf(entry: LogEntry): string {
 /**
  * An opponent window renders as a separator rather than a line of prose: a rule
  * across the log with the turn it precedes, then the engine's summary beneath.
+ *
+ * The summary is one seat turn per ` · ` segment, so the segments are broken
+ * onto their own lines and the window reads down the log as the cycle of turns
+ * it was. The split is for display only — the entry's message is untouched, and
+ * everything that scores a run reads the payload rather than the prose.
  */
 function WindowSeparator({ entry }: { entry: LogEntry }) {
   const before = entry.payload.windowBeforeTurn;
@@ -42,7 +47,16 @@ function WindowSeparator({ entry }: { entry: LogEntry }) {
       <div className="hud-log-window-rule">
         <span>OPPONENT WINDOW → TURN {turn}</span>
       </div>
-      <div className="hud-log-window-sum">{entry.message}</div>
+      <div className="hud-log-window-sum">
+        {/* The rule above already names the turn, so the summary's own
+            "Before turn N" opener is the one segment not repeated. */}
+        {entry.message
+          .split(' · ')
+          .filter((segment, i) => !(i === 0 && segment.startsWith('Before turn ')))
+          .map((segment, i) => (
+            <span key={i}>{segment}</span>
+          ))}
+      </div>
     </div>
   );
 }

@@ -24,6 +24,20 @@
  *       the tax suppressed that turn's mana-left finding.
  *   E — stopped mid-turn, the way a concede or lethal damage stops one. The last
  *       turn is still owed its land drop and its mana, so nothing may name it.
+ *   G — a race clock, and where the damage went while it ran. Five of them: one
+ *       raced against the wrong seat, one left alone until it expired, one
+ *       turned on and won, one cleared by declaring held interaction and one
+ *       cleared by killing its owner. The last two keep sending damage after the
+ *       clock has left, which is the whole point of them: a span that runs to
+ *       the deadline regardless would count it. Which seat gets a clock and how
+ *       much the pod takes are the seed's business, so these are hand-written
+ *       like D and F.
+ *   H — spells cast into a seat's open counters, twice and then once.
+ *   I — a seat at 9.2 threat across three windows, once with nothing sent at it
+ *       and once with damage in the middle window that breaks the run.
+ *
+ * `reviewPatterns` is exercised last, over hand-built reviews: it reads finished
+ * reviews and never a log, so a run is the wrong fixture for it.
  *
  * The hand is staged card by card rather than left to the shuffle: a review
  * assertion about "the three-drop drawn on turn 2" needs that card to be a known
@@ -39,7 +53,14 @@
  */
 import { cardsInZone, isLandCard, useGameStore } from '../src/state/gameStore.ts';
 import { scoreRun } from '../src/engine/scorecard.ts';
-import { reviewRun, type Review, type ReviewFinding } from '../src/engine/review.ts';
+import {
+  reviewPatterns,
+  reviewRun,
+  type FindingCode,
+  type FindingKind,
+  type Review,
+  type ReviewFinding,
+} from '../src/engine/review.ts';
 import { REVIEW } from '../src/data/review.ts';
 import type {
   CardData,
@@ -51,6 +72,7 @@ import type {
   RosterEntry,
   RunRecord,
   RunResult,
+  SeatId,
 } from '../src/domain/types.ts';
 
 const SEED = process.argv[2] ?? 'review-verify';
@@ -680,12 +702,470 @@ function playHatePieceRun(seed: string, fate: HateFate): RunRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Run G — the race clock, and where the damage went
+// ---------------------------------------------------------------------------
+
+const POD: SeatId[] = ['A', 'B', 'C'];
+/** Low enough that "a seat ran away with it" has nothing to say about these runs. */
+const QUIET_THREAT = 4;
+/** A silhouette the window entries carry verbatim; nothing reads it here. */
+const QUIET_BOARD = { creatures: 2, power: 4, artifacts: 1, openMana: 3, bonusMana: 0 };
+
+const CLOCK_LANDS = ['clk-l1', 'clk-l2', 'clk-l3', 'clk-l4', 'clk-l5', 'clk-l6', 'clk-l7', 'clk-l8'];
+const CLOCK_ROSTER: Record<string, RosterEntry> = Object.fromEntries(
+  CLOCK_LANDS.map((iid) => [iid, rosterEntry(LAND)]),
+);
+const CLOCK_SPAWN = 5;
+const CLOCK_DEADLINE = 7;
+
+type ClockMode = 'wrong-seat' | 'ignored' | 'answered' | 'declared' | 'eliminated';
+
+interface ClockSpec {
+  owner: SeatId;
+  /** Last turn played. The expiry cuts one run a turn short of the others. */
+  lastTurn: number;
+  hits: { turn: number; seatId: SeatId; amount: number }[];
+  result: RunResult;
+  /**
+   * The turn the clock left the table before its deadline, and how. Everything
+   * the player did after it is outside the span the clock findings may read.
+   */
+  cleared?: { turn: number; by: 'declared-interaction' | 'elimination' };
+}
+
+const CLOCK_SPECS: Record<ClockMode, ClockSpec> = {
+  // 14 at seat C and 3 at the seat that was about to win.
+  'wrong-seat': {
+    owner: 'A',
+    lastTurn: 8,
+    hits: [
+      { turn: 5, seatId: 'C', amount: 6 },
+      { turn: 6, seatId: 'C', amount: 8 },
+      { turn: 6, seatId: 'A', amount: 3 },
+    ],
+    result: 'loss',
+  },
+  // Nothing at seat B at all, and ten at a seat that is not the clock — enough
+  // that `wrong-seat` would fire on its own, which is what makes this run an
+  // assertion about which of the two wins rather than about the fixture.
+  ignored: {
+    owner: 'B',
+    lastTurn: CLOCK_DEADLINE,
+    hits: [{ turn: 5, seatId: 'A', amount: 10 }],
+    result: 'loss',
+  },
+  // 12 of the 20 dealt in the span — 60% — at the clock's own seat.
+  answered: {
+    owner: 'A',
+    lastTurn: 8,
+    hits: [
+      { turn: 5, seatId: 'A', amount: 12 },
+      { turn: 6, seatId: 'C', amount: 8 },
+    ],
+    result: 'win',
+  },
+  // The reviewer's report: the same 14 at seat C as `wrong-seat`, but the clock
+  // was cleared by declaring held interaction on the turn it spawned. Eight of
+  // the fourteen land on T6, after the clock was already gone, so the span the
+  // findings read must stop at T5 and see only six — under the eight the miss
+  // needs even if the outcome did not rule it out on its own.
+  declared: {
+    owner: 'A',
+    lastTurn: 8,
+    hits: [
+      { turn: 5, seatId: 'C', amount: 6 },
+      { turn: 6, seatId: 'C', amount: 8 },
+    ],
+    result: 'loss',
+    cleared: { turn: CLOCK_SPAWN, by: 'declared-interaction' },
+  },
+  // The other route off the table: the clock's owner burned down on T6, and ten
+  // sent at seat C on T7 — a turn the clock no longer covers.
+  eliminated: {
+    owner: 'A',
+    lastTurn: 8,
+    hits: [
+      { turn: 6, seatId: 'A', amount: 40 },
+      { turn: 7, seatId: 'C', amount: 10 },
+    ],
+    result: 'loss',
+    cleared: { turn: 6, by: 'elimination' },
+  },
+};
+
+/**
+ * Eight land drops out of a hand of nothing else, so the only thing in the run
+ * worth a finding is the clock: a seat holds one from T5 with a deadline of T7,
+ * and the damage the player deals inside that span is the whole variable.
+ *
+ * Hand-written for the same reason D and F are — the seed decides which seat
+ * gets a clock and how hard the pod is hit, and no scripted run can put the same
+ * clock in front of three different outcomes.
+ */
+function playClockRun(seed: string, mode: ClockMode): RunRecord {
+  const spec = CLOCK_SPECS[mode];
+  const id = `verify-review-clock-${mode}`;
+  const log: LogEntry[] = [];
+  let turn = 1;
+  const life: Record<SeatId, number> = { A: 40, B: 40, C: 40 };
+
+  function add(kind: LogKind, message: string, payload: Record<string, unknown>, phase: Phase = 'main1'): void {
+    log.push({ seq: log.length + 1, turn, phase, kind, message, payload, at: 0 });
+  }
+
+  add('run', `Run started: Race Clock (seed ${seed})`, {
+    runId: id,
+    deckId: 'verify-review-deck',
+    deckName: 'Race Clock',
+    seed,
+    bracket: 3,
+    librarySize: CLOCK_LANDS.length,
+  });
+  add('draw', `Drew ${CLOCK_LANDS.length}`, {
+    iids: [...CLOCK_LANDS],
+    names: CLOCK_LANDS.map(() => LAND.name),
+    count: CLOCK_LANDS.length,
+  });
+
+  for (let i = 0; i < spec.lastTurn; i++) {
+    if (i > 0) {
+      // The window runs before the turn entry, while the counter still reads the
+      // turn that is ending — the shape `beginNextTurn` writes.
+      const upcoming = i + 1;
+      // A cleared clock is off the table, so the windows after it carry none —
+      // the same thing the store's window entries stop reporting.
+      const live =
+        upcoming >= CLOCK_SPAWN &&
+        upcoming <= CLOCK_DEADLINE &&
+        (spec.cleared === undefined || upcoming <= spec.cleared.turn);
+      add('window', `Window before turn ${upcoming}`, {
+        window: i,
+        windowBeforeTurn: upcoming,
+        seats: POD.map((sid) => ({ id: sid, threat: QUIET_THREAT, silhouette: QUIET_BOARD })),
+        eventTypes: [],
+        counterArmed: null,
+        clock: live
+          ? { seatId: spec.owner, spawnedTurn: CLOCK_SPAWN, deadlineTurn: CLOCK_DEADLINE }
+          : null,
+      });
+      turn = upcoming;
+      add('turn', `Turn ${turn}`, { turn, previousTurn: turn - 1 });
+    }
+    add('move', `${LAND.name} → battlefield`, {
+      iid: CLOCK_LANDS[i],
+      name: LAND.name,
+      from: 'hand',
+      to: 'battlefield',
+    });
+
+    for (const hit of spec.hits.filter((h) => h.turn === turn)) {
+      const before = life[hit.seatId];
+      life[hit.seatId] = before - hit.amount;
+      add('life', `Seat ${hit.seatId}: ${before} → ${life[hit.seatId]}`, {
+        target: hit.seatId,
+        seatId: hit.seatId,
+        delta: -hit.amount,
+        before,
+        after: life[hit.seatId],
+      });
+    }
+
+    // The clock leaving early, in the store's own shapes: `declareInteraction`
+    // writes one 'respond' entry, and an elimination writes the 'damage' entry
+    // that retires the seat followed by the 'threat' entry that cancels its
+    // clock. Either way everything after this turn is outside the span.
+    if (spec.cleared !== undefined && turn === spec.cleared.turn) {
+      if (spec.cleared.by === 'declared-interaction') {
+        add('respond', `Declared held interaction. Seat ${spec.owner}'s clock is answered.`, {
+          seatId: spec.owner,
+          deadlineTurn: CLOCK_DEADLINE,
+          spawnedTurn: CLOCK_SPAWN,
+          canceled: true,
+          reason: 'declared-interaction',
+        });
+      } else {
+        add('damage', `Seat ${spec.owner} eliminated`, {
+          seatId: spec.owner,
+          reason: 'life',
+          life: life[spec.owner],
+          commanderDamage: 0,
+          threatAtDeath: QUIET_THREAT,
+        });
+        add('threat', `Seat ${spec.owner} is out. Its race clock is canceled.`, {
+          seatId: spec.owner,
+          canceled: true,
+          reason: 'elimination',
+          deadlineTurn: CLOCK_DEADLINE,
+        });
+      }
+    }
+  }
+
+  if (mode === 'ignored') {
+    // The deadline passed in the window before the next turn, which is where the
+    // store ends the run rather than dealing another hand.
+    add('window', `Lost the race. Seat ${spec.owner} wins.`, {
+      window: spec.lastTurn,
+      windowBeforeTurn: turn + 1,
+      clockExpired: true,
+      clockSeatId: spec.owner,
+      deadlineTurn: CLOCK_DEADLINE,
+    });
+    add('run', `Lost the race. Seat ${spec.owner} won on the turn after turn ${CLOCK_DEADLINE}.`, {
+      reason: 'clock-expired',
+      seatId: spec.owner,
+      deadlineTurn: CLOCK_DEADLINE,
+      turn: turn + 1,
+    });
+  }
+  add('run', `Run ended: ${spec.result}`, { result: spec.result, endedAt: 0, turns: turn }, 'end');
+
+  return {
+    id,
+    deckId: 'verify-review-deck',
+    deckName: 'Race Clock',
+    seed,
+    bracket: 3,
+    startedAt: 0,
+    endedAt: 0,
+    result: spec.result,
+    roster: CLOCK_ROSTER,
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Run H — spells cast into open counters
+// ---------------------------------------------------------------------------
+
+const COUNTER_LANDS = ['ctr-l1', 'ctr-l2', 'ctr-l3', 'ctr-l4', 'ctr-l5', 'ctr-l6'];
+const COUNTER_ROSTER: Record<string, RosterEntry> = Object.fromEntries(
+  COUNTER_LANDS.map((iid) => [iid, rosterEntry(LAND)]),
+);
+const COUNTER_THRESHOLD = 3;
+/** The two spells seat B took, and the turns it took them on. */
+const COUNTERED = [
+  { eventId: 'evt-ctr-1', turn: 3, name: RANGER.name },
+  { eventId: 'evt-ctr-2', turn: 5, name: WARDEN.name },
+];
+
+/**
+ * Six land drops and nothing else, with `count` of the pod's counterspells
+ * resolving on the turns above. Hand-written because whether a seat holds up a
+ * counter — and whether the player walks into it — is the seed's business.
+ */
+function playCounterRun(seed: string, count: number): RunRecord {
+  const id = `verify-review-counters-${count}`;
+  const log: LogEntry[] = [];
+  let turn = 1;
+
+  function add(kind: LogKind, message: string, payload: Record<string, unknown>, phase: Phase = 'main1'): void {
+    log.push({ seq: log.length + 1, turn, phase, kind, message, payload, at: 0 });
+  }
+
+  add('run', `Run started: Open Counters (seed ${seed})`, {
+    runId: id,
+    deckId: 'verify-review-deck',
+    deckName: 'Open Counters',
+    seed,
+    bracket: 3,
+    librarySize: COUNTER_LANDS.length,
+  });
+  add('draw', `Drew ${COUNTER_LANDS.length}`, {
+    iids: [...COUNTER_LANDS],
+    names: COUNTER_LANDS.map(() => LAND.name),
+    count: COUNTER_LANDS.length,
+  });
+
+  for (let i = 0; i < COUNTER_LANDS.length; i++) {
+    if (i > 0) {
+      turn = i + 1;
+      add('turn', `Turn ${turn}`, { turn, previousTurn: turn - 1 });
+    }
+    add('move', `${LAND.name} → battlefield`, {
+      iid: COUNTER_LANDS[i],
+      name: LAND.name,
+      from: 'hand',
+      to: 'battlefield',
+    });
+
+    for (const spell of COUNTERED.slice(0, count).filter((s) => s.turn === turn)) {
+      const base = {
+        eventId: spell.eventId,
+        eventType: 'counter',
+        seatId: 'B',
+        eventTurn: turn,
+        card: 'Counterspell',
+        cardEffect: 'Counter target spell.',
+        severity: { threshold: COUNTER_THRESHOLD, manaValue: 3 },
+      };
+      add('event', `Seat B counters spells of ${COUNTER_THRESHOLD}+ mana value.`, {
+        ...base,
+        state: 'queued',
+        queued: true,
+      });
+      add('event', `${spell.name} countered.`, {
+        ...base,
+        state: 'resolved',
+        resolved: true,
+        outcome: { counteredIid: `ctr-spell-${spell.eventId}`, counteredName: spell.name, commander: 0 },
+      });
+    }
+  }
+
+  add('run', 'Run ended: loss', { result: 'loss', endedAt: 0, turns: turn }, 'end');
+
+  return {
+    id,
+    deckId: 'verify-review-deck',
+    deckName: 'Open Counters',
+    seed,
+    bracket: 3,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'loss',
+    roster: COUNTER_ROSTER,
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Run I — a seat nobody touched
+// ---------------------------------------------------------------------------
+
+const THREAT_LANDS = ['thr-l1', 'thr-l2', 'thr-l3', 'thr-l4', 'thr-l5', 'thr-l6', 'thr-l7'];
+const THREAT_ROSTER: Record<string, RosterEntry> = Object.fromEntries(
+  THREAT_LANDS.map((iid) => [iid, rosterEntry(LAND)]),
+);
+const THREAT_SEAT: SeatId = 'B';
+const THREAT_HIGH = 9.2;
+/** The three consecutive windows seat B holds that number over. */
+const THREAT_FROM = 3;
+const THREAT_TO = 5;
+/** The middle one, where the variant sends damage and breaks the run. */
+const THREAT_MIDDLE = 4;
+
+/**
+ * Seven land drops with windows before every turn. Seat B shows 9.2 across the
+ * windows before T3, T4 and T5 and a quiet number either side of them, so the
+ * run of qualifying windows is exactly three long. `hitMiddle` sends five
+ * damage at it inside that run, which must split it into two and silence the
+ * note.
+ */
+function playThreatRun(seed: string, hitMiddle: boolean): RunRecord {
+  const id = `verify-review-threat-${hitMiddle ? 'hit' : 'clean'}`;
+  const log: LogEntry[] = [];
+  let turn = 1;
+
+  function add(kind: LogKind, message: string, payload: Record<string, unknown>, phase: Phase = 'main1'): void {
+    log.push({ seq: log.length + 1, turn, phase, kind, message, payload, at: 0 });
+  }
+
+  add('run', `Run started: Unchecked Seat (seed ${seed})`, {
+    runId: id,
+    deckId: 'verify-review-deck',
+    deckName: 'Unchecked Seat',
+    seed,
+    bracket: 3,
+    librarySize: THREAT_LANDS.length,
+  });
+  add('draw', `Drew ${THREAT_LANDS.length}`, {
+    iids: [...THREAT_LANDS],
+    names: THREAT_LANDS.map(() => LAND.name),
+    count: THREAT_LANDS.length,
+  });
+
+  for (let i = 0; i < THREAT_LANDS.length; i++) {
+    if (i > 0) {
+      const upcoming = i + 1;
+      const loud = upcoming >= THREAT_FROM && upcoming <= THREAT_TO;
+      add('window', `Window before turn ${upcoming}`, {
+        window: i,
+        windowBeforeTurn: upcoming,
+        seats: POD.map((sid) => ({
+          id: sid,
+          threat: sid === THREAT_SEAT && loud ? THREAT_HIGH : QUIET_THREAT,
+          silhouette: QUIET_BOARD,
+        })),
+        eventTypes: [],
+        counterArmed: null,
+        clock: null,
+      });
+      turn = upcoming;
+      add('turn', `Turn ${turn}`, { turn, previousTurn: turn - 1 });
+    }
+    add('move', `${LAND.name} → battlefield`, {
+      iid: THREAT_LANDS[i],
+      name: LAND.name,
+      from: 'hand',
+      to: 'battlefield',
+    });
+
+    if (hitMiddle && turn === THREAT_MIDDLE) {
+      add('life', `Seat ${THREAT_SEAT}: 40 → 35`, {
+        target: THREAT_SEAT,
+        seatId: THREAT_SEAT,
+        delta: -5,
+        before: 40,
+        after: 35,
+      });
+    }
+  }
+
+  add('run', 'Run ended: loss', { result: 'loss', endedAt: 0, turns: turn }, 'end');
+
+  return {
+    id,
+    deckId: 'verify-review-deck',
+    deckName: 'Unchecked Seat',
+    seed,
+    bracket: 3,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'loss',
+    roster: THREAT_ROSTER,
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Patterns across runs
+// ---------------------------------------------------------------------------
+
+/**
+ * A review with nothing in it but the codes named. `reviewPatterns` reads
+ * finished reviews and never a log, so this is the whole fixture it needs — and
+ * it keeps the assertion about the counting rather than about what six scripted
+ * runs happened to flag.
+ */
+function fakeReview(runId: string, findings: { code: FindingCode; kind: FindingKind }[]): Review {
+  return {
+    version: REVIEW.version,
+    runId,
+    findings: findings.map((f) => ({
+      id: f.code,
+      code: f.code,
+      kind: f.kind,
+      turns: [],
+      title: f.code,
+      detail: `${f.code} in ${runId}`,
+      evidence: [],
+      impact: 1,
+    })),
+    footer: REVIEW.footer,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
 
 const failures: string[] = [];
+/** Every assertion attempted, so the run reports what it actually covered. */
+let checked = 0;
 
 function check(label: string, condition: boolean, detail = ''): void {
+  checked += 1;
   if (!condition) failures.push(detail ? `${label} — ${detail}` : label);
 }
 
@@ -1024,6 +1504,332 @@ function main(): void {
   );
   checkEqual('F‴: the scorecard counts the sweep', scoreRun(sweptRecord).hazards.swept, 1);
 
+  // --- run G: the race clock -----------------------------------------------
+  const wrongSeatRecord = playClockRun(`${SEED}-g`, 'wrong-seat');
+  const g = review(wrongSeatRecord);
+  const wrongCard = scoreRun(wrongSeatRecord);
+
+  summary.push('');
+  summary.push(
+    `run G (hand-written log, Seat ${CLOCK_SPECS['wrong-seat'].owner}'s clock T${CLOCK_SPAWN}-T${CLOCK_DEADLINE}, 14 damage sent at Seat C)`,
+  );
+  summary.push(...describe(g));
+
+  checkEqual('G: the scorecard sees the clock', wrongCard.clock.spawnedTurn, CLOCK_SPAWN);
+  checkEqual('G: and its deadline', wrongCard.clock.deadlineTurn, CLOCK_DEADLINE);
+  checkEqual('G: the clock was never cleared', wrongCard.clock.outcome, 'standing');
+  checkEqual(
+    'G: the damage landed where the script sent it',
+    wrongCard.seats.map((s) => [s.seatId, s.damageDealt]),
+    [['A', 3], ['B', 0], ['C', 14]],
+  );
+
+  const wrongSeat = find(g, 'wrong-seat');
+  check('G: the wrong seat is reported', wrongSeat !== undefined, 'no wrong-seat finding');
+  checkEqual('G: it is a miss', wrongSeat?.kind, 'miss');
+  checkEqual('G: it spans the clock', wrongSeat?.turns, [CLOCK_SPAWN, CLOCK_DEADLINE]);
+  checkEqual(
+    'G: the detail names the owner, the off-seat damage and the owner damage',
+    wrongSeat?.detail,
+    'Seat A held the clock from T5; 14 damage went to Seat C in that span, 3 to Seat A.',
+  );
+  check(
+    'G: a clock that was never ignored is not reported as ignored',
+    find(g, 'clock-ignored') === undefined,
+    'clock-ignored on a clock that took 3 damage',
+  );
+  check(
+    'G: and no good is claimed for turning on it',
+    find(g, 'clock-answered-with-damage') === undefined,
+    'clock-answered-with-damage on a standing clock',
+  );
+  checkEvidence('G', g, wrongSeatRecord);
+
+  const ignoredRecord = playClockRun(`${SEED}-g`, 'ignored');
+  const gIgnored = review(ignoredRecord);
+  const ignoredCard = scoreRun(ignoredRecord);
+
+  summary.push('');
+  summary.push(
+    `run G' (the same clock on Seat ${CLOCK_SPECS.ignored.owner}, expired with nothing sent at it)`,
+  );
+  summary.push(...describe(gIgnored));
+
+  checkEqual("G': the clock expired", ignoredCard.clock.outcome, 'expired');
+  checkEqual("G': nothing reached its owner", ignoredCard.seats.find((s) => s.seatId === 'B')?.damageDealt, 0);
+  const ignored = find(gIgnored, 'clock-ignored');
+  check("G': the ignored clock is reported", ignored !== undefined, 'no clock-ignored finding');
+  checkEqual("G': it is a miss", ignored?.kind, 'miss');
+  checkEqual("G': it is titled plainly", ignored?.title, 'Let the clock run out untouched');
+  check(
+    "G': the detail names the owner and the deadline",
+    (ignored?.detail.includes('Seat B') ?? false) && (ignored?.detail.includes(`T${CLOCK_DEADLINE}`) ?? false),
+    ignored?.detail ?? '',
+  );
+  check(
+    "G': clock-ignored wins over wrong-seat on the same run",
+    find(gIgnored, 'wrong-seat') === undefined,
+    'both fired for one clock',
+  );
+  // "Nothing was sent at it" has to point at the clock's own seat. The damage
+  // evidence used to be one list per turn and seat-agnostic, so the ten sent at
+  // Seat A came back as the proof that nothing was sent at Seat B.
+  const offOwnerHits = new Set(
+    ignoredRecord.log
+      .filter((entry) => entry.kind === 'life' && entry.payload.seatId !== CLOCK_SPECS.ignored.owner)
+      .map((entry) => entry.seq),
+  );
+  check(
+    "G': the fixture really does hit another seat",
+    offOwnerHits.size > 0,
+    'nothing was sent anywhere — the check would pass vacuously',
+  );
+  check(
+    "G': the ignored clock cites no damage aimed at another seat",
+    (ignored?.evidence ?? []).every((seq) => !offOwnerHits.has(seq)),
+    `evidence ${ignored?.evidence.join(', ') ?? 'none'} against off-owner hits ${[...offOwnerHits].join(', ')}`,
+  );
+  checkEvidence("G'", gIgnored, ignoredRecord);
+
+  const answeredRecord = playClockRun(`${SEED}-g`, 'answered');
+  const gAnswered = review(answeredRecord);
+  const answeredCard = scoreRun(answeredRecord);
+
+  summary.push('');
+  summary.push("run G″ (the same clock, won with 12 of the 20 damage sent at its owner)");
+  summary.push(...describe(gAnswered));
+
+  checkEqual('G″: the run was won', answeredCard.clock.outcome, 'won');
+  const turned = find(gAnswered, 'clock-answered-with-damage');
+  check('G″: turning on the clock is credited', turned !== undefined, 'no clock-answered-with-damage');
+  checkEqual('G″: it is a good', turned?.kind, 'good');
+  checkEqual('G″: it is titled plainly', turned?.title, "Turned on the clock's owner");
+  check(
+    'G″: the detail shows the split',
+    turned?.detail.includes('took 12 of the 20 damage') ?? false,
+    turned?.detail ?? '',
+  );
+  check(
+    'G″: a won run is never told it hit the wrong seat',
+    find(gAnswered, 'wrong-seat') === undefined,
+    'wrong-seat on a won run',
+  );
+  checkEvidence('G″', gAnswered, answeredRecord);
+
+  // The reviewer's report: a clock the player cleared by declaring held
+  // interaction on T5, with the same 14 sent at Seat C the wrong-seat run
+  // sends. Eight of those land on T6, after the clock was already gone.
+  const declaredRecord = playClockRun(`${SEED}-g`, 'declared');
+  const gDeclared = review(declaredRecord);
+  const declaredCard = scoreRun(declaredRecord);
+
+  summary.push('');
+  summary.push(
+    `run G‴ (the same clock, cleared by declared interaction on T${CLOCK_SPAWN} with 14 still sent at Seat C)`,
+  );
+  summary.push(...describe(gDeclared));
+
+  checkEqual(
+    'G‴: the clock was answered by the declaration',
+    declaredCard.clock.outcome,
+    'declared-interaction',
+  );
+  checkEqual(
+    'G‴: and the card records the turn it left the table',
+    declaredCard.clock.clearedTurn,
+    CLOCK_SPAWN,
+  );
+  check(
+    'G‴: beating the race clock is credited',
+    find(gDeclared, 'clock-beaten') !== undefined,
+    'no clock-beaten finding',
+  );
+  check(
+    'G‴: a clock the player cleared is never told it hit the wrong seat',
+    find(gDeclared, 'wrong-seat') === undefined,
+    find(gDeclared, 'wrong-seat')?.detail ?? '',
+  );
+  check(
+    'G‴: nor that it was ignored',
+    find(gDeclared, 'clock-ignored') === undefined,
+    'clock-ignored on a clock that was answered',
+  );
+  checkEvidence('G‴', gDeclared, declaredRecord);
+
+  // The other route off the table: the owner burned down on T6, with ten sent at
+  // Seat C on T7 — a turn the clock no longer covers.
+  const eliminatedRecord = playClockRun(`${SEED}-g`, 'eliminated');
+  const gEliminated = review(eliminatedRecord);
+  const eliminatedCard = scoreRun(eliminatedRecord);
+  const clearedOn = CLOCK_SPECS.eliminated.cleared?.turn ?? 0;
+
+  summary.push('');
+  summary.push(
+    `run G⁗ (the same clock, its owner eliminated on T${clearedOn}, 10 sent at Seat C on T7)`,
+  );
+  summary.push(...describe(gEliminated));
+
+  checkEqual('G⁗: the clock left with its seat', eliminatedCard.clock.outcome, 'eliminated-seat');
+  checkEqual('G⁗: on the turn the seat died', eliminatedCard.clock.clearedTurn, clearedOn);
+  check(
+    'G⁗: damage sent after the clock was gone is not the wrong seat',
+    find(gEliminated, 'wrong-seat') === undefined,
+    find(gEliminated, 'wrong-seat')?.detail ?? '',
+  );
+  const turnedOn = find(gEliminated, 'clock-answered-with-damage');
+  check(
+    'G⁗: turning on the clock is credited',
+    turnedOn !== undefined,
+    'no clock-answered-with-damage finding',
+  );
+  checkEqual(
+    `G⁗: the span stops on T${clearedOn}, not at the T${CLOCK_DEADLINE} deadline`,
+    turnedOn?.turns,
+    [CLOCK_SPAWN, clearedOn],
+  );
+  const lateHit = eliminatedRecord.log.find(
+    (entry) => entry.kind === 'life' && entry.turn === 7 && entry.payload.seatId === 'C',
+  );
+  check(
+    'G⁗: and the T7 hit at Seat C is cited by nothing about the clock',
+    lateHit !== undefined &&
+      gEliminated.findings.every(
+        (f) => !f.code.startsWith('clock-') || !f.evidence.includes(lateHit.seq),
+      ),
+    `seq ${lateHit?.seq ?? '(the fixture never sent it)'}`,
+  );
+  checkEvidence('G⁗', gEliminated, eliminatedRecord);
+
+  // --- run H: open counters ------------------------------------------------
+  const twoCountersRecord = playCounterRun(`${SEED}-h`, 2);
+  const h = review(twoCountersRecord);
+
+  summary.push('');
+  summary.push(
+    `run H (hand-written log, ${COUNTERED.length} spells countered by Seat B at ${COUNTER_THRESHOLD}+)`,
+  );
+  summary.push(...describe(h));
+
+  const fed = find(h, 'fed-counters');
+  check('H: the countered spells are reported', fed !== undefined, 'no fed-counters finding');
+  checkEqual('H: it is a miss', fed?.kind, 'miss');
+  checkEqual(
+    'H: it names both turns',
+    fed?.turns,
+    COUNTERED.map((s) => s.turn),
+  );
+  check(
+    'H: the detail names the spells the seat took',
+    (fed?.detail.includes(RANGER.name) ?? false) && (fed?.detail.includes(WARDEN.name) ?? false),
+    fed?.detail ?? '',
+  );
+  check(
+    'H: and the threshold the seat was showing',
+    fed?.detail.includes(`showing ${COUNTER_THRESHOLD}+ mana up both times`) ?? false,
+    fed?.detail ?? '',
+  );
+  check(
+    'H: and admits it cannot see the rest of the hand',
+    fed?.detail.includes('does not know what else was castable') ?? false,
+    fed?.detail ?? '',
+  );
+  checkEvidence('H', h, twoCountersRecord);
+
+  const oneCounterRecord = playCounterRun(`${SEED}-h`, 1);
+  const hOne = review(oneCounterRecord);
+  check(
+    `H': one countered spell is under the threshold of ${REVIEW.counters.minCountered}`,
+    find(hOne, 'fed-counters') === undefined,
+    'fed-counters for a single countered spell',
+  );
+
+  // --- run I: a seat nobody touched ----------------------------------------
+  const uncheckedRecord = playThreatRun(`${SEED}-i`, false);
+  const iClean = review(uncheckedRecord);
+
+  summary.push('');
+  summary.push(
+    `run I (hand-written log, Seat ${THREAT_SEAT} at ${THREAT_HIGH} across the windows before T${THREAT_FROM}-T${THREAT_TO})`,
+  );
+  summary.push(...describe(iClean));
+
+  const unchecked = find(iClean, 'seat-unchecked');
+  check('I: the unchecked seat is reported', unchecked !== undefined, 'no seat-unchecked finding');
+  checkEqual('I: it is a note, not a miss', unchecked?.kind, 'note');
+  checkEqual('I: it names the seat', unchecked?.title, `Seat ${THREAT_SEAT} ran away with it`);
+  checkEqual('I: it spans the three windows', unchecked?.turns, [THREAT_FROM, THREAT_TO]);
+  checkEqual(
+    'I: the detail counts the windows',
+    unchecked?.detail,
+    `Threat ${REVIEW.threat.uncheckedMin}+ for ${REVIEW.threat.uncheckedWindows} windows from T${THREAT_FROM} with nothing sent its way.`,
+  );
+  checkEqual(
+    'I: only the loud seat earns one',
+    iClean.findings.filter((f) => f.code === 'seat-unchecked').length,
+    1,
+  );
+  checkEvidence('I', iClean, uncheckedRecord);
+
+  const hitRecord = playThreatRun(`${SEED}-i`, true);
+  const iHit = review(hitRecord);
+  check(
+    `I': damage in the middle window breaks the run`,
+    find(iHit, 'seat-unchecked') === undefined,
+    'seat-unchecked across a window the seat took damage in',
+  );
+
+  // --- patterns across runs -------------------------------------------------
+  // Newest first, the order `useDeckScorecards` hands its runs over in.
+  const history: Review[] = [
+    fakeReview('run-1', [
+      { code: 'land-drop', kind: 'miss' },
+      { code: 'mana-left', kind: 'miss' },
+    ]),
+    fakeReview('run-2', [
+      { code: 'land-drop', kind: 'miss' },
+      { code: 'mana-left', kind: 'miss' },
+    ]),
+    fakeReview('run-3', [{ code: 'land-drop', kind: 'miss' }]),
+    fakeReview('run-4', [{ code: 'land-drop', kind: 'miss' }]),
+    fakeReview('run-5', []),
+    fakeReview('run-6', []),
+  ];
+  const patterns = reviewPatterns(history);
+
+  summary.push('');
+  summary.push(`patterns (6 reviews: land-drop in 4, mana-left in 2)`);
+  for (const p of patterns) {
+    summary.push(`  ${p.kind.toUpperCase().padEnd(5)} ${p.title} · ${p.runs} of ${p.of} runs`);
+    summary.push(`        ${p.sampleDetail}`);
+  }
+
+  checkEqual('P: only the recurring code is a pattern', patterns.map((p) => p.code), ['land-drop']);
+  checkEqual('P: it counts 4 of 6 runs', [patterns[0]?.runs, patterns[0]?.of], [4, 6]);
+  checkEqual('P: it keeps the kind', patterns[0]?.kind, 'miss');
+  checkEqual('P: it is titled generically', patterns[0]?.title, 'Misses land drops');
+  checkEqual(
+    'P: the sample line comes off the most recent run that had it',
+    patterns[0]?.sampleDetail,
+    'land-drop in run-1',
+  );
+  checkEqual(
+    `P: fewer than ${REVIEW.patterns.minRuns} reviews is no pattern at all`,
+    reviewPatterns(history.slice(0, 2)),
+    [],
+  );
+  checkEqual(
+    'P: a code in half the runs but under the run floor is not a pattern',
+    reviewPatterns(history.slice(0, 4)).map((p) => p.code),
+    ['land-drop'],
+  );
+  // Two of the four carry mana-left, which is exactly half — and two runs, under
+  // the floor. The share alone must not be enough.
+  checkEqual(
+    'P: and the share alone does not carry it',
+    reviewPatterns(history.slice(0, 4)).some((p) => p.code === 'mana-left'),
+    false,
+  );
+
   // --- output --------------------------------------------------------------
   console.log('\nverify:review');
   console.log('─'.repeat(72));
@@ -1034,11 +1840,11 @@ function main(): void {
   console.log('─'.repeat(72));
 
   if (failures.length > 0) {
-    console.log(`${failures.length} check(s) FAILED:`);
+    console.log(`${failures.length} of ${checked} check(s) FAILED:`);
     for (const failure of failures) console.log(`  ✗ ${failure}`);
     throw new Error(`${failures.length} review check(s) failed`);
   }
-  console.log('all checks passed');
+  console.log(`all ${checked} checks passed`);
 }
 
 main();

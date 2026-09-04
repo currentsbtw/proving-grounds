@@ -66,6 +66,12 @@ interface FrameProps {
   armedThreshold: number | null;
   hit: boolean;
   /**
+   * Whether the event in front of the player came out of this seat's turn. The
+   * window drains in turn order, so exactly one seat is acting at a time and the
+   * frame says which — with the word TURN, never the rule alone.
+   */
+  acting: boolean;
+  /**
    * Whether the HIT chip is printed. A narrow frame has no room for a third
    * chip beside CLOCK and ARMED, and the accent already runs round the whole
    * frame; the reading in `aria-label` is unconditional either way.
@@ -95,6 +101,7 @@ export default function SeatFrame({
   hasClock,
   armedThreshold,
   hit,
+  acting,
   showHit,
   pinned,
   onTogglePin,
@@ -166,6 +173,7 @@ export default function SeatFrame({
 
   const states = [
     dead ? 'out' : null,
+    !dead && acting ? 'taking its turn' : null,
     !dead && hasClock ? 'clock' : null,
     !dead && armedThreshold !== null ? `armed, counters ${armedThreshold} or more mana` : null,
     // The pieces are named rather than counted: "holding Blood Moon" is the
@@ -199,7 +207,10 @@ export default function SeatFrame({
       <button
         type="button"
         className={
-          'hud-frame pg-pane' + (dead ? ' is-out' : '') + (hit && !dead ? ' is-hit' : '')
+          'hud-frame pg-pane' +
+          (dead ? ' is-out' : '') +
+          (acting && !dead ? ' is-acting' : '') +
+          (hit && !dead ? ' is-hit' : '')
         }
         aria-expanded={pinned}
         aria-label={label}
@@ -229,6 +240,10 @@ export default function SeatFrame({
 
           <span className="rd-chips" aria-hidden="true">
             {dead && <span className="rd-chip is-out">OUT</span>}
+            {/* Whose turn the player is answering. The word is the signal; the
+                rule down the frame's edge only agrees with it. */}
+            {/* Same width rule as HIT: a narrow frame keeps the is-acting rule and drops the chip. */}
+            {!dead && acting && showHit && <span className="rd-chip is-turn">TURN</span>}
             {!dead && hasClock && <span className="rd-chip is-clock">CLOCK</span>}
             {!dead && armedThreshold !== null && (
               <span className="rd-chip is-armed">ARMED {armedThreshold}+</span>

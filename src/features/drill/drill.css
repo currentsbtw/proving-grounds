@@ -1,0 +1,145 @@
+/* The hand drill, in the centre panel between runs. It borrows the rail's
+   quiet buttons, inputs and error block and the readout's key square rather
+   than reprinting them: a drill is the same kneeboard as everything else, just
+   with seven cards on it. */
+
+.dr-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dr-head,
+.dr-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dr-head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.dr-head-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.dr-seed-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dr-seed {
+  width: 11ch;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+/* Printed slot: the label sits beside its figure here, the way the player bar
+   sets them, because the drill's readings are a row and not a grid. */
+.dr-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.dr-slot-value {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* Seven cards, side by side and never overlapping: there is room for the whole
+   hand in the centre panel, and a drill about reading a hand must not hide any
+   of it. */
+.dr-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dr-count {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.dr-calls {
+  display: flex;
+  gap: 8px;
+}
+
+/* Square, outlined, key square inside — the readout's turn actions, which is
+   what these are: the two things this screen is waiting for. */
+.dr-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 110px;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 4px 9px;
+}
+
+.dr-tally {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dr-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.dr-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: right;
+  max-width: 320px;
+}
+
+.dr-table caption {
+  text-align: left;
+  padding-bottom: 6px;
+}
+
+.dr-table th,
+.dr-table td {
+  padding: 3px 10px 3px 0;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+
+.dr-table thead th {
+  color: var(--muted);
+}
+
+.dr-table tbody th {
+  color: var(--ink);
+}
+
+.dr-table tbody tr:last-child th,
+.dr-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.dr-note {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}

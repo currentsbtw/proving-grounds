@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { formatDuration } from '../../domain/duration';
 import { PHASE_LABELS } from '../../domain/phases';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { commanderTax, isLandCard, useGameStore } from '../../state/gameStore';
@@ -34,13 +36,51 @@ function turnsLabel(remaining: number): string {
 }
 
 /** Printed label, tabular figure, optional caption — the readout's unit, laid on its side. */
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub }: { label: string; value: string; sub?: ReactNode }) {
   return (
     <div className="hud-stat">
       <span className="rd-label">{label}</span>
       <span className="hud-stat-value num">{value}</span>
       {sub && <span className="hud-stat-sub">{sub}</span>}
     </div>
+  );
+}
+
+/**
+ * The shot clock, counting down and then up. Mounted only while a run is being
+ * played against one, so a run with no clock pays nothing for it — not the
+ * interval, not the slot.
+ *
+ * It reads two figures the store already holds and writes nothing back. A
+ * countdown that logged, or that pushed a second into state, would put a line
+ * in the run log for every second the player spent thinking, and the log is the
+ * product (PRODUCT.md principle 3).
+ *
+ * OVER is a word, not a colour: the reading says which side of the limit it is
+ * on before any ink does.
+ */
+function ShotClock({ seconds, startedAt }: { seconds: number; startedAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const spent = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const over = spent > seconds;
+  const reading = over ? `OVER ${formatDuration(spent - seconds)}` : formatDuration(seconds - spent);
+
+  // A span in the TURN stat's caption rather than a slot of its own: a slot
+  // wide enough for "OVER 0:12" was what squeezed the race clock reading out of
+  // the bar at 1440, and the time a turn has taken is a fact about the turn.
+  return (
+    <span
+      className={'hud-shot num' + (over ? ' is-over' : '')}
+      title={`Shot clock: ${formatDuration(seconds)} a turn`}
+    >
+      {reading}
+    </span>
   );
 }
 
@@ -67,6 +107,8 @@ export default function PlayerBar({
   const life = useGameStore((s) => s.playerLife);
   const turnStartLife = useGameStore((s) => s.turnStartLife);
   const clock = useGameStore((s) => s.clock);
+  const shotClockSeconds = useGameStore((s) => s.shotClockSeconds);
+  const turnStartedAt = useGameStore((s) => s.turnStartedAt);
   const nextPhase = useGameStore((s) => s.nextPhase);
   const nextTurn = useGameStore((s) => s.nextTurn);
   const undoLastLifeChange = useGameStore((s) => s.undoLastLifeChange);
@@ -128,7 +170,23 @@ export default function PlayerBar({
 
   return (
     <section className="hud-bar" aria-label="You">
-      <Stat label="TURN" value={String(turn)} sub={PHASE_LABELS[phase]} />
+      {/* The shot clock rides in the turn's caption. Remounted on every turn
+          (keyed on the turn's start stamp), so the countdown restarts from the
+          limit without the component having to watch for the turn changing. */}
+      <Stat
+        label="TURN"
+        value={String(turn)}
+        sub={
+          shotClockSeconds !== null ? (
+            <>
+              {PHASE_LABELS[phase]} ·{' '}
+              <ShotClock key={turnStartedAt} seconds={shotClockSeconds} startedAt={turnStartedAt} />
+            </>
+          ) : (
+            PHASE_LABELS[phase]
+          )
+        }
+      />
       {/* "open / lands" under the word MANA needs no caption to say so, and the
           caption was the width that broke the bar onto a second row. */}
       <Stat label="MANA" value={mana} />

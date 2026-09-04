@@ -196,7 +196,11 @@
   width: 10px;
 }
 
+/* One line per seat turn, stacked: a window is a cycle of turns, and reading it
+   as a single wrapped sentence hid where one seat stopped and the next began. */
 .hud-log-window-sum {
+  display: flex;
+  flex-direction: column;
   margin-top: 2px;
   padding-left: 18px;
   font-size: 12px;
