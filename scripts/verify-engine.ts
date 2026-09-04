@@ -10,7 +10,7 @@
  *
  *   npm run verify:engine
  *
- * Sixteen checks, each labelled:
+ * Seventeen checks, each labelled:
  *
  *   (a) a seat with a queued event is eliminated — the event leaves the queue,
  *       the log says it was canceled, and the scorecard never lists it
@@ -65,6 +65,11 @@
  *       and the same seed answering the same way replays byte for byte
  *   (p) the three seats are three different archetypes, and the "Seats seated"
  *       entry carries each seat's profile into the log
+ *   (q) the counter-arming clamp keeps the holder's archetype: at the bracket
+ *       and player threat where the roll sits hardest against its ceiling, a
+ *       control seat arms more often than an unmodified one and an aggro seat
+ *       less, nothing exceeds `profileCeiling`, and the unmodified seat lands
+ *       exactly where the pre-clamp formula put it
  *
  * (a) to (c), (h), (i), (k), (l) and (o) need a run where the pod actually did the thing
  * being tested, so each one searches seeds until it finds one and prints which
@@ -84,12 +89,13 @@ import {
 } from '../src/state/gameStore.ts';
 import { scoreRun } from '../src/engine/scorecard.ts';
 import { reviewRun } from '../src/engine/review.ts';
-import { PRESSURE } from '../src/data/pressure.ts';
+import { PRESSURE, byBracket } from '../src/data/pressure.ts';
 import { ALL_COLORS, PROFILE_IDS, type SeatProfileId } from '../src/data/profiles.ts';
 import { createRng } from '../src/domain/rng.ts';
 import {
   chooseCounterCitation,
   colorsOf,
+  counterArmChance,
   emptySilhouette,
   initialThreat,
   resolveWindow,
@@ -2940,6 +2946,60 @@ function checkSeatsCarryDistinctProfiles(): void {
   );
 }
 
+// ---------------------------------------------------------------------------
+// (q) the counter-arming clamp keeps the holder's archetype
+// ---------------------------------------------------------------------------
+/**
+ * Pure arithmetic, no store: `counterArmChance` at bracket 5 against a player
+ * at maximum threat, which is the hardest the roll ever presses on its ceiling
+ * and therefore where a multiplier applied before that ceiling used to vanish.
+ * The three profiles have to come out ordered, none of them past
+ * `profileCeiling`, and the unmodified one has to sit exactly where the old
+ * formula put it — the fix is meant to free the multipliers, not to move the
+ * seat that never had one.
+ */
+function checkCounterArmClamp(): void {
+  const BRACKET_HERE = 5;
+  const THREAT_HERE = PRESSURE.threat.max;
+  const control = counterArmChance(BRACKET_HERE, THREAT_HERE, 1.5);
+  const neutral = counterArmChance(BRACKET_HERE, THREAT_HERE, 1.0);
+  const aggro = counterArmChance(BRACKET_HERE, THREAT_HERE, 0.2);
+
+  check(
+    '(q) a control seat arms more often than an unmodified one',
+    control > neutral,
+    `${control} vs ${neutral}`,
+  );
+  check(
+    '(q) an aggro seat arms less often than an unmodified one',
+    neutral > aggro,
+    `${neutral} vs ${aggro}`,
+  );
+  check(
+    '(q) nothing arms past the profile ceiling',
+    [control, neutral, aggro].every((v) => v <= PRESSURE.profileCeiling),
+    `${control}, ${neutral}, ${aggro}`,
+  );
+
+  // What the engine computed before the profile multiplier moved after the cap.
+  const armScale =
+    PRESSURE.counter.playerThreatBase + THREAT_HERE * PRESSURE.counter.playerThreatPer;
+  const before = Math.min(
+    Math.max(byBracket(PRESSURE.counter.armChance, BRACKET_HERE) * armScale, 0),
+    PRESSURE.counter.max,
+  );
+  check(
+    '(q) an unmodified seat did not move',
+    neutral === before,
+    `${neutral} vs ${before}`,
+  );
+
+  summary.push(
+    `(q) bracket ${BRACKET_HERE} at threat ${THREAT_HERE}: control ${control.toFixed(3)} > neutral ` +
+      `${neutral.toFixed(3)} (unmoved) > aggro ${aggro.toFixed(3)}, ceiling ${PRESSURE.profileCeiling}`,
+  );
+}
+
 function checkDeterminism(): void {
   const seed = 'engine-determinism';
   const first = normalizeLog(scriptedRun(seed));
@@ -2987,6 +3047,7 @@ async function main(): Promise<void> {
   await checkPaidTaxIsNotNameable();
   await checkCounterCitationColors();
   checkSeatsCarryDistinctProfiles();
+  checkCounterArmClamp();
   checkDeterminism();
 
   console.log('\nverify:engine');

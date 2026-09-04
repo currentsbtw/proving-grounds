@@ -276,7 +276,16 @@ function foldRun(run: RunRecord, roster: Record<string, RosterEntry>, accs: Map<
         const single = readString(p, 'iid');
         // Mills log one entry for the whole batch, with `iids` and no `iid`.
         const moved = single ? [single] : readStringArray(p, 'iids');
+        // A token that left the battlefield ceased to exist, so it has no zone
+        // to move to. `scorecard.ts` and `review.ts` read the flag the same way;
+        // no roster instance ever carries it, so this only keeps the three
+        // replayers reading one log by one rule.
+        const tokenGone = isTrue(p, 'tokenGone');
         for (const iid of moved) {
+          if (tokenGone) {
+            zones.delete(iid);
+            continue;
+          }
           const from = zones.get(iid);
           if (from === undefined || from === to) continue;
           if (from === 'library' && to === 'hand') {

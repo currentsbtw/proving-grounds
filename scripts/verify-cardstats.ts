@@ -16,7 +16,7 @@
  *
  *   npm run verify:cardstats [seed]
  *
- * Two deliberate constraints on the script:
+ * Three deliberate choices in the script:
  *
  *  - It answers exactly one event per run, with an instant out of hand, and
  *    resolves every other one. Resolving is the harsher path and the one
@@ -24,9 +24,19 @@
  *    single answer is what puts the other spend on the table: a card leaving the
  *    hand for the graveyard because it was held up is a card that was cast, and
  *    the card the answer named. Neither reading has any other way in.
+ *  - From turn `BOUNCE_TURN` it puts its biggest permanent back in hand and
+ *    recasts it. No seed offers that on its own, and without it `castRate` above
+ *    100% — a card cast twice on one draw — is a branch nothing ever walks.
  *  - It never calls `declareInteraction`, so a race clock can run out and end
  *    the run early. That is a legitimate outcome, so every loop checks
  *    `store().run` and stops rather than pretending the turn happened.
+ *
+ * What it then asserts: every per-card tally (`drawn`, `cast`, `firstCastTurns`,
+ * `stuckAtEnd`, `removedBySeat`, `discardedOrSacrificed`, `answeredWith`) against
+ * the oracle's, that `cast` never outruns what reached the hand, that the bounce
+ * really produced a card cast more often than it was drawn, that the tokens the
+ * script makes and the wipes sweep never become rows, and that the ordering
+ * helpers, the rosterless-run skip and the empty history all behave.
  *
  * Failures are collected rather than thrown one at a time, so a bad run reports
  * everything wrong in a single pass. The process exits non-zero if any failed.
@@ -46,20 +56,29 @@ import {
   sortCardStats,
   type CardStat,
 } from '../src/engine/cardStats.ts';
-import type { CardData, Deck, RunRecord, RunResult } from '../src/domain/types.ts';
+import type {
+  CardData,
+  CardInstance,
+  Deck,
+  RunRecord,
+  RunResult,
+  ZoneId,
+} from '../src/domain/types.ts';
 
 /**
  * The default seed is deliberate: its two runs offer wraths, targeted removal
  * and a resource attack the script hands a card to, so `removedBySeat` and
  * `discardedOrSacrificed` are both exercised, and each run finds an instant to
- * hold up so `answeredWith` is too. A bounce that puts the board back in hand —
- * the one way a card can be cast more often than it was drawn — is rarer than
- * any seed can be relied on for; the summary says out loud when a path went
- * untested. Any other seed still checks the store against the log.
+ * hold up so `answeredWith` is too. The bounce that puts a permanent back in hand
+ * — the one way a card can be cast more often than it was drawn — is not left to
+ * the seed: the script performs it, so that reading is checked whatever seed is
+ * handed in. Any other seed still checks the store against the log.
  */
 const SEED = process.argv[2] ?? 'cardstats-verify-7';
 const TURNS = 10;
 const BRACKET = 4;
+/** The turn from which the script bounces its biggest permanent and recasts it. */
+const BOUNCE_TURN = 7;
 
 // ---------------------------------------------------------------------------
 // A synthetic 99 + 1 deck
@@ -374,13 +393,21 @@ function playLand(): void {
   if (land) store().moveCard(land.iid, 'battlefield');
 }
 
+/**
+ * The highest-mana nonland card in a zone, by iid. `Array.prototype.sort` is
+ * stable, so equal mana values keep the zone's own order.
+ */
+function biggestIn(zone: ZoneId, keep?: (c: CardInstance) => boolean): string | null {
+  const state = store();
+  const card = cardsInZone(state, zone)
+    .filter((c) => !isLandCard(state, c) && (keep?.(c) ?? true))
+    .sort((a, b) => manaValueOf(state, b) - manaValueOf(state, a))[0];
+  return card?.iid ?? null;
+}
+
 /** The biggest spell in hand, so the deployment is not all one-drops. */
 function biggestSpell(): string | null {
-  const state = store();
-  const spell = cardsInZone(state, 'hand')
-    .filter((c) => !isLandCard(state, c))
-    .sort((a, b) => manaValueOf(state, b) - manaValueOf(state, a))[0];
-  return spell?.iid ?? null;
+  return biggestIn('hand');
 }
 
 /**
@@ -447,6 +474,27 @@ function playScriptedRun(seed: string, mulligans: number): RunRecord {
           if (store().run) store().resolveTop();
         }
         drainEvents();
+      }
+    }
+
+    // Bounce and replay. From `BOUNCE_TURN` on, the biggest permanent the player
+    // put down goes back to hand and is recast the same turn — the pod's
+    // Evacuation, scripted. It is the only way a card can be cast more often
+    // than the deck showed it, and no seed can be relied on to offer it, so the
+    // script does it itself rather than reporting the path untested.
+    if (turn >= BOUNCE_TURN && store().run) {
+      const target = biggestIn('battlefield', (c) => !c.isCommander && !c.isToken);
+      if (target) {
+        store().moveCard(target, 'hand');
+        // Recast this card rather than leaving it to `biggestSpell()` next turn,
+        // which would happily pick a fresh draw instead and leave the replay to
+        // chance. Guarded on the bounce having landed, and a seat can still
+        // counter the replay — the card stays in hand then, and the next turn
+        // bounces whatever else is on the board.
+        if (store().cards[target]?.zone === 'hand') {
+          store().moveCard(target, 'battlefield');
+          drainEvents();
+        }
       }
     }
 
@@ -640,10 +688,32 @@ function main(): void {
   if (pitchedTotal === 0) {
     console.log('note: no resource attack took a card, so discardedOrSacrificed is untested');
   }
+  // The bounce path. A card put back in hand and recast was cast twice on one
+  // draw, so its rate climbs past 100% — the reading `castRate` exists to allow
+  // and the one the `cast <= drawn + bounced` inequality above is really testing.
   const bouncedTotal = [...deckOracle.bounced.values()].reduce((a, b) => a + b, 0);
-  if (bouncedTotal === 0) {
-    console.log('note: nothing was bounced to hand, so cast-more-often-than-drawn is untested');
+  check('a card was bounced back to hand', bouncedTotal >= 1, `${bouncedTotal} bounced`);
+  const replayed = stats.cards.filter((c) => !c.isCommander && c.castRate !== null && c.castRate > 1);
+  check(
+    'a bounced card was cast more often than it was drawn',
+    replayed.length >= 1,
+    'every card was cast at most as often as it was drawn',
+  );
+  if (replayed.length > 0) {
+    console.log(
+      `note: cast more often than drawn — ${replayed
+        .map((c) => `${c.name} (${c.cast} cast, ${c.drawn} drawn)`)
+        .join(', ')}`,
+    );
   }
+  // Tokens are not roster entries and must never reach the table: the script
+  // makes Soldiers on turn 5 and the wipes sweep them away with `tokenGone`,
+  // which the replayer has to read without inventing a card nobody can cut.
+  check(
+    'no token has a row',
+    !stats.cards.some((c) => c.name === 'Soldier'),
+    'the token showed up as a card',
+  );
 
   // --- determinism ---------------------------------------------------------
   checkEqual('tallying the same records twice is stable', cardStats(records), stats);

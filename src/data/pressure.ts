@@ -91,6 +91,14 @@ export const PRESSURE = {
    * near a cap comes out differently, so a version-4 seed does not replay
    * identically.
    *
+   * Version 6 gives the counterspell arming roll the same shape (see
+   * `counterArmChance`). The bracket-agnostic ceiling that was a literal in the
+   * engine is now `counter.max`, the roll is capped against it first, and the
+   * holder's `counterArmMult` scales the capped value under `profileCeiling` —
+   * so a control seat (1.5x) is no longer pinned to the same chance as an
+   * unmodified one. Seeds where the arming roll sat near that cap do not replay
+   * identically; the hazard rolls are untouched.
+   *
    * Two files share this version rather than carrying their own. Changing a
    * multiplier in `src/data/profiles.ts` bumps it, because those numbers are
    * read straight off these curves. Editing `src/data/citations.ts` bumps it
@@ -99,7 +107,7 @@ export const PRESSURE = {
    * seed's stream from that window on. `CITATIONS_VERSION` in that file tracks
    * the table's own revision and must move with this number.
    */
-  version: 5,
+  version: 6,
 
   /**
    * Hard ceiling on a hazard's per-window probability after its seat's profile
@@ -223,6 +231,14 @@ export const PRESSURE = {
     startTurn: [5, 4, 3, 2, 2] as BracketTable,
     /** Chance a seat is armed for the coming turn, before the player-threat scale. */
     armChance: [0.06, 0.14, 0.24, 0.36, 0.55] as BracketTable,
+    /**
+     * Bracket-agnostic ceiling on how often a pod holds up a counter, before
+     * the holder's profile: however scary the player looks, no bracket ever
+     * represents interaction in more than 90% of its windows. The holder's
+     * `counterArmMult` is applied after it, under `profileCeiling` — see
+     * `counterArmChance`.
+     */
+    max: 0.9,
     /** Mana value at or above which an armed seat counters. */
     threshold: [6, 5, 4, 4, 3] as BracketTable,
     playerThreatBase: 0.6,

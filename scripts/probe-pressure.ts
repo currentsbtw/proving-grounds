@@ -18,11 +18,12 @@
  * Three of the checks are rules rather than bands, and fail the probe on their
  * own however well the curves fit: no event fires without a card citation, no
  * seat cites a card outside its colour identity (events and the counter pick
- * both), and `neutral` is never dealt to a seat. The last row of `TARGETS` is a
- * rule wearing a band — `archetypeGap` measures how much more often the aggro
- * seat attacks than the control seat, per bracket, because every other metric
- * here sums over the whole table and would happily pass with three identical
- * seats at it.
+ * both), and `neutral` is never dealt to a seat. The last two rows of `TARGETS`
+ * are rules wearing bands — `archetypeGap` measures how much more often the
+ * aggro seat attacks than the control seat and `counterArmGap` how much more
+ * often the control seat holds up a counter than the stax seat, per bracket,
+ * because every other metric here sums over the whole table and would happily
+ * pass with three identical seats at it.
  *
  * The player is a fiction, and every number below is a consequence of that
  * fiction as much as of the engine, so the assumptions are printed with the
@@ -187,6 +188,8 @@ interface Tally {
    */
   seatRunsHere: ProfileCounts;
   combat6to10Here: ProfileCounts;
+  /** Windows this archetype spent holding up a counter, *at this bracket*. */
+  armedHere: ProfileCounts;
 }
 
 function freshTally(): Tally {
@@ -215,6 +218,7 @@ function freshTally(): Tally {
     citationMissing: 0,
     seatRunsHere: zeroProfileCounts(),
     combat6to10Here: zeroProfileCounts(),
+    armedHere: zeroProfileCounts(),
   };
 }
 
@@ -444,7 +448,13 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
     }
     clock = result.clock;
     counterArmed = result.counterArmed;
-    if (counterArmed) tally.counterArmedWindows += 1;
+    if (counterArmed) {
+      tally.counterArmedWindows += 1;
+      // Attributed to the seat actually holding it up, the same way an event is
+      // attributed to the seat that cast it — see the `counterArmGap` metric.
+      const armedProfile = seats.find((s) => s.id === counterArmed?.seatId)?.profile;
+      if (armedProfile) tally.armedHere[armedProfile] += 1;
+    }
 
     for (const event of result.events) {
       // Combat is the silhouette turning sideways rather than a spell; every
@@ -671,19 +681,62 @@ const TARGETS: Metric[] = [
     band: 1.1,
     bands: [2.5, 1.8, 1.1, 0.8, 1.1],
     targets: [7.0, 5.8, 3.8, 2.8, 3.7],
-    value: (t) => combatRatio(t, 'aggro', 'control'),
+    value: (t) => profileRatio(t.combat6to10Here, t.seatRunsHere, 'aggro', 'control'),
+  },
+  {
+    // The same rule as `archetypeGap`, pointed at the other half of the engine:
+    // the counter-arming roll had the version-4 shape long after the hazards
+    // were fixed, so a control seat at bracket 5 against a scary player hit the
+    // same 0.9 ceiling as a seat with no multiplier at all.
+    //
+    // The fiction: holding up a counter is the one thing a control seat is
+    // named for, so it should be doing it a clear multiple as often as a seat
+    // that would rather spend its mana on the board. The pair is control (1.5x)
+    // against stax (0.7x) rather than against aggro, because only a seat with
+    // blue in it is ever a candidate to hold one: aggro is Mardu and can never
+    // arm at all, so an aggro denominator would be a division by zero dressed
+    // up as a gap. Control and stax are the same three colours in the same
+    // order, so their eligibility is identical every window and what separates
+    // them is `counterArmMult` and nothing else — which is exactly the number
+    // being measured.
+    //
+    // The band is a floor, like `archetypeGap`'s: every lower edge is 1.35, so
+    // a collapse back to ~1.0 — the two seats arming equally often, the
+    // multiplier swallowed again — MISSES at every bracket. The measured gap is
+    // well under the 2.14x the multipliers alone would suggest, and bracket 5
+    // is the narrowest of the five rather than the widest, because only one
+    // seat holds up a counter per window and the holder is whoever has the most
+    // open mana and threat: the control seat grows threat slowest of the six,
+    // so it loses the roll to the stax seat often enough to eat into the gap,
+    // and at bracket 5 its own chance is against `profileCeiling` while the
+    // stax seat's is still climbing. Per-bracket bands, because that narrowing
+    // is real and one width would either pass a collapse at bracket 1 or fail
+    // an honest bracket 5.
+    key: 'counterArmGap',
+    label: 'control:stax armed windows',
+    kind: 'num',
+    digits: 2,
+    band: 0.5,
+    bands: [0.6, 0.55, 0.5, 0.6, 0.3],
+    targets: [1.95, 1.9, 1.85, 1.95, 1.65],
+    value: (t) => profileRatio(t.armedHere, t.seatRunsHere, 'control', 'stax'),
   },
 ];
 
 /**
- * Combat events per seat-run for one archetype against another, over turns 6
- * to 10. Null rather than Infinity when the denominator saw no combat at all —
- * a bracket where the control seat never attacks is a result to read, not a
- * number to divide by.
+ * Something-per-seat-run for one archetype against another, at this bracket.
+ * Null rather than Infinity when the denominator saw none at all — a bracket
+ * where the control seat never attacks is a result to read, not a number to
+ * divide by.
  */
-function combatRatio(tally: Tally, over: SeatProfileId, under: SeatProfileId): number | null {
-  const a = mean(tally.combat6to10Here[over], tally.seatRunsHere[over]);
-  const b = mean(tally.combat6to10Here[under], tally.seatRunsHere[under]);
+function profileRatio(
+  counts: ProfileCounts,
+  seatRuns: ProfileCounts,
+  over: SeatProfileId,
+  under: SeatProfileId,
+): number | null {
+  const a = mean(counts[over], seatRuns[over]);
+  const b = mean(counts[under], seatRuns[under]);
   if (a === null || b === null || b === 0) return null;
   return a / b;
 }
