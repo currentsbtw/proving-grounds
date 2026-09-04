@@ -19,9 +19,13 @@
  * Failures are collected rather than thrown one at a time, so a bad run reports
  * everything that is wrong in a single pass. The process exits non-zero if any
  * check failed. The default seed is deliberate: it is one whose pressure rolls
- * put two wraths on the table, which is what the wipe-recovery checks need.
- * Passing a different seed still exercises everything else, but those two checks
- * may legitimately fail.
+ * put two wraths on the table with one of them rebuilt from (the wipe-recovery
+ * checks), offer a resource attack, and leave the run alive for all twelve
+ * scripted turns. Passing a different seed still exercises everything else, but
+ * those checks may legitimately fail on one where the pod behaved differently.
+ * It was re-picked when seat archetype profiles landed (pressure version 4),
+ * which redrew every seed's stream; on the previous default the run now settles
+ * on turn 11 and the twelfth scripted turn plays into an already-ending run.
  */
 import {
   cardsInZone,
@@ -49,7 +53,7 @@ import type {
   ZoneId,
 } from '../src/domain/types.ts';
 
-const SEED = process.argv[2] ?? 'scorecard-verify-12';
+const SEED = process.argv[2] ?? 'scorecard-verify-12b';
 const MULLIGAN_SEED = `${SEED}-mull`;
 const TURNS = 12;
 const BRACKET = 4;
@@ -260,7 +264,7 @@ function drainEvents(policy: Policy): void {
       policy.wipesSeen += 1;
       // Answer the second wrath and eat the rest: the scorecard needs both a
       // negated wipe and one it can measure a rebuild from.
-      if (policy.wipesSeen === 2) store().respondToActiveEvent('held a counterspell');
+      if (policy.wipesSeen === 2) store().respondToActiveEvent({ note: 'held a counterspell' });
       else store().resolveActiveEvent();
       continue;
     }
@@ -268,7 +272,7 @@ function drainEvents(policy: Policy): void {
     if (event.type === 'removal') {
       if (policy.removalsAnswered === 0) {
         policy.removalsAnswered += 1;
-        store().respondToActiveEvent('protection');
+        store().respondToActiveEvent({ note: 'protection' });
       } else {
         store().resolveActiveEvent();
       }
@@ -630,7 +634,7 @@ function playCounterRun(seed: string, viaStack: boolean, disposition: Dispositio
   if (raised?.type !== 'counter') throw new Error('the seat did not answer the commander');
 
   if (disposition === 'answered') {
-    store().respondToActiveEvent('held protection');
+    store().respondToActiveEvent({ note: 'held protection' });
     // The direct path's spell finishes its interrupted trip on the spot; the
     // tray's waits its turn, which is the player saying "and now it resolves".
     if (viaStack) store().resolveTop();
@@ -784,10 +788,24 @@ function main(): void {
   for (const zone of ZONES) {
     checkEqual(`derived ${zone} matches the store`, sorted(derived[zone]), sorted(first.zonesAtEnd[zone]));
   }
+  // The total is not a constant: the two Soldier tokens made on turn 5 cease to
+  // exist the moment the pod wraths after it, which is an ordinary thing for a
+  // seed to do. What has to hold whatever the pod did is that every *real* card
+  // is somewhere and is there exactly once — the roster is the list of them, and
+  // tokens are counted rather than required.
+  const rosterIids = new Set(Object.keys(first.record.roster ?? {}));
+  const allIids = ZONES.flatMap((zone) => derived[zone]);
+  const cardIids = allIids.filter((iid) => rosterIids.has(iid));
+  const tokensLeft = allIids.length - cardIids.length;
   check(
-    'every instance is accounted for',
-    ZONES.reduce((n, z) => n + derived[z].length, 0) === DECK_SIZE + 1 + 2,
-    `${ZONES.reduce((n, z) => n + derived[z].length, 0)} instances`,
+    'the roster holds every card the deck started with',
+    rosterIids.size === DECK_SIZE + 1,
+    `${rosterIids.size} rostered, expected ${DECK_SIZE + 1}`,
+  );
+  check(
+    'every deck card is accounted for exactly once',
+    cardIids.length === rosterIids.size && new Set(cardIids).size === cardIids.length,
+    `${cardIids.length} placed (${new Set(cardIids).size} distinct) of ${rosterIids.size}, plus ${tokensLeft} token(s) still on the table`,
   );
 
   // --- timeline ------------------------------------------------------------

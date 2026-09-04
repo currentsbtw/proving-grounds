@@ -8,6 +8,13 @@ import {
   type RemovalTarget,
 } from '../data/citations';
 import {
+  PROFILES,
+  PROFILE_IDS,
+  type ManaColor,
+  type SeatProfile,
+  type SeatProfileId,
+} from '../data/profiles';
+import {
   isArtifactTypeLine,
   isCreatureTypeLine,
   isEnchantmentTypeLine,
@@ -52,6 +59,8 @@ export interface SeatSnapshot {
   peakThreat?: number;
   /** The board held at that peak; defaults to `silhouette` when absent. */
   peakSilhouette?: Silhouette;
+  /** The seat's archetype. Absent means `neutral` — see `profileOf`. */
+  profile?: SeatProfileId;
 }
 
 /** One of the player's permanents, flattened for the targeting heuristic. */
@@ -218,6 +227,51 @@ export function highestThreatSeat(seats: SeatSnapshot[]): SeatSnapshot | undefin
 }
 
 // ---------------------------------------------------------------------------
+// Seat profiles
+// ---------------------------------------------------------------------------
+
+/**
+ * The archetype a seat is piloting. Optional on the snapshot on purpose: a
+ * caller that assigns no profiles falls back to `neutral`, whose every
+ * multiplier is exactly 1.0 and whose colours are all five, so the engine
+ * behaves as it did before profiles existed. `neutral` is never dealt to a
+ * seat — it is only ever this fallback.
+ */
+export function profileOf(seat: SeatSnapshot): SeatProfile {
+  return PROFILES[seat.profile ?? 'neutral'];
+}
+
+/**
+ * The colours a seat may cite from — the same fallback, so the two functions
+ * cannot disagree about what an unprofiled seat is. An unprofiled seat has no
+ * colour identity to be honest about, and pinning it to any archetype's would
+ * quietly delete cards from its table; `neutral` runs all five instead, which
+ * is the whole citation table, exactly as it was before profiles existed.
+ */
+export function colorsOf(seat: SeatSnapshot): readonly ManaColor[] {
+  return profileOf(seat).colors;
+}
+
+/**
+ * Three distinct archetypes for seats A, B and C, drawn once at run start.
+ * Distinct because a table of three Control seats is the thing this replaces:
+ * the point of a profile is that the seats behave differently from each other.
+ *
+ * A partial Fisher-Yates over `PROFILE_IDS`, so it costs exactly three draws
+ * and the same rng sequence always deals the same table.
+ */
+export function drawProfiles(rng: () => number): SeatProfileId[] {
+  const pool = [...PROFILE_IDS];
+  const out: SeatProfileId[] = [];
+  for (let i = 0; i < 3; i++) {
+    const j = i + Math.floor(rng() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+    out.push(pool[i]);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Derived player threat
 // ---------------------------------------------------------------------------
 
@@ -242,18 +296,39 @@ export function playerThreatOf(player: PlayerSummary): number {
  * dial is bracket-indexed, so the bracket moves the *schedule* — when the
  * hazard switches on and how steeply it climbs — not just an overall frequency.
  * A negative `perTurn` is legal: it makes a hazard decay out of the game.
+ *
+ * Two multipliers land here, and they sit on opposite sides of the bracket's
+ * `max` because they answer different questions.
+ *
+ * `scale` is the pod's response to the *player* — removal's player-threat
+ * scale. It belongs before the cap: the bracket's `max` is the statement "a
+ * bracket-3 pod never points removal at you more than 28% of windows, however
+ * scary you look", and moving that scale after the cap would delete it. Bracket
+ * ceilings stay ceilings on how much pressure a bracket produces.
+ *
+ * `profileMult` is *whose seat* is casting it, and it belongs after the cap. Put
+ * it before, and a multiplier above 1.0 gets swallowed the moment the ramp
+ * reaches the cap — bracket-4 combat pinned aggro (1.6x) and tokens (1.4x) to
+ * the same 0.9 from turn 5, and bracket-3 wipe pinned control (2.0x) to the same
+ * 0.5 as an unmodified seat from turn 6, while every multiplier below 1.0 kept
+ * its full effect. The archetypes stopped being distinguishable exactly where
+ * the game gets interesting. Scaling the capped value instead keeps the gap, and
+ * `PRESSURE.profileCeiling` is the one thing above it: no hazard becomes
+ * certain, whoever is holding it.
  */
 export function hazardChance(
   hazard: Hazard,
   turn: number,
   bracket: number,
   scale = 1,
+  profileMult = 1,
 ): number {
   const startTurn = byBracket(hazard.startTurn, bracket);
   if (turn < startTurn) return 0;
   const ramp =
     byBracket(hazard.base, bracket) + byBracket(hazard.perTurn, bracket) * (turn - startTurn);
-  return clamp(ramp * scale, 0, byBracket(hazard.max, bracket));
+  const capped = clamp(ramp * scale, 0, byBracket(hazard.max, bracket));
+  return clamp(capped * profileMult, 0, PRESSURE.profileCeiling);
 }
 
 function offCooldown(input: WindowInput, type: EventType, hazard: Hazard): boolean {
@@ -335,11 +410,27 @@ function inBracket(citation: Citation, bracket: number): boolean {
   return b >= citation.brackets[0] && b <= citation.brackets[1];
 }
 
-/** Bracket, mana and turn — the filters every kind of citation shares. */
-function baseEligible(list: Citation[], mana: number, bracket: number, turn: number): Citation[] {
+/**
+ * Whether a seat running `colors` could be holding this card. A colourless card
+ * is castable out of any pile, which is why an empty `colors` on the citation
+ * passes for everyone.
+ */
+function inColors(citation: Citation, colors: readonly ManaColor[]): boolean {
+  return citation.colors.every((c) => colors.includes(c));
+}
+
+/** Bracket, mana, turn and the caster's colours — the filters every kind of citation shares. */
+function baseEligible(
+  list: Citation[],
+  mana: number,
+  bracket: number,
+  turn: number,
+  colors: readonly ManaColor[],
+): Citation[] {
   return list.filter(
     (c) =>
       inBracket(c, bracket) &&
+      inColors(c, colors) &&
       c.cost <= mana &&
       turn >= (c.minTurn ?? 0) &&
       turn <= (c.maxTurn ?? Infinity),
@@ -402,10 +493,11 @@ function partitionWipes(
   mana: number,
   bracket: number,
   turn: number,
+  colors: readonly ManaColor[],
 ): { creatures: Citation[]; wide: Citation[] } {
   const creatures: Citation[] = [];
   const wide: Citation[] = [];
-  for (const c of baseEligible(CITATIONS.wipe, mana, bracket, turn)) {
+  for (const c of baseEligible(CITATIONS.wipe, mana, bracket, turn, colors)) {
     if (c.sweep === 'creatures') creatures.push(c);
     else if (c.sweep === 'nonland' || c.sweep === 'ace') wide.push(c);
   }
@@ -417,10 +509,11 @@ function eligibleRemoval(
   bracket: number,
   turn: number,
   target: PermanentSummary,
+  colors: readonly ManaColor[],
 ): Citation[] {
   const kinds = removalTargetsOf(target);
   if (kinds.size === 0) return [];
-  return baseEligible(CITATIONS.removal, mana, bracket, turn).filter(
+  return baseEligible(CITATIONS.removal, mana, bracket, turn, colors).filter(
     (c) =>
       (c.targets ?? []).some((t) => kinds.has(t)) &&
       // Go for the Throat is a nonartifact creature card, and a player would
@@ -430,6 +523,34 @@ function eligibleRemoval(
   );
 }
 
+/** One kind of resource attack a seat could make, with its roll weight. */
+interface ResourceOption {
+  variant: 'discard' | 'sacrifice' | 'tax';
+  weight: number;
+  list: Citation[];
+}
+
+/**
+ * The resource attacks a seat can actually make. Only variants it owns a card
+ * for are on the table and the weights are renormalised over what is left — a
+ * bracket-1 pod runs no stax piece, so it strips and edicts instead of taxing
+ * at four fifths the rate. The weights come from the seat's profile when it has
+ * its own shape (a stax seat mostly taxes), and from `PRESSURE` otherwise.
+ */
+function resourcePool(seat: SeatSnapshot, turn: number, bracket: number): ResourceOption[] {
+  const profile = profileOf(seat);
+  const w = profile.resourceWeights ?? PRESSURE.resource.weights;
+  const mana = seatMana(seat.silhouette, turn, bracket);
+  const options: ResourceOption[] = [
+    { variant: 'discard', weight: w.discard, list: CITATIONS.discard },
+    { variant: 'sacrifice', weight: w.sacrifice, list: CITATIONS.sacrifice },
+    { variant: 'tax', weight: w.tax, list: CITATIONS.tax },
+  ];
+  return options
+    .map((o) => ({ ...o, list: baseEligible(o.list, mana, bracket, turn, colorsOf(seat)) }))
+    .filter((o) => o.list.length > 0);
+}
+
 /**
  * The counterspell an armed seat actually holds, chosen without touching the
  * rng: the store raises counters on the player's cast, which is not a point in
@@ -437,6 +558,11 @@ function eligibleRemoval(
  * player cast into it. The index is a hash of things already fixed by the seed
  * and the spell. Returns undefined when the seat has nothing that catches this
  * spell — the seat then does not counter at all.
+ *
+ * `colors` is the holding seat's colour identity, and it is required. The
+ * arming step in `resolveWindow` only ever arms a seat that owns a counterspell
+ * in its colours, so a caller that left it out here could hand that same seat a
+ * card it was never eligible to be holding. Pass `colorsOf(seat)`.
  */
 export function chooseCounterCitation(
   windowIndex: number,
@@ -444,9 +570,10 @@ export function chooseCounterCitation(
   bracket: number,
   mana: number,
   spell: { name: string; manaValue: number; typeLine: string },
+  colors: readonly ManaColor[],
 ): EventCitation | undefined {
   const shapes = counterShapesOf(spell.typeLine);
-  const eligible = baseEligible(CITATIONS.counter, mana, bracket, turn).filter((c) =>
+  const eligible = baseEligible(CITATIONS.counter, mana, bracket, turn, colors).filter((c) =>
     (c.counters ?? []).some((t) => shapes.has(t)),
   );
   if (eligible.length === 0) return undefined;
@@ -465,9 +592,14 @@ function grownSilhouette(
 ): Silhouette {
   const c = PRESSURE.silhouette;
   const s = seat.silhouette;
+  // The profile decides the *shape* of the board, not how fast it arrives: a
+  // tokens seat grows more bodies and less power out of the same threat, an
+  // aggro seat the other way round.
+  const shape = profileOf(seat).silhouette;
   return {
-    creatures: s.creatures + stochasticRound(seat.threat * c.creaturesPerThreat, rng),
-    power: s.power + stochasticRound(seat.threat * c.powerPerThreat, rng),
+    creatures:
+      s.creatures + stochasticRound(seat.threat * c.creaturesPerThreat * shape.creaturesMult, rng),
+    power: s.power + stochasticRound(seat.threat * c.powerPerThreat * shape.powerMult, rng),
     artifacts: s.artifacts + stochasticRound(seat.threat * c.artifactsPerThreat, rng),
     // The land drop is recomputed every window; the banked mana rides along, so
     // the readout keeps showing what the seat can really represent.
@@ -568,14 +700,39 @@ export function punishPhrase(punish: Punish | undefined, seatId: SeatId): string
 /**
  * Resolve one opponent window.
  *
+ * Every hazard is cast by a seat, and which seat it is now changes the odds:
+ * the candidates are the living seats that could actually do the thing (they
+ * hold at least one citation in their colours at their mana — combat needs no
+ * card), the existing preference picks one of them, and the hazard's chance is
+ * multiplied by that seat's profile. So a table with the control seat still in
+ * it wraths more than one without, and a seat never cites a card outside its
+ * colours. A seat with no profile reads as `neutral`, whose multipliers are all
+ * exactly 1.0 and whose colours are all five.
+ *
  * The rng is consumed in a fixed order so a seed replays exactly:
  *   1. threat jitter, one draw per living seat
  *   2. silhouette growth, three draws per living seat
  *   3. hazard rolls in the order wipe, removal, combat, resource, then the
  *      clock (plus any sub-rolls a firing event needs, drawn immediately after
  *      its own roll, ending with the one draw that picks its card citation —
- *      no draw at all when nothing is eligible, because then nothing fires)
+ *      no draw at all when nothing is eligible, because then nothing fires).
+ *      Casters are chosen before the roll, because the roll is scaled by the
+ *      caster's profile; only the resource attack's caster costs a draw, and it
+ *      is taken immediately *before* that hazard's roll rather than after it.
  *   4. the counterspell arming roll
+ *
+ * The order is fixed, but the *number* of draws a window costs is not, and that
+ * is the thing to understand before comparing two seeds. A hazard that finds no
+ * eligible citation never rolls at all — the wipe, removal, clock and
+ * counter-arm steps each build their candidate list first and skip the whole
+ * step when no living seat holds a card for it — so how many draws a window
+ * takes depends on which profiles were dealt, what those seats can afford, and
+ * what is in `src/data/citations.ts`. Editing the citation table or a profile's
+ * colours moves every later window of every seed, which is why both bump
+ * `PRESSURE.version` (see the note there). Version 4 moved the resource
+ * attack's caster draw ahead of its own hazard roll; version 5 changes no draw
+ * order at all, only where a profile multiplier meets a hazard's cap, which is
+ * enough to change the outcome of rolls near that cap.
  *
  * When the clock's deadline has passed the function short-circuits: it reports
  * `clockExpired` and returns the seats untouched, because the run is over.
@@ -614,10 +771,17 @@ export function resolveWindow(input: WindowInput): WindowResult {
 
   const working: SeatSnapshot[] = input.seats.map((seat) => {
     if (seat.eliminated) return { ...seat, silhouette: { ...seat.silhouette } };
-    const threat = clampThreat(seat.threat + perWindow * (growthJitter + rng() * growthSpan));
+    const growth = perWindow * profileOf(seat).threatGrowthMult;
+    const threat = clampThreat(seat.threat + growth * (growthJitter + rng() * growthSpan));
     const grown = { ...seat, threat };
     return { ...grown, silhouette: grownSilhouette(grown, turn, rng) };
   });
+
+  // No profile notes here. A seat's archetype is dealt once at run start and
+  // never changes, so repeating all three of them every window said nothing new;
+  // anything attributing a window's events to archetypes reads `seat.profile`
+  // off the seats it already holds rather than parsing them back out of a log
+  // line.
 
   // --- 3: hazards ----------------------------------------------------------
   const events: PressureEvent[] = [];
@@ -656,20 +820,39 @@ export function resolveWindow(input: WindowInput): WindowResult {
   if (
     roomLeft() &&
     podCreatures >= PRESSURE.wipe.minPodCreatures &&
-    offCooldown(input, 'wipe', wipeHazard) &&
-    rng() < hazardChance(wipeHazard, turn, bracket)
+    offCooldown(input, 'wipe', wipeHazard)
   ) {
-    // The seat with the least to lose is the one holding the wrath.
-    const caster = bestSeat(alive(), (s) => -s.silhouette.power);
-    if (caster) {
+    // Only seats that own a wrath in their colours at their mana are in the
+    // running; among those, the seat with the least to lose is the one holding
+    // it. Filtering before the preference is what stops the least-scary seat
+    // from silently swallowing the pod's wrath because it happens to be mono-red.
+    const wipeCandidates = alive()
+      .map((seat) => ({
+        seat,
+        wipes: partitionWipes(
+          seatMana(seat.silhouette, turn, bracket),
+          bracket,
+          turn,
+          colorsOf(seat),
+        ),
+      }))
+      .filter((c) => c.wipes.creatures.length > 0 || c.wipes.wide.length > 0);
+    const chosen = bestSeat(
+      wipeCandidates.map((c) => c.seat),
+      (s) => -s.silhouette.power,
+    );
+    const entry = wipeCandidates.find((c) => c.seat.id === chosen?.id);
+    if (
+      entry &&
+      rng() < hazardChance(wipeHazard, turn, bracket, 1, profileOf(entry.seat).hazardMult.wipe)
+    ) {
+      const caster = entry.seat;
       const nonlands = rng() < byBracket(PRESSURE.wipe.nonlandChance, bracket);
-      const mana = seatMana(caster.silhouette, turn, bracket);
       // The roll asks for a nonland sweep; the table decides whether the seat
       // owns one. Nobody blows up the world with four mana up, so a pod that
       // cannot afford it settles for a creature wrath, and a pod that cannot
-      // afford either does not wrath at all.
-      const wipes = partitionWipes(mana, bracket, turn);
-      const list = nonlands && wipes.wide.length > 0 ? wipes.wide : wipes.creatures;
+      // afford either was never a candidate.
+      const list = nonlands && entry.wipes.wide.length > 0 ? entry.wipes.wide : entry.wipes.creatures;
       const card = pickCitation(list, rng);
       if (card) {
         // One vocabulary for scope everywhere: the event's variant is the card's
@@ -696,18 +879,40 @@ export function resolveWindow(input: WindowInput): WindowResult {
   const removalScale =
     PRESSURE.removal.playerThreatBase + playerThreat * PRESSURE.removal.playerThreatPer;
   const target = chooseRemovalTarget(input.permanents);
-  if (
-    roomLeft() &&
-    target &&
-    offCooldown(input, 'removal', removalHazard) &&
-    rng() < hazardChance(removalHazard, turn, bracket, removalScale)
-  ) {
-    const caster = bestSeat(alive(), (s) => s.threat);
-    if (caster) {
-      const card = pickCitation(
-        eligibleRemoval(seatMana(caster.silhouette, turn, bracket), bracket, turn, target),
-        rng,
-      );
+  if (roomLeft() && target && offCooldown(input, 'removal', removalHazard)) {
+    // Candidates first, preference second: the scariest seat fires the removal,
+    // but only out of the seats that own something that can point at this
+    // permanent in their colours.
+    const removalCandidates = alive()
+      .map((seat) => ({
+        seat,
+        list: eligibleRemoval(
+          seatMana(seat.silhouette, turn, bracket),
+          bracket,
+          turn,
+          target,
+          colorsOf(seat),
+        ),
+      }))
+      .filter((c) => c.list.length > 0);
+    const chosen = bestSeat(
+      removalCandidates.map((c) => c.seat),
+      (s) => s.threat,
+    );
+    const entry = removalCandidates.find((c) => c.seat.id === chosen?.id);
+    if (
+      entry &&
+      rng() <
+        hazardChance(
+          removalHazard,
+          turn,
+          bracket,
+          removalScale,
+          profileOf(entry.seat).hazardMult.removal,
+        )
+    ) {
+      const caster = entry.seat;
+      const card = pickCitation(entry.list, rng);
       if (card) {
         events.push(
           makeEvent(
@@ -726,7 +931,9 @@ export function resolveWindow(input: WindowInput): WindowResult {
     }
   }
 
-  // Combat — the highest-threat seat turns its silhouette sideways.
+  // Combat — the highest-threat seat turns its silhouette sideways. The only
+  // hazard with no citation to satisfy, so every living seat is a candidate and
+  // the board it grew is the whole gate.
   const combatHazard = PRESSURE.hazards.combat;
   const attacker = highestThreatSeat(working);
   if (
@@ -734,7 +941,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
     !wiped &&
     attacker &&
     attacker.silhouette.power >= PRESSURE.combat.minPower &&
-    rng() < hazardChance(combatHazard, turn, bracket)
+    rng() < hazardChance(combatHazard, turn, bracket, 1, profileOf(attacker).hazardMult.combat)
   ) {
     const c = PRESSURE.combat;
     const plausible = Math.round(
@@ -762,56 +969,50 @@ export function resolveWindow(input: WindowInput): WindowResult {
 
   // Resource attack — discard, sacrifice, or a tax.
   const resourceHazard = PRESSURE.hazards.resource;
-  if (
-    roomLeft() &&
-    offCooldown(input, 'resource', resourceHazard) &&
-    rng() < hazardChance(resourceHazard, turn, bracket)
-  ) {
-    const caster = pick(alive(), rng);
-    if (caster) {
-      const mana = seatMana(caster.silhouette, turn, bracket);
-      const w = PRESSURE.resource.weights;
-      // Only variants the seat owns a card for are on the table, and the weights
-      // are renormalised over what is left — a bracket-1 pod runs no stax piece,
-      // so it strips and edicts instead of taxing at four fifths the rate.
-      const pool = [
-        { variant: 'discard', weight: w.discard, list: CITATIONS.discard },
-        { variant: 'sacrifice', weight: w.sacrifice, list: CITATIONS.sacrifice },
-        { variant: 'tax', weight: w.tax, list: CITATIONS.tax },
-      ]
-        .map((entry) => ({ ...entry, list: baseEligible(entry.list, mana, bracket, turn) }))
-        .filter((entry) => entry.list.length > 0);
-
-      if (pool.length > 0) {
-        const total = pool.reduce((n, entry) => n + entry.weight, 0);
-        const roll = rng() * total;
-        let acc = 0;
-        let chosen = pool[pool.length - 1];
-        for (const entry of pool) {
-          acc += entry.weight;
-          if (roll < acc) {
-            chosen = entry;
-            break;
-          }
+  if (roomLeft() && offCooldown(input, 'resource', resourceHazard)) {
+    // Which seat strips you is the one caster choice with no preference behind
+    // it, so it stays a seeded pick — but only over seats that own a strip, an
+    // edict or a tax piece in their colours. A Selesnya tokens seat owns none
+    // of the three below bracket 3 and simply never comes up.
+    const resourceCandidates = alive()
+      .map((seat) => ({ seat, pool: resourcePool(seat, turn, bracket) }))
+      .filter((c) => c.pool.length > 0);
+    const entry = resourceCandidates.length > 0 ? pick(resourceCandidates, rng) : undefined;
+    if (
+      entry &&
+      rng() <
+        hazardChance(resourceHazard, turn, bracket, 1, profileOf(entry.seat).hazardMult.resource)
+    ) {
+      const caster = entry.seat;
+      const pool = entry.pool;
+      const total = pool.reduce((n, e) => n + e.weight, 0);
+      const roll = rng() * total;
+      let acc = 0;
+      let chosen = pool[pool.length - 1];
+      for (const e of pool) {
+        acc += e.weight;
+        if (roll < acc) {
+          chosen = e;
+          break;
         }
-        const variant = chosen.variant;
-        const card = pickCitation(chosen.list, rng);
-        if (card) {
-          const seat = seatLabel(caster.id);
-          const prompt =
-            variant === 'discard'
-              ? `${seat} casts ${card.name}. Discard a card of your choice.`
-              : variant === 'sacrifice'
-                ? `${seat} casts ${card.name}. Sacrifice a creature.`
-                : // Pay-or-punish, not a one-shot surcharge: the price is real,
-                  // and so is what the seat gets when it goes unpaid.
-                  `${seat} has ${card.name} out. Pay ${card.pay ?? 1} ${
-                    card.punish === 'treasure' ? 'when you next draw' : 'for your next spell'
-                  }, or ${punishPhrase(card.punish, caster.id)}.`;
-          events.push(makeEvent('resource', caster.id, prompt, { amount: 1 }, { variant, card }));
-          bumpThreat(caster.id, 'resource');
-          notes.push(`resource:${caster.id}:${variant}:${card.name}`);
-        }
+      }
+      const variant = chosen.variant;
+      const card = pickCitation(chosen.list, rng);
+      if (card) {
+        const seat = seatLabel(caster.id);
+        const prompt =
+          variant === 'discard'
+            ? `${seat} casts ${card.name}. Discard a card of your choice.`
+            : variant === 'sacrifice'
+              ? `${seat} casts ${card.name}. Sacrifice a creature.`
+              : // Pay-or-punish, not a one-shot surcharge: the price is real,
+                // and so is what the seat gets when it goes unpaid.
+                `${seat} has ${card.name} out. Pay ${card.pay ?? 1} ${
+                  card.punish === 'treasure' ? 'when you next draw' : 'for your next spell'
+                }, or ${punishPhrase(card.punish, caster.id)}.`;
+        events.push(makeEvent('resource', caster.id, prompt, { amount: 1 }, { variant, card }));
+        bumpThreat(caster.id, 'resource');
+        notes.push(`resource:${caster.id}:${variant}:${card.name}`);
       }
     }
   }
@@ -825,21 +1026,31 @@ export function resolveWindow(input: WindowInput): WindowResult {
     clock = null;
     notes.push('clock-canceled:dead-owner');
   }
-  if (!clock) {
-    const owner = highestThreatSeat(working);
+  if (!clock && offCooldown(input, 'clock', clockHazard)) {
+    // A clock is what the seat is assembling, not a spell it just cast, so the
+    // citation is filtered on the bracket and the seat's colours alone: the mana
+    // is the thing it is still finding.
+    const minThreat = byBracket(PRESSURE.clock.minThreat, bracket);
+    const clockCandidates = alive()
+      .filter((seat) => seat.threat >= minThreat)
+      .map((seat) => ({
+        seat,
+        list: CITATIONS.clock.filter(
+          (c) => inBracket(c, bracket) && inColors(c, colorsOf(seat)),
+        ),
+      }))
+      .filter((c) => c.list.length > 0);
+    const chosen = bestSeat(
+      clockCandidates.map((c) => c.seat),
+      (s) => s.threat,
+    );
+    const entry = clockCandidates.find((c) => c.seat.id === chosen?.id);
     if (
-      owner &&
-      owner.threat >= byBracket(PRESSURE.clock.minThreat, bracket) &&
-      offCooldown(input, 'clock', clockHazard) &&
-      rng() < hazardChance(clockHazard, turn, bracket)
+      entry &&
+      rng() < hazardChance(clockHazard, turn, bracket, 1, profileOf(entry.seat).hazardMult.clock)
     ) {
-      // A clock is what the seat is assembling, not a spell it just cast, so the
-      // citation is filtered on the bracket alone: the mana is the thing it is
-      // still finding.
-      const card = pickCitation(
-        CITATIONS.clock.filter((c) => inBracket(c, bracket)),
-        rng,
-      );
+      const owner = entry.seat;
+      const card = pickCitation(entry.list, rng);
       if (card) {
         const deadlineTurn = turn + byBracket(PRESSURE.clock.deadlineOffset, bracket);
         clock = { seatId: owner.id, deadlineTurn, spawnedTurn: turn };
@@ -862,13 +1073,34 @@ export function resolveWindow(input: WindowInput): WindowResult {
   let counterArmed: CounterArmed | null = null;
   const counterStart = byBracket(PRESSURE.counter.startTurn, bracket);
   if (turn >= counterStart) {
-    const armScale =
-      PRESSURE.counter.playerThreatBase + playerThreat * PRESSURE.counter.playerThreatPer;
-    const chance = clamp(byBracket(PRESSURE.counter.armChance, bracket) * armScale, 0, 0.9);
-    if (rng() < chance) {
-      // The seat with the most open mana is the credible threat to hold up.
-      const holder = bestSeat(alive(), (s) => s.silhouette.openMana + s.threat / 10);
-      if (holder) {
+    // Counterspells are blue, so only a seat with blue in it can be holding one
+    // up: a Selesnya tokens seat never represents interaction, and a table with
+    // no blue seat at it holds up nothing all run. Among those that can, the one
+    // with the most open mana is the credible threat.
+    const holder = bestSeat(
+      alive().filter(
+        (seat) =>
+          baseEligible(
+            CITATIONS.counter,
+            seatMana(seat.silhouette, turn, bracket),
+            bracket,
+            turn,
+            colorsOf(seat),
+          ).length > 0,
+      ),
+      (s) => s.silhouette.openMana + s.threat / 10,
+    );
+    if (holder) {
+      const armScale =
+        PRESSURE.counter.playerThreatBase + playerThreat * PRESSURE.counter.playerThreatPer;
+      const chance = clamp(
+        byBracket(PRESSURE.counter.armChance, bracket) *
+          armScale *
+          profileOf(holder).counterArmMult,
+        0,
+        0.9,
+      );
+      if (rng() < chance) {
         counterArmed = { seatId: holder.id, threshold: byBracket(PRESSURE.counter.threshold, bracket) };
         notes.push(`armed:${holder.id}:${counterArmed.threshold}`);
       }
@@ -927,6 +1159,7 @@ export function toSnapshot(seat: Seat): SeatSnapshot {
     silhouette: seat.silhouette,
     peakThreat: seat.peakThreat,
     peakSilhouette: seat.peakSilhouette,
+    profile: seat.profile,
   };
 }
 

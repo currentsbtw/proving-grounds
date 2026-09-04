@@ -419,6 +419,25 @@
   margin-bottom: 7px;
 }
 
+/* A reading, not a gate: how much mana is actually open while the player claims
+   an answer. It sits between the title and the close button, and takes the
+   space left over so a long title never pushes it off the row. */
+.pgp-picker-tell {
+  margin-left: auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* The way out of the answer picker: an answer the app has no card for is still
+   an answer, and the link says so without dressing itself up as a choice. */
+.pgp-picker-unbound {
+  margin-top: 8px;
+}
+
 .pgp-picker-close {
   display: inline-flex;
   align-items: center;

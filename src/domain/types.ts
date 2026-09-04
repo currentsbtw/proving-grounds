@@ -1,4 +1,5 @@
 import type { Citation } from '../data/citations';
+import type { SeatProfileId } from '../data/profiles';
 
 /**
  * `stack` is bookkeeping, not a rules engine: a card sits there only while the
@@ -108,6 +109,17 @@ export interface Seat {
    */
   peakThreat?: number;
   peakSilhouette?: Silhouette;
+  /**
+   * The archetype this seat is piloting, drawn once at run start. Still not a
+   * decklist and still no abilities (PRODUCT.md): a label, a colour identity
+   * the citation table is filtered against, and a set of multipliers over the
+   * hazard curves. Absent on a run that started before profiles existed, and on
+   * any caller that has not assigned them — the engine then falls back to
+   * `neutral`, whose multipliers are all exactly 1.0 and whose colours are all
+   * five, so an unprofiled seat inherits no archetype's opinions. `neutral` is
+   * never dealt to a seat; it only ever shows up as that fallback.
+   */
+  profile?: SeatProfileId;
 }
 
 export type EventType = 'wipe' | 'removal' | 'counter' | 'combat' | 'clock' | 'resource';

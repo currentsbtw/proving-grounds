@@ -77,8 +77,39 @@ export function byBracket(table: BracketTable, bracket: number): number {
 }
 
 export const PRESSURE = {
-  /** Bumped whenever the numbers below change, so logged runs stay comparable. */
-  version: 3,
+  /**
+   * Bumped whenever the numbers below change, so logged runs stay comparable.
+   *
+   * Version 4 added seat archetype profiles (`src/data/profiles.ts`), which
+   * multiply these curves per seat and moved the resource attack's caster draw
+   * ahead of its hazard roll.
+   *
+   * Version 5 fixes where a profile multiplier meets a hazard's `max`: the ramp
+   * is capped first and the profile scales the capped value under
+   * `profileCeiling`, so a multiplier above 1.0 is no longer swallowed by the
+   * bracket's own ceiling (see `hazardChance`). Every hazard roll that lands
+   * near a cap comes out differently, so a version-4 seed does not replay
+   * identically.
+   *
+   * Two files share this version rather than carrying their own. Changing a
+   * multiplier in `src/data/profiles.ts` bumps it, because those numbers are
+   * read straight off these curves. Editing `src/data/citations.ts` bumps it
+   * too: eligibility decides whether a hazard rolls at all, and `pickCitation`
+   * indexes into a filtered list, so adding or removing one card shifts every
+   * seed's stream from that window on. `CITATIONS_VERSION` in that file tracks
+   * the table's own revision and must move with this number.
+   */
+  version: 5,
+
+  /**
+   * Hard ceiling on a hazard's per-window probability after its seat's profile
+   * multiplier is applied. Nothing the pod does is ever certain, however
+   * pointed the archetype: an aggro seat at bracket 4 on turn 10 should be
+   * expected to attack, not guaranteed to. It sits above every bracket `max` on
+   * purpose — the bracket's ceiling shapes the schedule, this one only stops a
+   * multiplier running off the end of it.
+   */
+  profileCeiling: 0.97,
 
   seatMana: {
     /**

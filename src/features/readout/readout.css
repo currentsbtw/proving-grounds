@@ -536,6 +536,18 @@
   white-space: nowrap;
 }
 
+/* The archetype chip sits beside the seat letter rather than in the state row,
+   because it is not a state: it does not come and go, it is who the seat is.
+   Quiet by default, and the first thing on the row allowed to give up width —
+   the reader can lose a letter off "Midrange" more cheaply than the life
+   figure can lose a digit or the state chips can wrap to a second line. */
+.rd-chip.is-profile {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The accent is spent on one chip only: the seat to hit is the answer to "who
    do I attack", and it has to be the loudest word on the frame. */
 .rd-chip.is-hit {

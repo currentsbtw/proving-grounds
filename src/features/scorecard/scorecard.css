@@ -1,6 +1,9 @@
 /* ── Proving Grounds — M2 scorecard ──────────────────────────────────────── */
 
-/* Shared: result chips, used by the rail and the header alike. */
+/* Shared: result chips, used by the rail and the header alike. The full pill is
+   the between-runs vocabulary DESIGN.md names (result chips, ledger class chips,
+   profile tags, the rail's bracket chip); the play surface has no pills at all,
+   which is what keeps the two reading as different rooms. */
 .sc-chip {
   flex: none;
   padding: 0 6px;
@@ -168,6 +171,9 @@
   color: var(--muted);
 }
 
+/* Sits in the same row as the run's result chip, so it takes that chip's pill
+   rather than the panel radius: two radii in one row read as two kinds of thing,
+   and these are both between-runs chips. */
 .sc-hist-pair {
   flex: none;
   padding: 0 5px;
@@ -228,8 +234,10 @@
   min-width: 0;
 }
 
+/* The title step. It wraps (a deck name is player text), so it keeps a reading
+   line-height rather than the tighter one a single-line title would take. */
 .sc-deck {
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1.2;
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
@@ -330,7 +338,7 @@
 .sc-empty {
   margin: 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 12px;
   font-style: italic;
 }
 
@@ -403,6 +411,10 @@
   white-space: nowrap;
 }
 
+/* One step under the deck name and well over body prose, which is the whole
+   hierarchy of the panel's head: the deck is which run this is, the verdict is
+   what the run says. The type scale has nothing between body and the title step
+   the deck name takes, so this sentence keeps the 17px DESIGN.md records. */
 .sc-verdict-text {
   min-width: 0;
   font-size: 17px;
@@ -465,6 +477,10 @@
   letter-spacing: 0;
 }
 
+/* Held between the 24px figure it replaces and the 12px caption under it. The
+   type scale has no step in that gap: at body size "n/a" reads as a second
+   caption line rather than as the slot's value, and at the title step it is
+   nearly as loud as a real reading. DESIGN.md records the 16px. */
 .sc-tile-value.is-na {
   font-size: 16px;
 }
@@ -535,11 +551,13 @@
   gap: 5px;
 }
 
+/* Square, like the marks it is a key for: the chart draws its bars and bands as
+   plain rects, so a rounded swatch was a corner the chart itself never has. */
 .sc-key::before {
   content: '';
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: 0;
   flex: none;
 }
 
@@ -558,7 +576,6 @@
 .sc-key-board::before {
   background: var(--mana-u);
   height: 2px;
-  border-radius: 0;
 }
 
 .sc-key-life::before {
@@ -568,7 +585,6 @@
     transparent 4px 7px
   );
   height: 2px;
-  border-radius: 0;
 }
 
 .sc-key-wipe::before {
@@ -816,7 +832,7 @@
 
 .sc-profile dd {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -953,4 +969,104 @@
   color: var(--muted);
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
+}
+
+/* ── Cards across runs ──────────────────────────────────────────────────── */
+
+/* Sortable headings. The heading *is* the control, so the button carries no
+   chrome of its own until it is focused or active — a row of nine boxed buttons
+   would read as a toolbar sitting on top of the table rather than as its head. */
+.sc-sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sc-sort:hover,
+.sc-sort.is-active {
+  color: var(--ink);
+}
+
+/* Reserves the arrow's width on every heading so switching the sort does not
+   shuffle the column widths under the reader. */
+.sc-sort-mark {
+  display: inline-block;
+  min-width: 0.9em;
+  font-size: 11px;
+}
+
+.sc-cards-numcol {
+  text-align: right;
+}
+
+.sc-cards-numcol .sc-sort {
+  /* The heading tracks its own right-aligned figures. */
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.sc-cards-table td:not(.sc-cards-name) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sc-cards-name {
+  min-width: 16ch;
+  text-align: left;
+}
+
+.sc-cards-title {
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.sc-cards-mv {
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+/* A word, never a colour on its own: CMDR and "low cast" have to survive
+   greyscale and forced colours the same way the review kinds do. */
+.sc-flag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.sc-flag.is-cut {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.sc-cards-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sc-cards-toggle input {
+  margin: 0;
+}
+
+.sc-cards-skipped {
+  margin: 8px 0 0;
+  font-size: 12px;
 }

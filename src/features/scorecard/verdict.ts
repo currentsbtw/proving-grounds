@@ -24,13 +24,28 @@ interface Finding {
   over: number;
 }
 
+// --- shared figure formatting ----------------------------------------------
+// Every surface that prints a run's numbers prints them the same way: this
+// file's findings, the panel's tiles and profile, the card table, and the share
+// image. A figure rounded one way on screen and another way on the receipt is
+// two numbers, so the formats live here rather than once per caller.
+
+/** Printed wherever a metric has no value. `pct` falls back to it, and the
+ *  `Figure` component keys its muted styling off it. */
+export const NO_VALUE = 'n/a';
+
+/** One decimal by default, trailing zero trimmed: 2.5 and 3 rather than 2.5 and 3.0. */
+export function num(value: number, digits = 1): string {
+  return String(Number(value.toFixed(digits)));
+}
+
 /**
  * One percentage format for every surface that prints a rate: this file's
  * findings, the panel's tiles and profile, and the share image's tiles. A rate
  * rounded one way on screen and another way on the receipt is two numbers.
  */
 export function pct(value: number | null): string {
-  return value === null ? 'n/a' : `${Math.round(value * 100)}%`;
+  return value === null ? NO_VALUE : `${Math.round(value * 100)}%`;
 }
 
 export function verdictOf(card: Scorecard): { text: string; clear: boolean } {

@@ -6,11 +6,13 @@ import type { EventLedgerRow, Scorecard } from '../../engine/scorecard';
 import type { Deck, RunResult } from '../../domain/types';
 import { useUiStore } from '../../state/uiStore';
 import { normalizeSweep, sweepWord } from '../pressure/pressureUi';
+import CardStatsSection from './CardStatsSection';
 import ReviewSection from './ReviewSection';
 import TimelineChart from './TimelineChart';
 import { useDeckScorecards, useScorecard } from './useScorecards';
 import { renderScorecardPng } from './shareImage';
-import { pct, verdictOf } from './verdict';
+import { Figure } from './figures';
+import { NO_VALUE, num, pct, verdictOf } from './verdict';
 import { startDeckRun } from '../decks/startDeckRun';
 import './scorecard.css';
 
@@ -35,9 +37,6 @@ const RESULT_CLASS: Record<RunResult, string> = {
   abandoned: 'is-abandoned',
 };
 
-/** Printed wherever a metric has no value for this run. `pct` prints the same. */
-const NO_VALUE = 'n/a';
-
 const CLOCK_WORD: Record<string, string> = {
   won: 'won first',
   'eliminated-seat': 'eliminated the seat',
@@ -47,11 +46,9 @@ const CLOCK_WORD: Record<string, string> = {
 };
 
 // --- formatting -------------------------------------------------------------
-
-function num(value: number, digits = 1): string {
-  const rounded = Number(value.toFixed(digits));
-  return String(rounded);
-}
+// `num`, `pct` and `NO_VALUE` are the scorecard's shared figure formats and live
+// in `verdict.ts`, so the panel, the card table and the share image all round
+// the same number the same way.
 
 /** "n/a", "1 turn", "2.5 turns". Averages are rounded before the noun is chosen. */
 function turns(value: number | null): string {
@@ -97,7 +94,9 @@ function eventDetail(row: EventLedgerRow): string {
 
 /** What the table looked like afterwards, in a handful of words. */
 function eventOutcome(row: EventLedgerRow): string {
-  if (row.terminal === 'responded') return 'answered on the table';
+  // A bound answer names the card; an unbound one is still only a claim.
+  if (row.terminal === 'responded')
+    return row.answerCard ? `answered with ${row.answerCard}` : 'answered on the table';
   if (row.terminal === 'unresolved') return 'never resolved';
   const o = row.outcome;
   switch (row.type) {
@@ -130,13 +129,6 @@ function eventOutcome(row: EventLedgerRow): string {
 }
 
 // --- small pieces -----------------------------------------------------------
-
-/** A figure, or the muted "n/a" that says there was nothing to measure. */
-function Figure({ value, className }: { value: string; className: string }) {
-  return (
-    <span className={`${className} num${value === NO_VALUE ? ' is-na' : ''}`}>{value}</span>
-  );
-}
 
 function Tile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
@@ -270,7 +262,10 @@ function Seats({ card }: { card: Scorecard }) {
     <div className="sc-seats">
       {card.seats.map((seat) => (
         <div key={seat.seatId} className={`sc-seat${seat.eliminatedTurn !== null ? ' is-dead' : ''}`}>
-          <span className="sc-seat-name">SEAT {seat.seatId}</span>
+          <span className="sc-seat-name">
+            SEAT {seat.seatId}
+            {seat.profile && <span className="sc-dim"> · {seat.profile}</span>}
+          </span>
           <span className="sc-seat-dmg num">{seat.damageDealt}</span>
           <span className="sc-seat-sub">damage dealt</span>
           <span className="sc-seat-sub">
@@ -310,21 +305,20 @@ function Profile({ cards }: { cards: Scorecard[] }) {
         <div>
           <dt>Win rate</dt>
           <dd>
-            <Figure className="" value={pct(profile.winRate)} />{' '}
+            <Figure value={pct(profile.winRate)} />{' '}
             <span className="sc-dim">({profile.wins}W {profile.losses}L)</span>
           </dd>
         </div>
         <div>
           <dt>Avg turns</dt>
           <dd>
-            <Figure className="" value={profile.avgTurns === null ? NO_VALUE : num(profile.avgTurns)} />
+            <Figure value={profile.avgTurns === null ? NO_VALUE : num(profile.avgTurns)} />
           </dd>
         </div>
         <div>
           <dt>Avg first cast</dt>
           <dd>
             <Figure
-              className=""
               value={
                 profile.avgFirstCommanderCast === null
                   ? NO_VALUE
@@ -337,7 +331,6 @@ function Profile({ cards }: { cards: Scorecard[] }) {
           <dt>Avg MV / turn</dt>
           <dd>
             <Figure
-              className=""
               value={profile.avgMvPerTurn === null ? NO_VALUE : num(profile.avgMvPerTurn)}
             />
           </dd>
@@ -349,25 +342,25 @@ function Profile({ cards }: { cards: Scorecard[] }) {
         <div>
           <dt>Avg rebuild</dt>
           <dd>
-            <Figure className="" value={turns(profile.avgTurnsToRecover)} />
+            <Figure value={turns(profile.avgTurnsToRecover)} />
           </dd>
         </div>
         <div>
           <dt>Never rebuilt</dt>
           <dd>
-            <Figure className="" value={pct(profile.unrecoveredWipeRate)} />
+            <Figure value={pct(profile.unrecoveredWipeRate)} />
           </dd>
         </div>
         <div>
           <dt>Cmdr downtime</dt>
           <dd>
-            <Figure className="" value={turns(profile.avgCommanderDowntime)} />
+            <Figure value={turns(profile.avgCommanderDowntime)} />
           </dd>
         </div>
         <div>
           <dt>Answer rate</dt>
           <dd>
-            <Figure className="" value={pct(profile.answerRate)} />
+            <Figure value={pct(profile.answerRate)} />
           </dd>
         </div>
         <div>
@@ -379,7 +372,7 @@ function Profile({ cards }: { cards: Scorecard[] }) {
         <div>
           <dt>Mulligan rate</dt>
           <dd>
-            <Figure className="" value={pct(profile.mulliganRate)} />
+            <Figure value={pct(profile.mulliganRate)} />
           </dd>
         </div>
       </dl>
@@ -734,6 +727,10 @@ export default function ScorecardPanel() {
         {deckRuns ? <Profile cards={deckRuns.cards} /> : <p className="sc-empty">Scoring…</p>}
         <p className="sc-hint">Replay the seed after a deck edit to compare like for like.</p>
       </section>
+
+      {/* The profile above is the deck's tendency; this is which card produced
+          it, which is the view that gets a card cut. */}
+      <CardStatsSection stats={deckRuns?.cardStats} />
     </section>
   );
 }

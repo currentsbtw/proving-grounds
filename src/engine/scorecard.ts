@@ -36,7 +36,14 @@ import type {
  *    store's own totals do.
  */
 
-export const SCORECARD_VERSION = 1;
+/**
+ * 3 — `EventTally.nameable` joins the shape, and `AnswerRate.namedRate` is read
+ * against it rather than against every answer: a paid tax is an answer with no
+ * card in it, so counting it in the denominator made naming look worse than it
+ * was. 2 added `EventTally.named`, `AnswerRate.namedRate` and the ledger's
+ * `answerCard`, when answers first bound to the card that made them.
+ */
+export const SCORECARD_VERSION = 3;
 
 export interface TurnRow {
   turn: number;
@@ -95,6 +102,18 @@ export interface EventTally {
   responded: number;
   resolved: number;
   unresolved: number;
+  /**
+   * Answers that named the card that made them. Always ≤ `responded`: an answer
+   * with no card is still an answer, it just cannot say which card it held up.
+   */
+  named: number;
+  /**
+   * Answers that *could* have named a card — every responded event except a paid
+   * tax. Paying a tax is mana, not a card: nothing is asked for and nothing can
+   * be bound, so counting it against `named` would only ever read as a player
+   * failing to name what they were never offered the chance to.
+   */
+  nameable: number;
 }
 
 export interface AnswerRate {
@@ -102,10 +121,19 @@ export interface AnswerRate {
   total: EventTally;
   /** responded / (responded + resolved), 0..1, null if nothing terminal. */
   rate: number | null;
+  /**
+   * named / nameable, 0..1, null if nothing answerable-with-a-card was answered.
+   * `rate` says how often the player claimed an answer; this says how often the
+   * claim came with a card behind it — the difference between measuring claims
+   * and measuring answers.
+   */
+  namedRate: number | null;
 }
 
 export interface SeatOutcome {
   seatId: SeatId;
+  /** The archetype the seat was dealt at run start, read off the seating entry. Absent on older runs. */
+  profile?: string;
   damageDealt: number;
   commanderDamageDealt: number;
   eliminatedTurn: number | null;
@@ -149,6 +177,10 @@ export interface EventLedgerRow {
   terminal: 'responded' | 'resolved' | 'unresolved';
   outcome?: Record<string, unknown>;
   note?: string;
+  /** The card the player answered with, when the answer named one. */
+  answerCard?: string;
+  /** Where that card went — absent when it answered from the battlefield and stayed. */
+  answerTo?: string;
 }
 
 export interface Scorecard {
@@ -434,6 +466,13 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
   };
   /** How the last clock left the table, if it did. */
   let clockClearedBy: 'eliminated-seat' | 'declared-interaction' | null = null;
+  /**
+   * The ledger row a *standing* clock's answer had to invent, and the turn it
+   * landed on. Kept so a legacy log that wrote the answer fields onto both the
+   * clock's entry and the warning's can have the invented one taken back out —
+   * one spent card must not answer two events.
+   */
+  let standingClockRow: { eventId: string; turn: number } | null = null;
   let clockClearedTurn: number | null = null;
   let clockExpired = false;
 
@@ -780,6 +819,42 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
           clockClearedTurn = entry.turn;
           clock.deadlineTurn = readNumber(p, 'deadlineTurn') ?? clock.deadlineTurn;
           clock.spawnedTurn = readNumber(p, 'spawnedTurn') ?? clock.spawnedTurn;
+          // A clock the player answered while its warning card was still up puts
+          // the answer on the warning's own entry, which has an event id and is
+          // scored below like any other answer. A *standing* clock has no
+          // warning and no event entry anywhere in the log, so this is the only
+          // place its answer can be read: the row is invented under the same id
+          // the store bound the card to, `clock-<seatId>`, and the tallies see
+          // one responded event with a card behind it. An answer that named no
+          // card invents nothing — there is no event to file it under, and a
+          // bare claim about a clock was never counted before either.
+          const claimed = readString(p, 'answerName');
+          const clockSeat = readSeat(p, 'seatId');
+          if (claimed && clockSeat) {
+            const eventId = `clock-${clockSeat}`;
+            const severity: Record<string, number> = {};
+            const deadline = readNumber(p, 'deadlineTurn');
+            if (deadline !== undefined) severity.deadlineTurn = deadline;
+            const invented: EventLedgerRow = events.get(eventId) ?? {
+              eventId,
+              type: 'clock',
+              seatId: clockSeat,
+              turn: entry.turn,
+              severity,
+              terminal: 'responded',
+            };
+            invented.terminal = 'responded';
+            invented.answerCard = claimed;
+            const wentTo = readZone(p, 'answerTo');
+            if (wentTo) invented.answerTo = wentTo;
+            const claimNote = readString(p, 'note');
+            if (claimNote) invented.note = claimNote;
+            if (!events.has(eventId)) {
+              events.set(eventId, invented);
+              eventTurns.set(eventId, invented.turn);
+            }
+            standingClockRow = { eventId, turn: entry.turn };
+          }
           break;
         }
         const row = ledgerFor(entry);
@@ -787,6 +862,26 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
         row.terminal = 'responded';
         const note = readString(p, 'note');
         if (note) row.note = note;
+        // Only a bound answer names a card. A rejected iid writes `bound: false`
+        // and no name, so the row stays as silent as an unbound answer does.
+        const answerCard = readString(p, 'answerName');
+        if (answerCard) row.answerCard = answerCard;
+        const answerTo = readZone(p, 'answerTo');
+        if (answerTo) row.answerTo = answerTo;
+        // The warning's entry follows the clock's own, in the same turn. A log
+        // written before the fields were confined to one entry carries the
+        // answer on both; the warning is the entry with a real event id, so it
+        // keeps the answer and the invented row goes back out.
+        if (
+          row.type === 'clock' &&
+          answerCard !== undefined &&
+          standingClockRow !== null &&
+          standingClockRow.turn === entry.turn
+        ) {
+          events.delete(standingClockRow.eventId);
+          eventTurns.delete(standingClockRow.eventId);
+          standingClockRow = null;
+        }
         if (row.type === 'wipe') {
           wipes.push({
             eventId: row.eventId,
@@ -803,6 +898,18 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
       }
 
       case 'threat': {
+        // The seating entry is the one place the profiles are written down.
+        const seated = p.seats;
+        if (Array.isArray(seated)) {
+          for (const item of seated) {
+            if (!item || typeof item !== 'object') continue;
+            const bag = item as Record<string, unknown>;
+            const id = readString(bag, 'id') as SeatId | undefined;
+            const profile = readString(bag, 'profile');
+            const outcome = id ? seats.get(id) : undefined;
+            if (outcome && profile) outcome.profile = profile;
+          }
+        }
         if (isTrue(p, 'canceled') && readString(p, 'reason') === 'elimination') {
           clockClearedBy = 'eliminated-seat';
           clockClearedTurn = entry.turn;
@@ -873,7 +980,16 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
 // ---------------------------------------------------------------------------
 
 function emptyTally(): EventTally {
-  return { offered: 0, responded: 0, resolved: 0, unresolved: 0 };
+  return { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 };
+}
+
+/**
+ * A tax is paid in mana. It is the one answer with no card in it — the store
+ * asks for none and binds none — so it is an answer that could never have named
+ * one, and it sits out of the naming denominator.
+ */
+function isPaidTax(row: EventLedgerRow): boolean {
+  return row.type === 'resource' && row.variant === 'tax';
 }
 
 /** A seat that never took a point of damage still gets a row. */
@@ -938,6 +1054,14 @@ export function scoreRun(run: RunRecord, options?: ScoreOptions): Scorecard {
     total.offered += 1;
     tally[row.terminal] += 1;
     total[row.terminal] += 1;
+    if (row.terminal === 'responded' && !isPaidTax(row)) {
+      tally.nameable += 1;
+      total.nameable += 1;
+    }
+    if (row.terminal === 'responded' && row.answerCard !== undefined) {
+      tally.named += 1;
+      total.named += 1;
+    }
   }
   const terminal = total.responded + total.resolved;
 
@@ -973,7 +1097,12 @@ export function scoreRun(run: RunRecord, options?: ScoreOptions): Scorecard {
     },
     wipes: replay.wipes,
     commander: replay.commander,
-    answers: { byType, total, rate: terminal > 0 ? total.responded / terminal : null },
+    answers: {
+      byType,
+      total,
+      rate: terminal > 0 ? total.responded / terminal : null,
+      namedRate: total.nameable > 0 ? total.named / total.nameable : null,
+    },
     seats: SEAT_IDS.map((id) => replay.seats.get(id) ?? emptySeatOutcome(id)),
     clock: replay.clock,
     keep: replay.keep,
@@ -1016,6 +1145,14 @@ export interface DeckProfile {
   avgCommanderDowntime: number | null;
   /** Pooled across runs, not an average of per-run rates. */
   answerRate: number | null;
+  /**
+   * Of the answers that could have named a card across those runs, the share
+   * that did. Pooled the same way, and past the paid taxes for the same reason
+   * `AnswerRate.namedRate` is. A deck answering often but naming rarely is a
+   * deck whose pilot is claiming, not holding up — which is a reading about the
+   * run, not about the list, so it earns no tag.
+   */
+  namedAnswerRate: number | null;
   clocksFaced: number;
   clocksBeaten: number;
   mulliganRate: number | null;
@@ -1048,6 +1185,10 @@ export function aggregateProfile(cards: Scorecard[]): DeckProfile {
 
   const responded = cards.reduce((n, c) => n + c.answers.total.responded, 0);
   const resolved = cards.reduce((n, c) => n + c.answers.total.resolved, 0);
+  const named = cards.reduce((n, c) => n + c.answers.total.named, 0);
+  // Pooled the same way `named` is, and against the same denominator the
+  // per-run rate uses: paid taxes are answers that could name nothing.
+  const nameable = cards.reduce((n, c) => n + c.answers.total.nameable, 0);
 
   const clocksFaced = cards.filter((c) => c.clock.faced).length;
   const clocksBeaten = cards.filter((c) => c.clock.beatClock).length;
@@ -1074,6 +1215,7 @@ export function aggregateProfile(cards: Scorecard[]): DeckProfile {
         : null,
     avgCommanderDowntime: mean(cards.map((c) => c.commander.downtimeTurns)),
     answerRate: responded + resolved > 0 ? responded / (responded + resolved) : null,
+    namedAnswerRate: nameable > 0 ? named / nameable : null,
     clocksFaced,
     clocksBeaten,
     mulliganRate: runs > 0 ? cards.filter((c) => c.keep.mulligans > 0).length / runs : null,

@@ -10,7 +10,7 @@
  *
  *   npm run verify:engine
  *
- * Twelve checks, each labelled:
+ * Sixteen checks, each labelled:
  *
  *   (a) a seat with a queued event is eliminated — the event leaves the queue,
  *       the log says it was canceled, and the scorecard never lists it
@@ -51,14 +51,30 @@
  *       generator of its own, so answering a Chaos Warp and resolving one leave
  *       the run's next rolls identical, and a card that excludes a kind is
  *       never cited on it (Go for the Throat, artifact creature)
+ *   (o) an answer names the card that made it: an instant answering out of hand
+ *       is spent to the graveyard through an ordinary 'move' entry that says
+ *       which event it answered, a permanent answering stays on the battlefield
+ *       untapped, an answer with no card still stands and says it is unbound, a
+ *       card sitting on the stack tray is refused (and moves nothing), the
+ *       scored ledger and tally read the card back off the log, a paid tax is an
+ *       answer that could never have named a card and sits out of the named
+ *       rate, the per-card tally reads an instant's spend as the cast it was
+ *       (and never counts a refused binding), declaring past a race clock binds
+ *       the card once whether or not the clock's warning was still up, an
+ *       intercepting seat only ever cites a counterspell in its own colours,
+ *       and the same seed answering the same way replays byte for byte
+ *   (p) the three seats are three different archetypes, and the "Seats seated"
+ *       entry carries each seat's profile into the log
  *
- * (a) to (c), (h), (i), (k) and (l) need a run where the pod actually did the thing
+ * (a) to (c), (h), (i), (k), (l) and (o) need a run where the pod actually did the thing
  * being tested, so each one searches seeds until it finds one and prints which
  * it used. Failures are collected rather than thrown, so one execution reports
  * everything.
  */
 import {
+  canCastToStack,
   canMulligan,
+  cardName,
   cardsInZone,
   isInstantOrSorceryCard,
   isLandCard,
@@ -69,18 +85,27 @@ import {
 import { scoreRun } from '../src/engine/scorecard.ts';
 import { reviewRun } from '../src/engine/review.ts';
 import { PRESSURE } from '../src/data/pressure.ts';
+import { ALL_COLORS, PROFILE_IDS, type SeatProfileId } from '../src/data/profiles.ts';
 import { createRng } from '../src/domain/rng.ts';
 import {
   chooseCounterCitation,
+  colorsOf,
   emptySilhouette,
   initialThreat,
   resolveWindow,
   seatMana,
+  toSnapshot,
   zeroFiredCounts,
   zeroLastFiredWindow,
   type PermanentSummary,
   type SeatSnapshot,
 } from '../src/engine/pressure.ts';
+import {
+  cardStats,
+  isCutCandidate,
+  CUT_CANDIDATE,
+  type CardStat,
+} from '../src/engine/cardStats.ts';
 import type {
   CardData,
   CardInstance,
@@ -310,7 +335,7 @@ function drainEventsWithoutDamage(): void {
   for (let guard = 0; guard < 60; guard++) {
     const event = store().activeEvent;
     if (!event || !store().run) return;
-    if (event.type === 'combat') store().respondToActiveEvent('blocked it');
+    if (event.type === 'combat') store().respondToActiveEvent({ note: 'blocked it' });
     else store().resolveActiveEvent();
   }
   throw new Error('the event queue never emptied');
@@ -764,6 +789,14 @@ function checkPeakBoardTracks(): void {
   const survivors: SeatId[] = ['A', 'B'];
   const seatOf = (id: SeatId): Seat | undefined => store().seats.find((s) => s.id === id);
 
+  // The search owns the whole scenario, not just "a seat reached the cap": it
+  // also plays the three windows the check needs and rejects the seed when they
+  // did not leave a grown board. A pod that wraths in one of those windows
+  // zeroes every seat's board, which is a normal thing for a pod to do and not
+  // an answer to the question being asked here — so the search steps over that
+  // seed instead of the check failing on it. The property still has teeth: an
+  // engine that froze board growth at the threat cap would satisfy no seed at
+  // all, and the search reports that as a failure.
   const found = search('engine-silhouette', (seed) => {
     freshRun(seed);
     for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
@@ -772,44 +805,39 @@ function checkPeakBoardTracks(): void {
       drainEventsWithoutDamage();
       if (!store().run) return null;
       const seat = seatOf(victim);
-      if (seat && seat.threat >= PRESSURE.threat.max) return { seed, turn: store().turn };
+      if (seat && seat.threat >= PRESSURE.threat.max) {
+        const boardAtCap: Silhouette = { ...seat.silhouette };
+        const cappedTurn = store().turn;
+        // Three more windows with threat unable to rise. The board grows anyway.
+        for (let i = 0; i < 3; i++) {
+          store().nextTurn();
+          if (!store().run) return null;
+          if (store().clock) store().declareInteraction();
+          drainEventsWithoutDamage();
+        }
+        const after = seatOf(victim);
+        if (!after || after.eliminated) return null;
+        if (after.threat < PRESSURE.threat.max) return null;
+        if (after.silhouette.power <= boardAtCap.power) return null;
+        return { seed, turn: cappedTurn, boardAtCap };
+      }
       store().nextTurn();
     }
     return null;
   });
 
   if (!found) {
-    failures.push('(h) no seed pinned a seat at the threat cap within the search');
+    failures.push('(h) no seed grew a capped seat’s board over three clean windows');
     return;
   }
 
-  const atCap = seatOf(victim);
-  if (!atCap) {
-    failures.push('(h) the seat vanished at the cap');
-    return;
-  }
-  const boardAtCap: Silhouette = { ...atCap.silhouette };
-
-  // Three more windows with threat unable to rise. The board grows anyway.
-  for (let i = 0; i < 3; i++) {
-    store().nextTurn();
-    if (!store().run) break;
-    if (store().clock) store().declareInteraction();
-    drainEventsWithoutDamage();
-  }
-
+  const boardAtCap = found.boardAtCap;
   const grown = seatOf(victim);
   const peakBoard = grown?.peakSilhouette;
   if (!grown || !peakBoard) {
     failures.push('(h) no peak board recorded for the seat');
     return;
   }
-  check('(h) the seat is still pinned at the cap', grown.threat >= PRESSURE.threat.max, `${grown.threat}`);
-  check(
-    '(h) its board grew while the cap held',
-    grown.silhouette.power > boardAtCap.power,
-    `power ${boardAtCap.power} -> ${grown.silhouette.power}`,
-  );
   check(
     '(h) the recorded peak grew with it',
     peakBoard.power >= grown.silhouette.power && peakBoard.creatures >= grown.silhouette.creatures,
@@ -1202,7 +1230,7 @@ async function checkStackedCounter(): Promise<void> {
   store().resolveTop();
   check('(k) the tray will not resolve the counter itself', store().stack.length === 2, `${store().stack.length}`);
 
-  store().respondToActiveEvent('forced it through');
+  store().respondToActiveEvent({ note: 'forced it through' });
   check('(k) answering takes only the counter off', store().stack.length === 1 && stackTop()?.kind === 'spell');
   checkStackDepth('(k) the answered counter is logged off the tray at the right depth');
   check(
@@ -1656,19 +1684,23 @@ function checkEveryEventCitesACard(): void {
 /** A seat holding up mana it cannot spend has no counterspell to hold. */
 function checkCounterCitationSkips(): void {
   const spell = { name: 'Grounds Titan', manaValue: 7, typeLine: 'Creature — Giant' };
-  const broke = chooseCounterCitation(3, 5, 1, 0, spell);
-  const afforded = chooseCounterCitation(3, 5, 1, 5, spell);
+  // Every colour, so what is being checked here is mana and shape alone.
+  const broke = chooseCounterCitation(3, 5, 1, 0, spell, ALL_COLORS);
+  const afforded = chooseCounterCitation(3, 5, 1, 5, spell, ALL_COLORS);
   check('(m) no mana, no counterspell, no interception', broke === undefined);
   check('(m) with mana up the same seat does counter', afforded !== undefined, `${afforded?.name}`);
   // The other way a seat has nothing is shape: at bracket 2 the only counter
   // one mana buys is An Offer You Can't Refuse, which does not look at
   // creatures. The same seat, same mana, catches a noncreature spell.
-  const noShape = chooseCounterCitation(3, 5, 2, 1, spell);
-  const rightShape = chooseCounterCitation(3, 5, 2, 1, {
-    name: 'Grounds Signet',
-    manaValue: 6,
-    typeLine: 'Artifact',
-  });
+  const noShape = chooseCounterCitation(3, 5, 2, 1, spell, ALL_COLORS);
+  const rightShape = chooseCounterCitation(
+    3,
+    5,
+    2,
+    1,
+    { name: 'Grounds Signet', manaValue: 6, typeLine: 'Artifact' },
+    ALL_COLORS,
+  );
   check('(m) a counter the wrong shape is not cited', noShape === undefined, `${noShape?.name}`);
   check(
     '(m) the same mana still catches what it is shaped for',
@@ -1696,7 +1728,7 @@ function findTaxEvent(seed: string, want?: 'draw' | 'treasure'): PressureEvent |
       ) {
         return event;
       }
-      if (event.type === 'combat') store().respondToActiveEvent('blocked it');
+      if (event.type === 'combat') store().respondToActiveEvent({ note: 'blocked it' });
       else store().resolveActiveEvent();
     }
     if (store().clock) store().declareInteraction();
@@ -1838,7 +1870,7 @@ function findTuckEvent(seed: string, castCommander = false): PressureEvent | nul
         const onCommander = store().cards[event.targetIid ?? '']?.isCommander === true;
         if (onCommander === castCommander) return event;
       }
-      if (event.type === 'combat') store().respondToActiveEvent('blocked it');
+      if (event.type === 'combat') store().respondToActiveEvent({ note: 'blocked it' });
       else store().resolveActiveEvent();
     }
     if (store().clock) store().declareInteraction();
@@ -1908,7 +1940,7 @@ function checkTuckShuffleIsOffTheMainStream(): void {
     const iid = event?.targetIid;
     const topBefore = store().libraryOrder.slice(0, 6).join(',');
     if (exit === 'resolve') store().resolveActiveEvent();
-    else store().respondToActiveEvent('answered it');
+    else store().respondToActiveEvent({ note: 'answered it' });
     const topAfter = store().libraryOrder.slice(0, 6).join(',');
     const rng = store().rng;
     const rolls = rng ? Array.from({ length: 16 }, () => rng()).join(',') : 'no rng';
@@ -2056,6 +2088,748 @@ function checkExcludesAreHonoured(): void {
 }
 
 // ---------------------------------------------------------------------------
+// (o) an answer names the card that made it
+// ---------------------------------------------------------------------------
+
+/** The newest 'respond' entry, whichever event it settled. */
+function lastRespondEntry(): LogEntry | undefined {
+  return (store().run?.log ?? []).filter((entry) => entry.kind === 'respond').pop();
+}
+
+/**
+ * Drive the run until something a card could answer is in front of the player.
+ * A tax is not one of those — it is mana, and nothing asks for a card — so it is
+ * resolved past rather than handed back.
+ */
+function pumpToAnswerableEvent(limit = 12): PressureEvent | null {
+  for (let i = 0; i < limit; i++) {
+    if (!store().run) return null;
+    const event = store().activeEvent;
+    if (event) {
+      if (!(event.type === 'resource' && event.variant === 'tax')) return event;
+      store().resolveActiveEvent();
+      continue;
+    }
+    if (store().clock) store().declareInteraction();
+    store().nextTurn();
+    playLand();
+  }
+  return null;
+}
+
+/**
+ * Drive the run until the race clock's own warning card is the event in front of
+ * the player, with the clock still standing behind it. Combat is answered rather
+ * than resolved so the search cannot kill the player on the way.
+ */
+function pumpToClockWarning(limit = 16): PressureEvent | null {
+  for (let i = 0; i < limit; i++) {
+    if (!store().run) return null;
+    const event = store().activeEvent;
+    if (event) {
+      const clock = store().clock;
+      if (event.type === 'clock' && clock && clock.seatId === event.seatId) return event;
+      if (event.type === 'combat') store().respondToActiveEvent({ note: 'blocked it' });
+      else store().resolveActiveEvent();
+      continue;
+    }
+    store().nextTurn();
+    playLand();
+  }
+  return null;
+}
+
+/**
+ * Drive the run until a clock is standing with nothing in front of it — the case
+ * where declaring writes one entry and no event entry exists anywhere in the log
+ * for the ledger to hang the answer on. Resolving a clock warning is "the clock
+ * stands", so the clock survives being resolved past.
+ */
+function pumpToStandingClock(limit = 18): boolean {
+  for (let i = 0; i < limit; i++) {
+    if (!store().run) return false;
+    const event = store().activeEvent;
+    if (event) {
+      if (event.type === 'combat') store().respondToActiveEvent({ note: 'blocked it' });
+      else store().resolveActiveEvent();
+      continue;
+    }
+    if (store().clock) return true;
+    store().nextTurn();
+    playLand();
+  }
+  return false;
+}
+
+/** One card name's row in the per-card tally, or undefined. */
+function statFor(runs: RunRecord[], name: string): CardStat | undefined {
+  return cardStats(runs).cards.find((c) => c.name === name);
+}
+
+/** Every card's `answeredWith`, added up. Exactly the bound answers, no more. */
+function totalAnsweredWith(runs: RunRecord[]): number {
+  return cardStats(runs).cards.reduce((n, c) => n + c.answeredWith, 0);
+}
+
+/**
+ * The same record with the `answered <eventId>` reason taken off its move
+ * entries — the log as the per-card tally used to read it. It is what says the
+ * reason is load-bearing: without it an instant held up and spent goes hand →
+ * graveyard, which matches none of the cast shapes, and the card reads as one
+ * the player drew repeatedly and never cast.
+ */
+function withoutAnswerReasons(record: RunRecord): RunRecord {
+  return {
+    ...record,
+    log: record.log.map((entry) => {
+      const reason = entry.payload.reason;
+      if (entry.kind !== 'move' || typeof reason !== 'string' || !reason.startsWith('answered ')) {
+        return entry;
+      }
+      const payload = { ...entry.payload };
+      delete payload.reason;
+      return { ...entry, payload };
+    }),
+  };
+}
+
+/**
+ * A run whose instants only ever leave the hand as answers: nothing casts one,
+ * so the name's `cast` is exactly the number of events it answered. Left live
+ * rather than ended, so a seed search over it leaves no pending persistence
+ * behind to clear the store out from under the run that is finally kept.
+ */
+function instantAnswerRun(seed: string): RunRecord | null {
+  freshStackRun(seed);
+  for (let guard = 0; guard < 16; guard++) {
+    if (!store().run) break;
+    if (!pumpToAnswerableEvent()) break;
+    const held = cardsInZone(store(), 'hand').find((c) => cardName(store(), c.iid) === INSTANT.name);
+    if (held) store().respondToActiveEvent({ iid: held.iid });
+    else store().resolveActiveEvent();
+  }
+  return store().run ?? lastCapturedRun();
+}
+
+/**
+ * A scripted run that answers every event with whatever is at the front of the
+ * hand, so the binding path — the type-line read, the move, the flattened
+ * fields on the entry — is inside what the determinism comparison covers. An
+ * empty hand answers unbound, which is the other branch.
+ */
+function scriptedAnswerRun(seed: string): RunRecord {
+  freshStackRun(seed);
+  for (let turn = 1; turn <= 8; turn++) {
+    if (!store().run) break;
+    if (store().clock) store().declareInteraction();
+    for (let guard = 0; guard < 30; guard++) {
+      if (!store().activeEvent) break;
+      const held = cardsInZone(store(), 'hand')[0];
+      store().respondToActiveEvent(held ? { iid: held.iid, note: 'answered' } : undefined);
+    }
+    store().drawCards(2);
+    playLand();
+    playBiggestSpell();
+    if (turn < 8) store().nextTurn();
+  }
+  const record = store().run ?? lastCapturedRun();
+  if (!record) throw new Error('scripted answer run produced no record');
+  return record;
+}
+
+async function checkAnswersNameTheCard(): Promise<void> {
+  const seed = search('answer-bound', (s) => {
+    freshStackRun(s);
+    return pumpToAnswerableEvent() ? s : null;
+  });
+  if (seed === null) {
+    failures.push('(o) no seed put an answerable event in front of the player');
+    return;
+  }
+
+  freshStackRun(seed);
+  const first = pumpToAnswerableEvent();
+  if (!first) {
+    failures.push('(o) the chosen seed stopped offering events');
+    return;
+  }
+
+  // --- a card answering out of hand is spent --------------------------------
+  // Deep enough that an instant is certainly in there.
+  store().drawCards(24);
+  const instant = cardsInZone(store(), 'hand').find((c) => isInstantOrSorceryCard(store(), c));
+  check('(o) the hand holds an instant to answer with', instant !== undefined);
+  if (!instant) return;
+  const instantName = cardName(store(), instant.iid);
+  const before = (store().run?.log ?? []).length;
+
+  store().respondToActiveEvent({ iid: instant.iid, note: 'held it up' });
+
+  check(
+    '(o) an instant answering out of hand lands in the graveyard',
+    store().cards[instant.iid]?.zone === 'graveyard',
+    `${store().cards[instant.iid]?.zone}`,
+  );
+  const move = (store().run?.log ?? [])
+    .slice(before)
+    .find((e) => e.kind === 'move' && e.payload.iid === instant.iid);
+  check(
+    '(o) the spend is an ordinary move entry',
+    move?.payload.from === 'hand' && move?.payload.to === 'graveyard',
+    `${JSON.stringify(move?.payload)}`,
+  );
+  check(
+    '(o) and the move says which event it answered',
+    move?.payload.reason === `answered ${first.id}`,
+    `${String(move?.payload.reason)}`,
+  );
+
+  const bound = lastRespondEntry();
+  check(
+    '(o) the respond entry binds the card',
+    bound?.payload.bound === true && bound?.payload.answerIid === instant.iid,
+    `${JSON.stringify(bound?.payload)}`,
+  );
+  check(
+    '(o) it carries the name, the zone it left and the zone it went to',
+    bound?.payload.answerName === instantName &&
+      bound?.payload.answerZone === 'hand' &&
+      bound?.payload.answerTo === 'graveyard' &&
+      bound?.payload.answerMv === INSTANT.manaValue,
+    `${JSON.stringify(bound?.payload)}`,
+  );
+  check(
+    '(o) and the message names what answered',
+    bound?.message.startsWith(`Answered ${first.type} with ${instantName}:`) === true,
+    `${bound?.message}`,
+  );
+
+  // --- a permanent answering stays where it is ------------------------------
+  playBiggestSpell();
+  const second = pumpToAnswerableEvent();
+  check('(o) a second event arrived to answer from the board', second !== null);
+  if (!second) return;
+  const permanent = Object.values(store().cards).find(
+    (c) =>
+      c.zone === 'battlefield' &&
+      !c.isToken &&
+      !isLandCard(store(), c) &&
+      c.iid !== second.targetIid,
+  );
+  check('(o) a nonland permanent is on the board to answer with', permanent !== undefined);
+  if (!permanent) return;
+  const permanentName = cardName(store(), permanent.iid);
+  const tappedBefore = permanent.tapped;
+
+  store().respondToActiveEvent({ iid: permanent.iid });
+
+  check(
+    '(o) a permanent answering stays on the battlefield',
+    store().cards[permanent.iid]?.zone === 'battlefield',
+    `${store().cards[permanent.iid]?.zone}`,
+  );
+  check(
+    '(o) and is never tapped for it',
+    store().cards[permanent.iid]?.tapped === tappedBefore,
+    `${tappedBefore} → ${store().cards[permanent.iid]?.tapped}`,
+  );
+  const boardEntry = lastRespondEntry();
+  check(
+    '(o) a battlefield answer binds with nowhere to go',
+    boardEntry?.payload.bound === true &&
+      boardEntry?.payload.answerZone === 'battlefield' &&
+      boardEntry?.payload.answerTo === undefined,
+    `${JSON.stringify(boardEntry?.payload)}`,
+  );
+
+  // --- no card is still an answer -------------------------------------------
+  const third = pumpToAnswerableEvent();
+  check('(o) a third event arrived to answer unbound', third !== null);
+  if (!third) return;
+  store().respondToActiveEvent();
+  const unbound = lastRespondEntry();
+  check(
+    '(o) an answer with no card says so',
+    unbound?.payload.bound === false && unbound?.payload.answerName === undefined,
+    `${JSON.stringify(unbound?.payload)}`,
+  );
+  check(
+    '(o) and keeps the plain message',
+    unbound?.message.startsWith(`Answered ${third.type}: `) === true,
+    `${unbound?.message}`,
+  );
+
+  // --- a card that is not the player's to spend is refused ------------------
+  const fourth = pumpToAnswerableEvent();
+  check('(o) a fourth event arrived to answer badly', fourth !== null);
+  if (!fourth) return;
+  const trayable = cardsInZone(store(), 'hand').find((c) => canCastToStack(store(), c.iid));
+  check('(o) something in hand can go on the tray', trayable !== undefined);
+  if (!trayable) return;
+  store().castToStack(trayable.iid);
+  check('(o) it is on the tray', store().cards[trayable.iid]?.zone === 'stack');
+
+  store().respondToActiveEvent({ iid: trayable.iid });
+  const rejected = lastRespondEntry();
+  check(
+    '(o) a card on the tray is refused as an answer',
+    rejected?.payload.bound === false && rejected?.payload.boundRejected === true,
+    `${JSON.stringify(rejected?.payload)}`,
+  );
+  check(
+    '(o) and the refusal moves nothing',
+    store().cards[trayable.iid]?.zone === 'stack',
+    `${store().cards[trayable.iid]?.zone}`,
+  );
+
+  // --- the scorer reads all of it -------------------------------------------
+  endRunQuietly('abandoned');
+  const record = lastCapturedRun();
+  if (!record) {
+    failures.push('(o) no run captured off the store');
+    return;
+  }
+  const scorecard = scoreRun({ ...record, result: 'abandoned' });
+  const handRow = scorecard.events.find((r) => r.eventId === first.id);
+  check(
+    '(o) the ledger row carries the answer card and where it went',
+    handRow?.answerCard === instantName && handRow?.answerTo === 'graveyard',
+    `${JSON.stringify(handRow)}`,
+  );
+  const boardRow = scorecard.events.find((r) => r.eventId === second.id);
+  check(
+    '(o) a battlefield answer names the card and no destination',
+    boardRow?.answerCard === permanentName && boardRow?.answerTo === undefined,
+    `${JSON.stringify(boardRow)}`,
+  );
+  const unboundRow = scorecard.events.find((r) => r.eventId === third.id);
+  check(
+    '(o) an unbound answer names nothing',
+    unboundRow?.terminal === 'responded' && unboundRow?.answerCard === undefined,
+    `${JSON.stringify(unboundRow)}`,
+  );
+  check(
+    '(o) the tally counts exactly the answers that named a card',
+    scorecard.answers.total.named === 2,
+    `named ${scorecard.answers.total.named} of ${scorecard.answers.total.responded} answered`,
+  );
+
+  // The named rate divides by what could have named something. This run pays no
+  // tax — every one it met was resolved past — so nothing is excluded here and
+  // the two denominators agree; `checkPaidTaxIsNotNameable` is where they part.
+  const paidTaxes = scorecard.events.filter(
+    (r) => r.terminal === 'responded' && r.type === 'resource' && r.variant === 'tax',
+  ).length;
+  check(
+    '(o) a paid tax is answered but could never have named a card',
+    scorecard.answers.total.nameable === scorecard.answers.total.responded - paidTaxes,
+    `nameable ${scorecard.answers.total.nameable}, responded ${scorecard.answers.total.responded}, ${paidTaxes} paid taxes`,
+  );
+  check(
+    '(o) the named rate is named over nameable',
+    scorecard.answers.namedRate !== null &&
+      Math.abs(scorecard.answers.namedRate - 2 / scorecard.answers.total.nameable) < 1e-9,
+    `${String(scorecard.answers.namedRate)} over ${scorecard.answers.total.nameable}`,
+  );
+
+  // --- and so does the per-card tally ---------------------------------------
+  // Two answers bound: the instant out of hand and the permanent off the board.
+  // The tray card was refused, and a refusal that counted would make three.
+  const runs = [{ ...record, result: 'abandoned' as RunResult }];
+  check(
+    '(o) only bound answers are tallied against a card',
+    totalAnsweredWith(runs) === 2,
+    `${totalAnsweredWith(runs)}`,
+  );
+  const refused = record.log.filter(
+    (e) => e.kind === 'respond' && e.payload.answerIid !== undefined && e.payload.bound !== true,
+  );
+  check(
+    '(o) the refusal is still on the log, it is just not a card that answered',
+    refused.length === 1,
+    `${refused.length} rejected bindings on the log`,
+  );
+
+  // --- and a bound answer replays byte for byte -----------------------------
+  const replaySeed = 'engine-answer-determinism';
+  const firstPass = normalizeLog(scriptedAnswerRun(replaySeed));
+  const secondPass = normalizeLog(scriptedAnswerRun(replaySeed));
+  const at = firstDifference(firstPass, secondPass);
+  check(
+    '(o) the same seed and the same scripted answers replay identically',
+    firstPass === secondPass,
+    at === -1
+      ? ''
+      : `diverges at char ${at}: ${firstPass.slice(at, at + 120)} | ${secondPass.slice(at, at + 120)}`,
+  );
+
+  summary.push(
+    `(o) seed ${seed}: ${instantName} answered out of hand, ${permanentName} answered from the board, ${scorecard.answers.total.named} of ${scorecard.answers.total.responded} answers named a card`,
+  );
+  await settle();
+}
+
+/**
+ * An instant held up and spent is a card the player cast. It leaves for the
+ * graveyard rather than the battlefield, which matched none of the shapes the
+ * per-card tally read as a cast, so the card came back as "drawn twice, cast
+ * never" — the cut list's own definition of a card not pulling its weight, aimed
+ * at the interaction the deck is built to hold up.
+ *
+ * The seed search asks for a run where the instant answered often enough to
+ * clear the cut threshold, so both readings are meaningful: the fixed one is no
+ * cut candidate, and the same log with the `answered` reason stripped is.
+ */
+async function checkAnsweredInstantCounts(): Promise<void> {
+  const seed = search('answer-cast', (s) => {
+    const run = instantAnswerRun(s);
+    if (!run) return null;
+    const stat = statFor([run], INSTANT.name);
+    if (!stat || stat.drawn < CUT_CANDIDATE.minDrawn) return null;
+    // Cast more than half the times it was seen, so the fixed reading is off the
+    // cut list and the unfixed one (cast zero) is on it.
+    return stat.cast * 2 > stat.drawn ? s : null;
+  });
+  if (seed === null) {
+    failures.push('(o) no seed answered enough events with the deck instant');
+    return;
+  }
+
+  const run = instantAnswerRun(seed);
+  if (!run) {
+    failures.push('(o) the chosen answer-cast seed produced no record');
+    return;
+  }
+  const fixed = statFor([run], INSTANT.name);
+  const blind = statFor([withoutAnswerReasons(run)], INSTANT.name);
+  if (!fixed || !blind) {
+    failures.push('(o) the deck instant has no row in the per-card tally');
+    return;
+  }
+
+  check(
+    '(o) an instant spent as an answer counts as a cast',
+    fixed.cast >= 1 && fixed.cast === fixed.answeredWith,
+    `${fixed.cast} cast, ${fixed.answeredWith} answered with, ${fixed.drawn} drawn`,
+  );
+  check(
+    '(o) and the card is not read as one the deck never cast',
+    !isCutCandidate(fixed),
+    `rate ${String(fixed.castRate)} over ${fixed.drawn} drawn`,
+  );
+  check(
+    '(o) the answered reason is what counts it',
+    blind.cast === 0 && isCutCandidate(blind),
+    `without it: ${blind.cast} cast, rate ${String(blind.castRate)}`,
+  );
+
+  summary.push(
+    `(o) seed ${seed}: ${INSTANT.name} answered ${fixed.answeredWith} events off ${fixed.drawn} draws, cast ${fixed.cast} (${blind.cast} before the reason was read)`,
+  );
+  if (store().run) endRunQuietly('abandoned');
+  await settle();
+}
+
+/**
+ * Declaring held interaction against a race clock binds the card once. It can
+ * write two entries — the clock's own, and the warning card's when one is still
+ * in front of the player — and the answer fields belong on exactly one of them,
+ * or one spent card answers two events.
+ *
+ * The standing clock is the other half: with no warning there is no event entry
+ * anywhere in the log, so the ledger has to invent the row or the answer is
+ * scored as if it never happened.
+ */
+async function checkClockAnswersBindOnce(): Promise<void> {
+  // --- the warning is still up ---------------------------------------------
+  const warned = search('answer-clock-warning', (s) => {
+    freshStackRun(s);
+    return pumpToClockWarning() ? s : null;
+  });
+  if (warned === null) {
+    failures.push('(o) no seed put a clock warning in front of the player');
+    return;
+  }
+
+  freshStackRun(warned);
+  const warning = pumpToClockWarning();
+  if (!warning) {
+    failures.push('(o) the chosen clock-warning seed stopped offering the warning');
+    return;
+  }
+  store().drawCards(24);
+  const heldUp = cardsInZone(store(), 'hand').find((c) => isInstantOrSorceryCard(store(), c));
+  check('(o) the hand holds an instant to declare with', heldUp !== undefined);
+  if (!heldUp) return;
+  const heldName = cardName(store(), heldUp.iid);
+  const before = (store().run?.log ?? []).length;
+
+  store().declareInteraction({ iid: heldUp.iid, note: 'held it up' });
+
+  const written = (store().run?.log ?? []).slice(before).filter((e) => e.kind === 'respond');
+  check(
+    '(o) declaring past a warning writes the clock entry and the warning entry',
+    written.length === 2,
+    `${written.length} respond entries`,
+  );
+  const carrying = written.filter((e) => e.payload.answerIid === heldUp.iid);
+  check(
+    '(o) the answer fields land on exactly one of them',
+    carrying.length === 1,
+    `${carrying.length} entries carry the card`,
+  );
+  check(
+    '(o) and it is the warning, the entry the ledger can file under an event',
+    carrying[0]?.payload.eventId === warning.id,
+    `${String(carrying[0]?.payload.eventId)} vs ${warning.id}`,
+  );
+  const warnedRun = store().run;
+  if (!warnedRun) {
+    failures.push('(o) the clock-warning run went away before it could be tallied');
+    return;
+  }
+  check(
+    '(o) one spent card answers one event',
+    totalAnsweredWith([warnedRun]) === 1,
+    `${totalAnsweredWith([warnedRun])} answers tallied`,
+  );
+  const warnedCard = scoreRun(warnedRun);
+  const warnedRows = warnedCard.events.filter((r) => r.answerCard !== undefined);
+  check(
+    '(o) and the ledger gives it one row',
+    warnedRows.length === 1 && warnedRows[0].eventId === warning.id,
+    `${JSON.stringify(warnedRows.map((r) => r.eventId))}`,
+  );
+
+  // The same run as a log written before the fields were confined to one entry:
+  // the answer on the clock's entry as well as the warning's. The scorer has to
+  // fold those back into one row, or a run recorded in that window reads as
+  // having answered two events with one card. (The store is what stops the
+  // per-card tally double counting; it has no event id to dedupe on.)
+  const answerFields = Object.fromEntries(
+    Object.entries(carrying[0]?.payload ?? {}).filter(
+      ([key]) => key.startsWith('answer') || key === 'bound',
+    ),
+  );
+  const legacy: RunRecord = {
+    ...warnedRun,
+    log: warnedRun.log.map((e) =>
+      e.kind === 'respond' && e.payload.reason === 'declared-interaction'
+        ? { ...e, payload: { ...e.payload, ...answerFields } }
+        : e,
+    ),
+  };
+  const legacyRows = scoreRun(legacy).events.filter((r) => r.answerCard !== undefined);
+  check(
+    '(o) a log carrying the answer on both entries still scores one row',
+    legacyRows.length === 1 && legacyRows[0].eventId === warning.id,
+    `${JSON.stringify(legacyRows.map((r) => r.eventId))}`,
+  );
+  endRunQuietly('abandoned');
+  await settle();
+
+  // --- the clock is standing on its own ------------------------------------
+  const standing = search('answer-clock-standing', (s) => {
+    freshStackRun(s);
+    return pumpToStandingClock() ? s : null;
+  });
+  if (standing === null) {
+    failures.push('(o) no seed left a clock standing with nothing in front of it');
+    return;
+  }
+
+  freshStackRun(standing);
+  if (!pumpToStandingClock()) {
+    failures.push('(o) the chosen standing-clock seed stopped raising a clock');
+    return;
+  }
+  const clockSeat = store().clock?.seatId;
+  check('(o) a clock is standing with no warning in front of it', clockSeat !== undefined);
+  if (!clockSeat) return;
+  store().drawCards(24);
+  const answer = cardsInZone(store(), 'hand').find((c) => isInstantOrSorceryCard(store(), c));
+  check('(o) the hand holds an instant to answer the standing clock with', answer !== undefined);
+  if (!answer) return;
+  const answerName = cardName(store(), answer.iid);
+  const standingBefore = (store().run?.log ?? []).length;
+
+  store().declareInteraction({ iid: answer.iid, note: 'held it up' });
+
+  const standingWritten = (store().run?.log ?? [])
+    .slice(standingBefore)
+    .filter((e) => e.kind === 'respond');
+  check(
+    '(o) a standing clock writes one entry, and it carries the card',
+    standingWritten.length === 1 &&
+      standingWritten[0].payload.answerIid === answer.iid &&
+      standingWritten[0].payload.answerName === answerName &&
+      standingWritten[0].payload.reason === 'declared-interaction',
+    `${JSON.stringify(standingWritten.map((e) => e.payload))}`,
+  );
+  const standingRun = store().run;
+  if (!standingRun) {
+    failures.push('(o) the standing-clock run went away before it could be scored');
+    return;
+  }
+  const standingCard = scoreRun(standingRun);
+  const clockRow = standingCard.events.find((r) => r.eventId === `clock-${clockSeat}`);
+  check(
+    '(o) the standing clock gets a ledger row of its own',
+    clockRow?.type === 'clock' &&
+      clockRow?.seatId === clockSeat &&
+      clockRow?.terminal === 'responded' &&
+      clockRow?.answerCard === answerName &&
+      clockRow?.answerTo === 'graveyard',
+    `${JSON.stringify(clockRow)}`,
+  );
+  check(
+    '(o) and the tally counts it as the one answer that named a card',
+    standingCard.answers.total.named === 1,
+    `named ${standingCard.answers.total.named} of ${standingCard.answers.total.responded} answered`,
+  );
+  check(
+    '(o) the clock still reads as answered by declaring',
+    standingCard.clock.outcome === 'declared-interaction',
+    `${String(standingCard.clock.outcome)}`,
+  );
+  check(
+    '(o) the card that answered a standing clock is tallied once',
+    totalAnsweredWith([standingRun]) === 1,
+    `${totalAnsweredWith([standingRun])} answers tallied`,
+  );
+
+  summary.push(
+    `(o) seeds ${warned} / ${standing}: ${heldName} answered a clock behind its warning, ${answerName} answered one standing alone, each counted once`,
+  );
+  endRunQuietly('abandoned');
+  await settle();
+}
+
+/**
+ * A paid tax is an answer with no card in it: the store asks for none and binds
+ * none, so it can never be an answer that named something. Counting it in the
+ * denominator made the named rate read as a pilot failing to name cards they
+ * were never offered the chance to.
+ */
+async function checkPaidTaxIsNotNameable(): Promise<void> {
+  const seed = search('answer-tax', (s) => (findTaxEvent(s) ? s : null));
+  if (seed === null) {
+    failures.push('(o) no seed offered a tax to pay');
+    return;
+  }
+  const paid = findTaxEvent(seed);
+  if (!paid) {
+    failures.push('(o) the chosen tax seed stopped offering one');
+    return;
+  }
+
+  store().respondToActiveEvent();
+  const paidEntry = lastRespondEntry();
+  check(
+    '(o) paying a tax binds nothing and says nothing about binding',
+    paidEntry?.payload.answerIid === undefined && paidEntry?.payload.bound === undefined,
+    `${JSON.stringify(paidEntry?.payload)}`,
+  );
+
+  // One answer that does name a card, so the rate has a numerator to read.
+  store().drawCards(25);
+  playBiggestSpell();
+  const next = pumpToAnswerableEvent();
+  check('(o) another event arrived to answer with a card', next !== null);
+  if (!next) return;
+  const permanent = Object.values(store().cards).find(
+    (c) =>
+      c.zone === 'battlefield' &&
+      !c.isToken &&
+      !isLandCard(store(), c) &&
+      c.iid !== next.targetIid,
+  );
+  check('(o) a permanent is on the board to answer the tax run with', permanent !== undefined);
+  if (!permanent) return;
+  store().respondToActiveEvent({ iid: permanent.iid });
+
+  const run = store().run;
+  if (!run) {
+    failures.push('(o) the tax run went away before it could be scored');
+    return;
+  }
+  const scored = scoreRun(run);
+  const answers = scored.answers.total;
+  const paidTaxes = scored.events.filter(
+    (r) => r.terminal === 'responded' && r.type === 'resource' && r.variant === 'tax',
+  ).length;
+  check('(o) the paid tax is scored as answered', paidTaxes >= 1, `${paidTaxes}`);
+  check(
+    '(o) and it is left out of what could have been named',
+    answers.nameable === answers.responded - paidTaxes,
+    `nameable ${answers.nameable}, responded ${answers.responded}, ${paidTaxes} paid taxes`,
+  );
+  check(
+    '(o) so the two denominators really do differ here',
+    answers.nameable < answers.responded,
+    `nameable ${answers.nameable}, responded ${answers.responded}`,
+  );
+  check(
+    '(o) the named rate divides by what could be named',
+    scored.answers.namedRate !== null &&
+      Math.abs(scored.answers.namedRate - answers.named / answers.nameable) < 1e-9,
+    `${String(scored.answers.namedRate)} vs ${answers.named}/${answers.nameable}`,
+  );
+
+  summary.push(
+    `(o) seed ${seed}: ${paid.card?.name} paid for ${String(paid.card?.pay)}, ${answers.named} of ${answers.nameable} nameable answers named a card (${answers.responded} answered in all)`,
+  );
+  endRunQuietly('abandoned');
+  await settle();
+}
+
+/**
+ * An intercepting seat cites a counterspell it could actually be holding. The
+ * store used to leave the colour filter at its default of all five, so a Sultai
+ * seat could produce a white counterspell it has no business owning; the seat's
+ * own archetype colours are what the pick is made from now.
+ */
+async function checkCounterCitationColors(): Promise<void> {
+  const armed = armSeat('engine-counter-colors', 7);
+  if (!armed) {
+    failures.push('(o) no seed armed a seat for the colour check');
+    return;
+  }
+
+  store().drawCards(25);
+  const fat = biggestInHand(store());
+  if (!fat || manaValueOf(store(), fat) < armed.armed.threshold) {
+    failures.push('(o) no spell in hand meets the threshold the armed seat held');
+    return;
+  }
+  store().moveCard(fat.iid, 'battlefield');
+  const raised = store().activeEvent;
+  check(
+    '(o) the cast was intercepted',
+    raised?.type === 'counter' && raised.targetIid === fat.iid,
+    String(raised?.type),
+  );
+  const seat = store().seats.find((s) => s.id === armed.armed.seatId);
+  check('(o) the intercepting seat is at the table', seat !== undefined);
+  if (!seat || !raised?.card) {
+    failures.push('(o) the interception cited no card to read colours off');
+    return;
+  }
+  const colors = colorsOf(toSnapshot(seat));
+  check(
+    '(o) the counterspell cited is inside the holding seat colours',
+    raised.card.colors.every((c) => colors.includes(c)),
+    `${raised.card.name} ${JSON.stringify(raised.card.colors)} from a ${String(seat.profile)} seat ${JSON.stringify(colors)}`,
+  );
+
+  summary.push(
+    `(o) seed ${armed.seed}: a ${String(seat.profile)} seat cited ${raised.card.name}, inside ${colors.join('')}`,
+  );
+  endRunQuietly('concede');
+  await settle();
+}
+
+// ---------------------------------------------------------------------------
 // (e) determinism, with the new paths in the script
 // ---------------------------------------------------------------------------
 
@@ -2119,6 +2893,53 @@ function normalizeLog(record: RunRecord): string {
   return json;
 }
 
+// ---------------------------------------------------------------------------
+// (p) the three seats are three different opponents
+// ---------------------------------------------------------------------------
+
+/**
+ * The archetype profile is the only thing making seat A a different opponent
+ * from seat B, so a draw that ever dealt the same one twice would quietly undo
+ * the whole feature. The draw is seeded, so this asserts the shape rather than
+ * any particular table: three seats, three different profiles, all of them real
+ * entries in the table, and the seating entry carrying them into the log where
+ * a replay and the scorecard can read them back.
+ */
+function checkSeatsCarryDistinctProfiles(): void {
+  freshRun('engine-profiles');
+  const seats = store().seats;
+  const profiles = seats.map((s) => s.profile);
+
+  check('(p) three seats were seated', seats.length === 3, `${seats.length}`);
+  check(
+    '(p) every seat carries a profile from the table',
+    profiles.every((p) => p !== undefined && PROFILE_IDS.includes(p)),
+    profiles.join(', '),
+  );
+  check('(p) the three profiles are distinct', new Set(profiles).size === 3, profiles.join(', '));
+
+  const seated = (store().run?.log ?? []).find(
+    (entry) => entry.kind === 'threat' && entry.message.startsWith('Seats seated'),
+  );
+  check('(p) the seating entry was written', seated !== undefined);
+  const logged = (seated?.payload.seats ?? []) as { id: SeatId; profile?: SeatProfileId }[];
+  check(
+    "(p) its payload carries every seat's profile",
+    logged.length === 3 &&
+      logged.every((row) => row.profile === seats.find((s) => s.id === row.id)?.profile),
+    logged.map((row) => `${row.id}:${row.profile}`).join(', '),
+  );
+  check(
+    '(p) and the message names them',
+    profiles.every((p) => p !== undefined && seated?.message.includes(p) === true),
+    `${seated?.message}`,
+  );
+
+  summary.push(
+    `(p) seed engine-profiles seated ${seats.map((s) => `${s.id} ${s.profile}`).join(', ')}`,
+  );
+}
+
 function checkDeterminism(): void {
   const seed = 'engine-determinism';
   const first = normalizeLog(scriptedRun(seed));
@@ -2160,6 +2981,12 @@ async function main(): Promise<void> {
   checkTuckedCommanderGoesHome();
   checkTokensCeaseToExist();
   checkExcludesAreHonoured();
+  await checkAnswersNameTheCard();
+  await checkAnsweredInstantCounts();
+  await checkClockAnswersBindOnce();
+  await checkPaidTaxIsNotNameable();
+  await checkCounterCitationColors();
+  checkSeatsCarryDistinctProfiles();
   checkDeterminism();
 
   console.log('\nverify:engine');

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import type { PressureEvent, SeatId } from '../../domain/types';
-import type { ResolveEventPayload } from '../../state/gameStore';
+import type { AnswerPayload, ResolveEventPayload } from '../../state/gameStore';
 import { cardName, isCreatureCard, useGameStore } from '../../state/gameStore';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { EVENT_RESPONSE_EVENT } from '../../hooks/useHotkeys';
@@ -8,12 +9,14 @@ import type { EventResponseDetail } from '../../hooks/useHotkeys';
 import Glossed from '../glossary/Glossed';
 import { CardView } from '../table/CardView';
 import {
+  answerChoices,
   collectChoices,
   describeAnswers,
   effectiveSweep,
   EVENT_LABEL,
   seatLabel,
   sweepScope,
+  untappedLandCount,
 } from './pressureUi';
 import type { Choice } from './pressureUi';
 
@@ -22,6 +25,12 @@ interface PickerProps {
   choices: Choice[];
   selected?: string;
   emptyText: string;
+  /** A reading printed beside the title. Never a gate on what can be picked. */
+  tell?: string;
+  /** An extra way out, printed under the row (the answer picker's unbound link). */
+  footer?: ReactNode;
+  /** Take the keyboard on open. Set where the picker was opened by a hotkey. */
+  autoFocus?: boolean;
   onPick: (iid: string) => void;
   onClose: () => void;
 }
@@ -30,8 +39,25 @@ interface PickerProps {
  * A small card picker that hangs off the event card, over the battlefield, so it
  * covers cards rather than the readout. Escape closes it; nothing is
  * focus-trapped.
+ *
+ * The keyboard reaches every choice: the arrows walk the row (it scrolls
+ * sideways, so left/right and up/down do the same thing), Enter picks the
+ * focused card because it is an ordinary button, and Escape leaves without
+ * answering.
  */
-function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: PickerProps) {
+function CardPicker({
+  title,
+  choices,
+  selected,
+  emptyText,
+  tell,
+  footer,
+  autoFocus,
+  onPick,
+  onClose,
+}: PickerProps) {
+  const root = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') {
@@ -43,10 +69,49 @@ function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: Pi
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
 
+  // On a hotkey open the first choice takes the keyboard, so the player who
+  // never touched the mouse can answer without hunting for the row. An empty
+  // row falls back to whatever else the picker offers, rather than dropping the
+  // focus on the floor.
+  useEffect(() => {
+    if (!autoFocus) return;
+    const first = root.current?.querySelector<HTMLElement>('.pgp-pick, .pgp-picker-unbound');
+    first?.focus();
+  }, [autoFocus]);
+
+  function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): void {
+    const step =
+      e.key === 'ArrowRight' || e.key === 'ArrowDown'
+        ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+          ? -1
+          : 0;
+    if (step === 0) return;
+    const picks = Array.from(root.current?.querySelectorAll<HTMLElement>('.pgp-pick') ?? []);
+    if (picks.length === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // The card inside each choice is its own tab stop (the drag library makes it
+    // one), so walk up from whatever actually holds focus.
+    const held =
+      document.activeElement instanceof Element
+        ? document.activeElement.closest('.pgp-pick')
+        : null;
+    const at = held ? picks.indexOf(held as HTMLElement) : -1;
+    picks[at === -1 ? 0 : (at + step + picks.length) % picks.length].focus();
+  }
+
   return (
-    <div className="pgp-picker" role="group" aria-label={title}>
+    <div
+      className="pgp-picker"
+      role="group"
+      aria-label={title}
+      ref={root}
+      onKeyDown={onKeyDown}
+    >
       <div className="pgp-picker-head">
         <span>{title}</span>
+        {tell && <span className="pgp-picker-tell">{tell}</span>}
         <button type="button" className="pgp-picker-close" onClick={onClose} aria-label="Close picker">
           <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false">
             <path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" strokeWidth="1.2" fill="none" />
@@ -71,7 +136,68 @@ function CardPicker({ title, choices, selected, emptyText, onPick, onClose }: Pi
           ))}
         </div>
       )}
+      {footer}
     </div>
+  );
+}
+
+/** Title and empty line the answer picker wears, wherever it is opened from. */
+const ANSWER_TITLE = 'Answer with: pick the card';
+const ANSWER_EMPTY = 'Nothing in hand or on the board. Answer without a card.';
+
+/**
+ * The one shape an answer leaves the dock in. Both places that can send one —
+ * the event card and the standing clock — build it here, so a table note is
+ * never dropped by whichever path the player happened to answer through.
+ * Absent keys rather than empty ones: the store reads `iid` and `note` as
+ * optional, and a blank string is not a note.
+ */
+function answerPayload(iid: string | undefined, note: string): AnswerPayload {
+  const payload: AnswerPayload = {};
+  if (iid) payload.iid = iid;
+  const trimmed = note.trim();
+  if (trimmed) payload.note = trimmed;
+  return payload;
+}
+
+interface AnswerPickerProps {
+  /** Called with the card that answered, or nothing at all for an unbound answer. */
+  onAnswer: (iid?: string) => void;
+  onClose: () => void;
+  autoFocus?: boolean;
+}
+
+/**
+ * The one picker that binds an answer to a card. Every way of answering — the
+ * first button, its hotkey, the declare link, the standing clock — opens this
+ * one, so the choices, the untapped-land tell and the way out are the same
+ * everywhere.
+ *
+ * It subscribes to `cards` itself rather than taking them as a prop. Only the
+ * open picker cares what is in hand, and a caller holding the subscription for
+ * it would re-render on every tap, draw and move the player makes with the
+ * picker shut.
+ */
+function AnswerPicker({ onAnswer, onClose, autoFocus }: AnswerPickerProps) {
+  const cards = useGameStore((s) => s.cards);
+  const choices = useMemo(() => answerChoices(cards), [cards]);
+  const lands = useMemo(() => untappedLandCount(cards), [cards]);
+
+  return (
+    <CardPicker
+      title={ANSWER_TITLE}
+      choices={choices}
+      emptyText={ANSWER_EMPTY}
+      tell={`untapped lands: ${lands}`}
+      autoFocus={autoFocus}
+      onPick={(iid) => onAnswer(iid)}
+      onClose={onClose}
+      footer={
+        <button type="button" className="pgp-link pgp-picker-unbound" onClick={() => onAnswer()}>
+          answer without a card
+        </button>
+      }
+    />
   );
 }
 
@@ -108,9 +234,16 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   // until the player says otherwise: an untouched toggle must not overrule the
   // card's own sweep on the way to the store.
   const [nonlands, setNonlands] = useState<boolean | undefined>(undefined);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  /**
+   * Which picker is hanging off the card, if any. 'resolve' is the one the
+   * event's own type decides (retarget, discard, sacrifice); 'answer' binds the
+   * answer to a card; 'declare' does the same for the race clock. Only ever one
+   * at a time, and `openedByKey` says whether it should take the keyboard.
+   */
+  const [picker, setPicker] = useState<'resolve' | 'answer' | 'declare' | null>(null);
+  const [openedByKey, setOpenedByKey] = useState(false);
 
-  const closePicker = useCallback(() => setPickerOpen(false), []);
+  const closePicker = useCallback(() => setPicker(null), []);
 
   const battlefield = useMemo(
     () => collectChoices(cards, (_s, c) => c.zone === 'battlefield'),
@@ -153,14 +286,39 @@ function DockBody({ event, onRetired }: DockBodyProps) {
   });
   const resolveBlocked = answers.blocked;
 
-  function doRespond(): void {
+  // A tax is mana, not a card. Nothing is asked for and no picker opens — "Pay
+  // 2" is the whole answer.
+  const isTax = event.type === 'resource' && variant === 'tax';
+
+  function doRespond(iid?: string): void {
     onRetired(null);
-    respondToActiveEvent(note.trim() || undefined);
+    setPicker(null);
+    respondToActiveEvent(answerPayload(iid, note));
   }
 
-  function doDeclare(): void {
+  function doDeclare(iid?: string): void {
     onRetired(null);
-    declareInteraction();
+    setPicker(null);
+    declareInteraction(answerPayload(iid, note));
+  }
+
+  /**
+   * The first response, one step later than it used to be: an answer names the
+   * card that made it, so the button opens the picker rather than filing a
+   * claim. The tax is the exception — it is the one answer with no card in it.
+   */
+  function beginAnswer(byKey: boolean): void {
+    if (isTax) {
+      doRespond();
+      return;
+    }
+    setOpenedByKey(byKey);
+    setPicker((open) => (open === 'answer' ? null : 'answer'));
+  }
+
+  function beginDeclare(byKey: boolean): void {
+    setOpenedByKey(byKey);
+    setPicker((open) => (open === 'declare' ? null : 'declare'));
   }
 
   function doResolve(): void {
@@ -190,6 +348,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
     }
 
     onRetired(event.type === 'wipe' ? event.seatId : null);
+    setPicker(null);
     resolveActiveEvent(payload);
   }
 
@@ -199,14 +358,14 @@ function DockBody({ event, onRetired }: DockBodyProps) {
    * current closures — every one of them reads local state that moves.
    */
   const handlers = useRef<{ first: () => void; second: () => void; blocked: boolean }>({
-    first: doRespond,
+    first: () => beginAnswer(true),
     second: doResolve,
     blocked: false,
   });
 
   useEffect(() => {
     handlers.current = {
-      first: event.type === 'clock' ? doDeclare : doRespond,
+      first: event.type === 'clock' ? () => beginDeclare(true) : () => beginAnswer(true),
       second: doResolve,
       blocked: resolveBlocked,
     };
@@ -266,7 +425,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
             <button
               type="button"
               className="pgp-link"
-              onClick={() => setPickerOpen((open) => !open)}
+              onClick={() => setPicker((open) => (open === 'resolve' ? null : 'resolve'))}
             >
               pick different target…
             </button>
@@ -310,7 +469,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
               <button
                 type="button"
                 className="pgp-link"
-                onClick={() => setPickerOpen((open) => !open)}
+                onClick={() => setPicker((open) => (open === 'resolve' ? null : 'resolve'))}
               >
                 {pickIid ? 'change…' : 'choose…'}
               </button>
@@ -346,7 +505,12 @@ function DockBody({ event, onRetired }: DockBodyProps) {
       <div className="pgp-answers">
         {event.type === 'clock' ? (
           <>
-            <button type="button" className="pgp-btn is-primary" onClick={doDeclare}>
+            <button
+              type="button"
+              className="pgp-btn is-primary"
+              aria-expanded={picker === 'declare'}
+              onClick={() => beginDeclare(false)}
+            >
               <span className="pgp-answer-key">{firstKey}</span>
               {answers.first}
             </button>
@@ -357,7 +521,12 @@ function DockBody({ event, onRetired }: DockBodyProps) {
           </>
         ) : (
           <>
-            <button type="button" className="pgp-btn" onClick={doRespond}>
+            <button
+              type="button"
+              className="pgp-btn"
+              aria-expanded={isTax ? undefined : picker === 'answer'}
+              onClick={() => beginAnswer(false)}
+            >
               <span className="pgp-answer-key">{firstKey}</span>
               <span className="pgp-btn-label">{answers.first}</span>
             </button>
@@ -382,13 +551,24 @@ function DockBody({ event, onRetired }: DockBodyProps) {
         <button
           type="button"
           className="pgp-link pgp-declare"
-          onClick={() => declareInteraction()}
+          aria-expanded={picker === 'declare'}
+          onClick={() => beginDeclare(false)}
         >
           declare held interaction · answers {seatLabel(clock.seatId)}'s clock
         </button>
       )}
 
-      {pickerOpen && event.type === 'removal' && (
+      {/* One picker for both ways of answering. They ask the same question and
+          offer the same cards; only where the answer is filed differs. */}
+      {(picker === 'answer' || picker === 'declare') && (
+        <AnswerPicker
+          autoFocus={openedByKey}
+          onAnswer={picker === 'declare' ? doDeclare : doRespond}
+          onClose={closePicker}
+        />
+      )}
+
+      {picker === 'resolve' && event.type === 'removal' && (
         <CardPicker
           title="Retarget: pick the permanent that actually died"
           choices={battlefield}
@@ -402,7 +582,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
         />
       )}
 
-      {pickerOpen && event.type === 'resource' && variant === 'discard' && (
+      {picker === 'resolve' && event.type === 'resource' && variant === 'discard' && (
         <CardPicker
           title="Discard: pick the card you pitch"
           choices={hand}
@@ -416,7 +596,7 @@ function DockBody({ event, onRetired }: DockBodyProps) {
         />
       )}
 
-      {pickerOpen && event.type === 'resource' && variant === 'sacrifice' && (
+      {picker === 'resolve' && event.type === 'resource' && variant === 'sacrifice' && (
         <CardPicker
           title="Sacrifice: pick the creature you give up"
           choices={creatures}
@@ -438,28 +618,77 @@ function ClockAnswer() {
   const declareInteraction = useGameStore((s) => s.declareInteraction);
   const keymap = useHotkeyStore((s) => s.keymap);
 
+  const [open, setOpen] = useState(false);
+  const [openedByKey, setOpenedByKey] = useState(false);
+  const [note, setNote] = useState('');
+  const [noteOpen, setNoteOpen] = useState(false);
+
   // The clock is the only thing to answer here, so it owns the first response
-  // key just as an event card's first button would.
+  // key just as an event card's first button would — and answers the same way,
+  // by naming the card that is holding the seat off.
   useEffect(() => {
     function onResponse(e: Event): void {
       if ((e as CustomEvent<EventResponseDetail>).detail?.slot !== 1) return;
-      declareInteraction();
+      setOpenedByKey(true);
+      setOpen((standing) => !standing);
     }
     window.addEventListener(EVENT_RESPONSE_EVENT, onResponse);
     return () => window.removeEventListener(EVENT_RESPONSE_EVENT, onResponse);
-  }, [declareInteraction]);
+  }, []);
 
   return (
-    <div className="pgp-answers">
-      <button
-        type="button"
-        className="pgp-btn is-primary"
-        onClick={() => declareInteraction()}
-      >
-        <span className="pgp-answer-key">{keyLabel(keymap.respondOne)}</span>
-        Declare held interaction
-      </button>
-    </div>
+    <>
+      <div className="pgp-dock-extras">
+        <span className="pgp-dock-spacer" />
+        <button
+          type="button"
+          className="pgp-link pgp-note-toggle"
+          aria-expanded={noteOpen}
+          onClick={() => setNoteOpen((shown) => !shown)}
+        >
+          {noteOpen ? 'hide note' : 'add note'}
+        </button>
+      </div>
+
+      {noteOpen && (
+        <div className="pgp-note" data-hotkeys="off">
+          <input
+            type="text"
+            value={note}
+            autoFocus
+            placeholder="What's your answer?"
+            aria-label="What's your answer?"
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+      )}
+
+      <div className="pgp-answers">
+        <button
+          type="button"
+          className="pgp-btn is-primary"
+          aria-expanded={open}
+          onClick={() => {
+            setOpenedByKey(false);
+            setOpen((standing) => !standing);
+          }}
+        >
+          <span className="pgp-answer-key">{keyLabel(keymap.respondOne)}</span>
+          Declare held interaction
+        </button>
+      </div>
+
+      {open && (
+        <AnswerPicker
+          autoFocus={openedByKey}
+          onAnswer={(iid) => {
+            setOpen(false);
+            declareInteraction(answerPayload(iid, note));
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 

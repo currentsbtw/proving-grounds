@@ -143,7 +143,7 @@ function drainEvents(state: { wipesSeen: number }): void {
     if (!event) return;
     if (event.type === 'wipe') {
       state.wipesSeen += 1;
-      if (state.wipesSeen === 1) store().respondToActiveEvent('held a counterspell');
+      if (state.wipesSeen === 1) store().respondToActiveEvent({ note: 'held a counterspell' });
       else store().resolveActiveEvent();
       continue;
     }
@@ -474,15 +474,16 @@ function emptyScorecard(): Scorecard {
     },
     answers: {
       byType: {
-        wipe: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
-        removal: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
-        counter: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
-        combat: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
-        clock: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
-        resource: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
+        wipe: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
+        removal: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
+        counter: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
+        combat: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
+        clock: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
+        resource: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
       },
-      total: { offered: 0, responded: 0, resolved: 0, unresolved: 0 },
+      total: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
       rate: null,
+      namedRate: null,
     },
     seats: [
       { seatId: 'A', damageDealt: 0, commanderDamageDealt: 0, eliminatedTurn: null, eliminationReason: null },
@@ -547,6 +548,7 @@ async function main(): Promise<void> {
       unrecoveredWipeRate: 0.25,
       avgCommanderDowntime: 2,
       answerRate: 0.4,
+      namedAnswerRate: 0.5,
       clocksFaced: 2,
       clocksBeaten: 1,
       mulliganRate: 0.25,

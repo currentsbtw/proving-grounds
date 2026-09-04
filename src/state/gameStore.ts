@@ -14,6 +14,8 @@ import { PRESSURE } from '../data/pressure';
 import {
   applyDamageToSeat,
   chooseCounterCitation,
+  colorsOf,
+  drawProfiles,
   emptySilhouette,
   initialThreat,
   makeCounterEvent,
@@ -98,6 +100,22 @@ export interface ResolveEventPayload {
   note?: string;
 }
 
+/**
+ * The answer the player claims to a pressure event, and the card that made it.
+ *
+ * Naming the card is the point: "I answer it" without one measures a claim, not
+ * an answer, and teaches nothing about holding up the right card. It is still
+ * optional, because the honor system is the rule everywhere else too — a player
+ * whose answer is something the app has no instance for (a land's ability, a
+ * card already exiled off a Cascade) has still answered, and says so unbound.
+ */
+export interface AnswerPayload {
+  /** The instance that did the work: in hand, or already on the battlefield. */
+  iid?: string;
+  /** Free-text table note recorded on the log entry. */
+  note?: string;
+}
+
 const SEAT_IDS: SeatId[] = ['A', 'B', 'C'];
 
 const ZONE_LABELS: Record<ZoneId, string> = {
@@ -133,14 +151,25 @@ function depthText(depth: number): string {
  * post-run state wants.
  */
 function freshSeats(rng?: () => number): Seat[] {
-  return SEAT_IDS.map((id) => ({
+  const seats: Seat[] = SEAT_IDS.map((id) => ({
     id,
     life: STARTING_LIFE,
     commanderDamage: 0,
     eliminated: false,
     threat: rng ? initialThreat(rng) : PRESSURE.threat.startMin,
     silhouette: emptySilhouette(),
-  })).map(trackPeak);
+  }));
+  // Archetypes are dealt after the opening threats so the three threat draws
+  // keep the position they had in the seed's stream; the profile draws simply
+  // follow them. Cleared post-run seats carry no profile and the engine reads
+  // them as a plain midrange pod in every colour.
+  if (rng) {
+    const profiles = drawProfiles(rng);
+    seats.forEach((seat, i) => {
+      seat.profile = profiles[i];
+    });
+  }
+  return seats.map(trackPeak);
 }
 
 /**
@@ -429,12 +458,16 @@ export interface GameState {
    * Returns false when the run ended (the race clock ran out).
    */
   resolveOpponentWindow: (upcomingTurn?: number) => boolean;
-  /** "I had an answer." Negates the active event without applying anything. */
-  respondToActiveEvent: (note?: string) => void;
+  /**
+   * "I had an answer." Negates the active event without applying anything. An
+   * `iid` binds the answer to the card that made it — spending it out of hand,
+   * or leaving a permanent where it stands.
+   */
+  respondToActiveEvent: (answer?: AnswerPayload) => void;
   /** "It resolved." Applies the event's bookkeeping, then advances the queue. */
   resolveActiveEvent: (payload?: ResolveEventPayload) => void;
-  /** Cancel the race clock by claiming held interaction (honor system). */
-  declareInteraction: () => void;
+  /** Cancel the race clock by claiming held interaction, with or without a card. */
+  declareInteraction: (answer?: AnswerPayload) => void;
 }
 
 /** Display name for a card instance (token name, cached Scryfall name, or a fallback). */
@@ -492,8 +525,12 @@ export function canMulligan(state: GameState): boolean {
  * of the player, or one still queued behind it. A spell a seat has spoken up
  * about is out of the player's hands until that question is answered, so it
  * cannot be cast (again) while the counter stands.
+ *
+ * Exported because `bindAnswer` refuses such a card and the answer picker has to
+ * refuse it in the same breath: a picker offering the very spell under the
+ * counter would be offering a choice the store then throws away.
  */
-function heldByLiveCounter(state: GameState, iid: string): boolean {
+export function heldByLiveCounter(state: GameState, iid: string): boolean {
   const live = state.activeEvent ? [state.activeEvent, ...state.pendingEvents] : state.pendingEvents;
   return live.some((event) => event.type === 'counter' && event.targetIid === iid);
 }
@@ -907,6 +944,69 @@ export const useGameStore = create<GameState>((set, get) => {
     return name;
   }
 
+  /** What binding an answer to a card produced: the log fields, and the name to print. */
+  interface BoundAnswer {
+    /** Flattened onto the 'respond' entry, the way every payload here is flat. */
+    fields: Record<string, unknown>;
+    /** Present only when a card really answered — the message names it. */
+    name?: string;
+  }
+
+  /**
+   * Bind an answer to the card that made it, and spend the card if answering
+   * spent it.
+   *
+   * An answer is a card the player actually had: one in hand they cast, or a
+   * permanent whose ability they activated. Nothing else the iid could name
+   * qualifies — a spell on the tray is already cast and still owed a
+   * resolution, a commander in the command zone has not been cast at all, and a
+   * card a seat is holding a counter over is out of the player's hands until
+   * that question is settled. Those are ignored rather than refused: the answer
+   * still stands, it just does not name a card, and the entry says why.
+   *
+   * A card answering out of hand leaves the hand by the same front-face reading
+   * `resolveTop` makes — instant or sorcery to the graveyard, anything else to
+   * the battlefield. A permanent answering stays exactly where it is: an
+   * activated ability moves nothing, and whether it tapped for it is the
+   * player's own bookkeeping, not something to guess at here.
+   */
+  function bindAnswer(iid: string | undefined, eventId: string): BoundAnswer {
+    if (!iid) return { fields: { bound: false } };
+    const state = get();
+    const card = state.cards[iid];
+    const reject = (why: string): BoundAnswer => ({
+      fields: { bound: false, boundRejected: true, boundReason: why, answerIid: iid },
+    });
+    if (!card) return reject('no such card');
+    if (card.zone !== 'hand' && card.zone !== 'battlefield') {
+      return reject(card.zone === 'stack' ? 'on the stack' : `in the ${ZONE_LABELS[card.zone]}`);
+    }
+    if (heldByLiveCounter(state, iid)) return reject('held by a counter');
+
+    const name = cardName(state, iid);
+    const answerMv = manaValueOf(state, card);
+    const answerZone = card.zone;
+    const answerTo: ZoneId | undefined =
+      answerZone === 'hand'
+        ? isInstantOrSorceryCard(state, card)
+          ? 'graveyard'
+          : 'battlefield'
+        : undefined;
+    if (answerTo) performMove(iid, answerTo, undefined, `answered ${eventId}`);
+
+    return {
+      name,
+      fields: {
+        answerIid: iid,
+        answerName: name,
+        answerZone,
+        answerTo,
+        answerMv,
+        bound: true,
+      },
+    };
+  }
+
   /**
    * Take a dead seat's events off the table: everything of its in the queue,
    * plus the one it currently has in front of the player. Each is logged as
@@ -1023,8 +1123,12 @@ export const useGameStore = create<GameState>((set, get) => {
    * so anything that must move regardless of held-up mana calls straight in
    * here: wipes, removal, a countered spell going to the graveyard, and a
    * spell the player forced through.
+   *
+   * `reason` rides onto the 'move' entry when the move was not the player
+   * picking a card up and putting it down — an answer spent against an event
+   * says which event it answered, so the log reads back as a sentence.
    */
-  function performMove(iid: string, toZone: ZoneId, options?: MoveArg): void {
+  function performMove(iid: string, toZone: ZoneId, options?: MoveArg, reason?: string): void {
     const state = get();
     const card = state.cards[iid];
     if (!card || card.zone === toZone) return;
@@ -1087,6 +1191,7 @@ export const useGameStore = create<GameState>((set, get) => {
       position: toZone === 'library' ? position : undefined,
       tapped: entersTapped || undefined,
       isCommander: card.isCommander,
+      reason,
     });
 
     if (card.isCommander && (toZone === 'graveyard' || toZone === 'exile')) {
@@ -1109,17 +1214,26 @@ export const useGameStore = create<GameState>((set, get) => {
     const state = get();
     const card = state.cards[iid];
     if (!card || !state.run) return undefined;
+    // No seat, no counterspell: a seat that is not at the table is holding
+    // nothing, and its colour identity is the whole point of the pick below.
     const seat = state.seats.find((s) => s.id === armed.seatId);
-    const mana = seatMana(
-      seat?.silhouette ?? emptySilhouette(),
+    if (!seat) return undefined;
+    const mana = seatMana(seat.silhouette, state.turn, state.run.bracket);
+    // The holder's colours, so a Sultai seat never cites a white counterspell.
+    // The arming step already refused to arm a seat with nothing in its colours;
+    // this is the same reading applied to the card it actually names.
+    return chooseCounterCitation(
+      state.windowCount,
       state.turn,
       state.run.bracket,
+      mana,
+      {
+        name: cardName(state, iid),
+        manaValue: manaValueOf(state, card),
+        typeLine: typeLineOf(state, card),
+      },
+      colorsOf(toSnapshot(seat)),
     );
-    return chooseCounterCitation(state.windowCount, state.turn, state.run.bracket, mana, {
-      name: cardName(state, iid),
-      manaValue: manaValueOf(state, card),
-      typeLine: typeLineOf(state, card),
-    });
   }
 
   /**
@@ -1513,8 +1627,17 @@ export const useGameStore = create<GameState>((set, get) => {
       });
       appendLog(
         'threat',
-        `Seats seated: ${seats.map((s) => `${s.id} ${s.threat.toFixed(1)}`).join(', ')}`,
-        { seats: seats.map((s) => ({ id: s.id, threat: s.threat, silhouette: s.silhouette })) },
+        `Seats seated: ${seats
+          .map((s) => `${s.id} ${s.profile ?? 'neutral'} ${s.threat.toFixed(1)}`)
+          .join(', ')}`,
+        {
+          seats: seats.map((s) => ({
+            id: s.id,
+            threat: s.threat,
+            silhouette: s.silhouette,
+            profile: s.profile,
+          })),
+        },
       );
       appendLog('shuffle', `Library shuffled (${libraryOrder.length} cards)`, {
         size: libraryOrder.length,
@@ -2331,7 +2454,7 @@ export const useGameStore = create<GameState>((set, get) => {
       return runOpponentWindow(upcomingTurn ?? get().turn + 1);
     },
 
-    respondToActiveEvent(note) {
+    respondToActiveEvent(answer) {
       // Answering an event applies nothing, so it cannot end a run on its own.
       // It settles anyway, as the safety net that keeps every event-queue exit
       // on the same footing.
@@ -2351,19 +2474,29 @@ export const useGameStore = create<GameState>((set, get) => {
         } else if (event.type === 'counter') forceCounterThrough(event);
 
         const answered: PressureEvent = { ...event, state: 'negated' };
-        const trimmed = note?.trim();
+        const trimmed = answer?.note?.trim();
         // Answering a tax is paying it. The price is on the entry, so the
         // scorers can tell a turn the player bought back from a turn the seat
         // collected on.
-        const paid =
-          event.type === 'resource' && event.variant === 'tax' ? event.card?.pay : undefined;
-        appendLog('respond', `Answered ${event.type}: ${event.prompt}${trimmed ? ` · "${trimmed}"` : ''}`, {
-          ...eventPayload(answered),
-          responded: true,
-          negated: true,
-          paid,
-          note: trimmed,
-        });
+        const isTax = event.type === 'resource' && event.variant === 'tax';
+        const paid = isTax ? event.card?.pay : undefined;
+        // A tax is mana, not a card. Nothing asks for one, so nothing is bound
+        // and the entry stays silent about binding rather than saying `false`
+        // to a question that was never put.
+        const bound = isTax ? { fields: {} } : bindAnswer(answer?.iid, event.id);
+        const withCard = bound.name ? ` with ${bound.name}` : '';
+        appendLog(
+          'respond',
+          `Answered ${event.type}${withCard}: ${event.prompt}${trimmed ? ` · "${trimmed}"` : ''}`,
+          {
+            ...eventPayload(answered),
+            responded: true,
+            negated: true,
+            paid,
+            ...bound.fields,
+            note: trimmed,
+          },
+        );
         advanceQueue();
       });
     },
@@ -2570,33 +2703,50 @@ export const useGameStore = create<GameState>((set, get) => {
       });
     },
 
-    declareInteraction() {
+    declareInteraction(answer) {
       const state = get();
       if (!state.run) return;
       const clock = state.clock;
       if (!clock) return;
 
       set({ clock: null });
+      // Bound once, and the fields land on exactly one entry. Declaring can
+      // write two entries — the clock's own, and the warning card's if one is
+      // still in front of the player — and every replayer counts the answer off
+      // whichever entry carries `answerIid`, so putting the fields on both would
+      // count one spent card twice. The warning entry wins when there is one,
+      // because it is the entry with an event id for the ledger to file under;
+      // with no warning the clock's own entry is the only place left.
+      const active = get().activeEvent;
+      const clockEvent =
+        active && active.type === 'clock' && active.seatId === clock.seatId ? active : null;
+      const bound = bindAnswer(answer?.iid, clockEvent?.id ?? `clock-${clock.seatId}`);
+      const withCard = bound.name ? ` with ${bound.name}` : '';
+      const trimmed = answer?.note?.trim();
+
       appendLog(
         'respond',
-        `Declared held interaction. Seat ${clock.seatId}'s clock is answered.`,
+        `Declared held interaction${withCard}. Seat ${clock.seatId}'s clock is answered.`,
         {
           seatId: clock.seatId,
           deadlineTurn: clock.deadlineTurn,
           spawnedTurn: clock.spawnedTurn,
           canceled: true,
           reason: 'declared-interaction',
+          ...(clockEvent ? {} : bound.fields),
+          note: trimmed,
         },
       );
 
       // If the clock's own warning is still sitting in front of the player,
       // retire it — it has just been answered.
-      const active = get().activeEvent;
-      if (active && active.type === 'clock' && active.seatId === clock.seatId) {
-        appendLog('respond', `Answered clock: ${active.prompt}`, {
-          ...eventPayload({ ...active, state: 'negated' }),
+      if (clockEvent) {
+        appendLog('respond', `Answered clock${withCard}: ${clockEvent.prompt}`, {
+          ...eventPayload({ ...clockEvent, state: 'negated' }),
           responded: true,
           negated: true,
+          ...bound.fields,
+          note: trimmed,
         });
         advanceQueue();
       }

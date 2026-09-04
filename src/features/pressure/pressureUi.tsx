@@ -1,7 +1,14 @@
 import type { CitationSweep, CitationZone } from '../../data/citations';
 import type { CardInstance, EventType, PressureEvent, SeatId } from '../../domain/types';
 import { punishPhrase } from '../../engine/pressure';
-import { byArrival, cardName, isCreatureCard, useGameStore } from '../../state/gameStore';
+import {
+  byArrival,
+  cardName,
+  heldByLiveCounter,
+  isCreatureCard,
+  isLandCard,
+  useGameStore,
+} from '../../state/gameStore';
 import type { GameState } from '../../state/gameStore';
 
 /** Short display name for an event type, used on the dock's class chip. */
@@ -43,6 +50,44 @@ export function collectChoices(
     .filter((card) => pred(state, card))
     .sort(byArrival)
     .map((card) => ({ card, name: cardName(state, card.iid) }));
+}
+
+/**
+ * Everything on the table that could have been the answer: the hand first, then
+ * the nonland permanents already down. Arrival order inside each group, so the
+ * row reads the way the hand and the board read. Lands and tokens are left out —
+ * neither is a card a player says they held up, and a land answering an event
+ * would only ever be a mis-click.
+ *
+ * The offer matches what `bindAnswer` will actually take. A spell a seat has a
+ * counter up over is still sitting in hand, so it would otherwise be offered as
+ * the answer to the very counter aimed at it; the store rejects that, and a
+ * picker that offers a choice the store throws away is a picker that lies. A
+ * spell already on the tray is out for the same reason, and falls out of the
+ * zone filters on its own.
+ */
+export function answerChoices(cards: Record<string, CardInstance>): Choice[] {
+  return [
+    // A land is never the answer to anything, and the type-line rule would put
+    // it onto the battlefield as if it had been played.
+    ...collectChoices(
+      cards,
+      (s, c) => c.zone === 'hand' && !isLandCard(s, c) && !heldByLiveCounter(s, c.iid),
+    ),
+    ...collectChoices(cards, (s, c) => c.zone === 'battlefield' && !c.isToken && !isLandCard(s, c)),
+  ];
+}
+
+/**
+ * Untapped lands on the battlefield. A tell, never a gate: the picker prints it
+ * so the player can see for themselves whether the answer they are claiming was
+ * affordable. Nothing checks it, nothing blocks on it (Principle 5).
+ */
+export function untappedLandCount(cards: Record<string, CardInstance>): number {
+  const state = useGameStore.getState();
+  return Object.values(cards).filter(
+    (card) => card.zone === 'battlefield' && !card.tapped && isLandCard(state, card),
+  ).length;
 }
 
 /**

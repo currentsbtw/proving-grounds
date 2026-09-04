@@ -7,12 +7,19 @@
  * cards produce which pressure and keeps every event something that can
  * actually happen at a table: no card, no event.
  *
+ * `colors` is the card's colour identity, and it is what keeps a seat honest:
+ * a seat only cites cards inside the colours its archetype profile runs (see
+ * `src/data/profiles.ts`), so the blue seat holds the counterspells and nobody
+ * casts Swords to Plowshares out of a Grixis pile.
+ *
  * `cost` is the mana the seat needs open to do it (Blasphemous Act prints 9
  * and costs about 3 against a full pod; Force of Will prints 5 and costs 0).
  * `mv` is the printed mana value, for the badge. `effect` is the card's real
  * effect in table-talk, and it is what the player resolves by hand, so it must
  * be true to the card. `zone` is where the affected cards go.
  */
+
+import type { ManaColor } from './profiles';
 
 export type CitationZone = 'graveyard' | 'exile' | 'hand' | 'library';
 
@@ -33,6 +40,12 @@ export type Punish = 'draw' | 'treasure';
 
 export interface Citation {
   name: string;
+  /**
+   * The card's real colour identity, so a seat only ever cites cards it could
+   * actually be playing. Empty for a colourless card, which every seat may
+   * cite. Mana symbols in rules text count, the same as deckbuilding does.
+   */
+  colors: ManaColor[];
   /** Printed mana value. */
   mv: number;
   /** Mana the seat needs open to do this. */
@@ -63,6 +76,21 @@ export interface Citation {
   punish?: Punish;
 }
 
+/**
+ * The table's own revision, bumped whenever a card is added, removed, or has a
+ * field changed that the engine filters on (`colors`, `cost`, `brackets`,
+ * `minTurn`, `maxTurn`, `sweep`, `targets`, `counters`).
+ *
+ * This is not cosmetic bookkeeping: eligibility decides whether a hazard rolls
+ * at all, and the citation is drawn by indexing a filtered list, so one card
+ * appearing or leaving shifts every seed's rng stream from that window onward.
+ * A table edit therefore has to bump `PRESSURE.version` alongside this, the
+ * same as a curve edit does — see the note there.
+ *
+ * Revision 2: Deadly Rollick's colour identity corrected from R to B.
+ */
+export const CITATIONS_VERSION = 2;
+
 export interface CitationTable {
   wipe: Citation[];
   removal: Citation[];
@@ -77,6 +105,7 @@ export const CITATIONS: CitationTable = {
   wipe: [
     {
       name: 'Wrath of God',
+      colors: ['W'],
       mv: 4,
       cost: 4,
       effect: "Destroy all creatures. They can't be regenerated.",
@@ -86,6 +115,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Day of Judgment',
+      colors: ['W'],
       mv: 4,
       cost: 4,
       effect: 'Destroy all creatures.',
@@ -95,6 +125,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Damnation',
+      colors: ['B'],
       mv: 4,
       cost: 4,
       effect: "Destroy all creatures. They can't be regenerated.",
@@ -104,6 +135,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Blasphemous Act',
+      colors: ['R'],
       mv: 9,
       cost: 3,
       effect: 'Deals 13 damage to each creature. Costs 1 less for each creature on the table.',
@@ -113,6 +145,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Toxic Deluge',
+      colors: ['B'],
       mv: 3,
       cost: 3,
       effect: 'All creatures get -X/-X until end of turn. The caster pays X life.',
@@ -122,6 +155,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Vanquish the Horde',
+      colors: ['W'],
       mv: 8,
       cost: 2,
       effect: 'Destroy all creatures. Costs 1 less for each creature on the table.',
@@ -131,6 +165,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Sunfall',
+      colors: ['W'],
       mv: 5,
       cost: 5,
       effect: 'Exile all creatures. The caster gets an Incubator token as big as the pile.',
@@ -140,6 +175,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Cyclonic Rift',
+      colors: ['U'],
       mv: 2,
       cost: 7,
       minTurn: 5,
@@ -150,6 +186,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Farewell',
+      colors: ['W'],
       mv: 6,
       cost: 6,
       minTurn: 5,
@@ -160,6 +197,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Planar Cleansing',
+      colors: ['W'],
       mv: 6,
       cost: 6,
       effect: 'Destroy all nonland permanents.',
@@ -169,6 +207,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Hour of Revelation',
+      colors: ['W'],
       mv: 6,
       cost: 6,
       effect: 'Destroy all nonland permanents.',
@@ -178,6 +217,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Nevinyrral's Disk",
+      colors: [],
       mv: 4,
       cost: 1,
       minTurn: 5,
@@ -188,6 +228,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Ruinous Ultimatum',
+      colors: ['R', 'W', 'B'],
       mv: 7,
       cost: 7,
       effect: 'Destroy all nonland permanents the caster does not control.',
@@ -197,6 +238,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Devastation Tide',
+      colors: ['U'],
       mv: 5,
       cost: 5,
       minTurn: 5,
@@ -210,6 +252,7 @@ export const CITATIONS: CitationTable = {
   removal: [
     {
       name: 'Swords to Plowshares',
+      colors: ['W'],
       mv: 1,
       cost: 1,
       effect: 'Exile target creature. Its controller gains life equal to its power.',
@@ -219,6 +262,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Path to Exile',
+      colors: ['W'],
       mv: 1,
       cost: 1,
       effect: 'Exile target creature. Its controller may fetch a basic land.',
@@ -228,6 +272,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Go for the Throat',
+      colors: ['B'],
       mv: 2,
       cost: 2,
       effect: 'Destroy target nonartifact creature.',
@@ -238,6 +283,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Infernal Grasp',
+      colors: ['B'],
       mv: 2,
       cost: 2,
       effect: 'Destroy target creature. The caster loses 2 life.',
@@ -247,6 +293,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Pongify',
+      colors: ['U'],
       mv: 1,
       cost: 1,
       effect: 'Destroy target creature. Its controller gets a 3/3 Ape.',
@@ -256,6 +303,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Fateful Absence',
+      colors: ['W'],
       mv: 2,
       cost: 2,
       effect: 'Destroy target creature or planeswalker. Its controller investigates.',
@@ -265,6 +313,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Deadly Rollick',
+      colors: ['B'],
       mv: 4,
       cost: 0,
       effect: 'Exile target creature. Free with their commander out.',
@@ -274,6 +323,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Beast Within',
+      colors: ['G'],
       mv: 3,
       cost: 3,
       effect: 'Destroy target permanent. Its controller gets a 3/3 Beast.',
@@ -283,6 +333,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Generous Gift',
+      colors: ['W'],
       mv: 3,
       cost: 3,
       effect: 'Destroy target permanent. Its controller gets a 3/3 Elephant.',
@@ -292,6 +343,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Assassin's Trophy",
+      colors: ['B', 'G'],
       mv: 2,
       cost: 2,
       effect: 'Destroy target permanent an opponent controls. Its controller may fetch a basic land.',
@@ -301,6 +353,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Vindicate',
+      colors: ['W', 'B'],
       mv: 3,
       cost: 3,
       effect: 'Destroy target permanent.',
@@ -310,6 +363,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Anguished Unmaking',
+      colors: ['W', 'B'],
       mv: 3,
       cost: 3,
       effect: 'Exile target nonland permanent. The caster loses 3 life.',
@@ -319,6 +373,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Chaos Warp',
+      colors: ['R'],
       mv: 3,
       cost: 3,
       effect:
@@ -329,6 +384,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Despark',
+      colors: ['W', 'B'],
       mv: 2,
       cost: 2,
       effect: 'Exile target permanent with mana value 4 or greater.',
@@ -339,6 +395,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Cyclonic Rift',
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: "Return target nonland permanent the caster doesn't control to its owner's hand.",
@@ -348,6 +405,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Nature's Claim",
+      colors: ['G'],
       mv: 1,
       cost: 1,
       effect: 'Destroy target artifact or enchantment. Its controller gains 4 life.',
@@ -357,6 +415,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Krosan Grip',
+      colors: ['G'],
       mv: 3,
       cost: 3,
       effect: 'Destroy target artifact or enchantment. Split second.',
@@ -369,6 +428,7 @@ export const CITATIONS: CitationTable = {
   counter: [
     {
       name: 'Counterspell',
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'Counter target spell.',
@@ -377,6 +437,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Mana Drain',
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'Counter target spell. The caster gets that much mana next main phase.',
@@ -385,6 +446,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Arcane Denial',
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'Counter target spell. You draw two cards next turn; the caster draws one.',
@@ -393,6 +455,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Rewind',
+      colors: ['U'],
       mv: 4,
       cost: 4,
       effect: 'Counter target spell. The caster untaps four lands.',
@@ -401,6 +464,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Force of Will',
+      colors: ['U'],
       mv: 5,
       cost: 0,
       effect: 'Counter target spell. Free by exiling a blue card and paying 1 life.',
@@ -409,6 +473,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Pact of Negation',
+      colors: ['U'],
       mv: 0,
       cost: 0,
       effect: 'Counter target spell. The caster pays 5 next upkeep or loses the game.',
@@ -417,6 +482,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Essence Scatter',
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'Counter target creature spell.',
@@ -425,6 +491,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Negate',
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'Counter target noncreature spell.',
@@ -433,6 +500,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Dovin's Veto",
+      colors: ['W', 'U'],
       mv: 2,
       cost: 2,
       effect: "Counter target noncreature spell. This can't be countered.",
@@ -441,6 +509,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "An Offer You Can't Refuse",
+      colors: ['U'],
       mv: 1,
       cost: 1,
       effect: 'Counter target noncreature spell. You get two Treasures.',
@@ -449,6 +518,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Fierce Guardianship',
+      colors: ['U'],
       mv: 3,
       cost: 0,
       effect: 'Counter target noncreature spell. Free with their commander out.',
@@ -457,6 +527,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Force of Negation',
+      colors: ['U'],
       mv: 3,
       cost: 0,
       effect: 'Counter target noncreature spell and exile it. Free on your turn by exiling a blue card.',
@@ -465,6 +536,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Swan Song',
+      colors: ['U'],
       mv: 1,
       cost: 1,
       effect: 'Counter target enchantment, instant or sorcery spell. You get a 2/2 Bird.',
@@ -473,6 +545,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Tale's End",
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'Counter target legendary spell, or an activated or triggered ability.',
@@ -484,6 +557,7 @@ export const CITATIONS: CitationTable = {
   discard: [
     {
       name: 'Burglar Rat',
+      colors: ['B'],
       mv: 2,
       cost: 2,
       effect: 'When it enters, each opponent discards a card.',
@@ -491,6 +565,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Raven's Crime",
+      colors: ['B'],
       mv: 1,
       cost: 1,
       effect: 'Target player discards a card. Retrace: cast it again from the graveyard by discarding a land.',
@@ -498,6 +573,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Liliana of the Veil',
+      colors: ['B'],
       mv: 3,
       cost: 3,
       effect: '+1: each player discards a card.',
@@ -505,6 +581,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Syphon Mind',
+      colors: ['B'],
       mv: 4,
       cost: 4,
       effect: 'Each other player discards a card. The caster draws a card for each one.',
@@ -515,6 +592,7 @@ export const CITATIONS: CitationTable = {
   sacrifice: [
     {
       name: 'Innocent Blood',
+      colors: ['B'],
       mv: 1,
       cost: 1,
       effect: 'Each player sacrifices a creature.',
@@ -522,6 +600,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Diabolic Edict',
+      colors: ['B'],
       mv: 2,
       cost: 2,
       effect: 'Target player sacrifices a creature.',
@@ -529,6 +608,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Liliana's Triumph",
+      colors: ['B'],
       mv: 2,
       cost: 2,
       effect: 'Each opponent sacrifices a creature.',
@@ -536,6 +616,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Fleshbag Marauder',
+      colors: ['B'],
       mv: 3,
       cost: 3,
       effect: 'When it enters, each player sacrifices a creature.',
@@ -543,6 +624,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Plaguecrafter',
+      colors: ['B'],
       mv: 3,
       cost: 3,
       effect: "When it enters, each player sacrifices a creature or planeswalker. Anyone who can't discards a card.",
@@ -553,6 +635,7 @@ export const CITATIONS: CitationTable = {
   tax: [
     {
       name: 'Rhystic Study',
+      colors: ['U'],
       mv: 3,
       cost: 3,
       effect: 'Whenever you cast a spell, the caster draws a card unless you pay 1.',
@@ -562,6 +645,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Esper Sentinel',
+      colors: ['W'],
       mv: 1,
       cost: 1,
       effect: 'Whenever you cast your first noncreature spell each turn, the caster draws a card unless you pay X, X being its power (1 as printed).',
@@ -571,6 +655,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Mystic Remora',
+      colors: ['U'],
       mv: 1,
       cost: 1,
       maxTurn: 5,
@@ -581,6 +666,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Smothering Tithe',
+      colors: ['W'],
       mv: 4,
       cost: 4,
       effect: 'Whenever you draw a card, the caster makes a Treasure unless you pay 2.',
@@ -593,6 +679,7 @@ export const CITATIONS: CitationTable = {
   clock: [
     {
       name: 'Craterhoof Behemoth',
+      colors: ['G'],
       mv: 8,
       cost: 8,
       effect: 'Their creatures get +X/+X and trample and the board swings for lethal.',
@@ -600,6 +687,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Overwhelming Stampede',
+      colors: ['G'],
       mv: 5,
       cost: 5,
       effect: 'Their creatures get +X/+X and trample, X being their biggest power.',
@@ -607,6 +695,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Insurrection',
+      colors: ['R'],
       mv: 8,
       cost: 8,
       effect: 'They untap and take every creature on the table for one attack.',
@@ -614,6 +703,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Approach of the Second Sun',
+      colors: ['W'],
       mv: 7,
       cost: 7,
       effect: 'The second cast wins the game.',
@@ -621,6 +711,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Triumph of the Hordes',
+      colors: ['G'],
       mv: 4,
       cost: 4,
       effect: 'Their creatures get +1/+1, trample and infect: ten poison ends you.',
@@ -628,6 +719,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Torment of Hailfire',
+      colors: ['B'],
       mv: 2,
       cost: 12,
       effect: 'For a big X, everyone loses life, sacrifices or discards until they are out.',
@@ -635,6 +727,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Exsanguinate',
+      colors: ['B'],
       mv: 2,
       cost: 10,
       effect: 'Each opponent loses X life and they gain it all.',
@@ -642,6 +735,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Aetherflux Reservoir',
+      colors: [],
       mv: 4,
       cost: 4,
       effect: 'A long storm turn, then 50 life paid to deal 50 damage.',
@@ -649,6 +743,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Expropriate',
+      colors: ['U'],
       mv: 9,
       cost: 9,
       effect: 'The table votes; they take extra turns and your best permanents.',
@@ -656,6 +751,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: "Thassa's Oracle",
+      colors: ['U'],
       mv: 2,
       cost: 2,
       effect: 'With Demonic Consultation or Tainted Pact: an empty library, and they win on the trigger.',
@@ -663,6 +759,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Underworld Breach',
+      colors: ['R'],
       mv: 2,
       cost: 2,
       effect: "With Brain Freeze and Lion's Eye Diamond: the whole graveyard recast until you are decked.",
@@ -670,6 +767,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Ad Nauseam',
+      colors: ['B'],
       mv: 5,
       cost: 5,
       effect: 'They draw most of their deck at instant speed and win on the spot.',
@@ -677,6 +775,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Dockside Extortionist',
+      colors: ['R'],
       mv: 2,
       cost: 2,
       effect: 'Treasures for every artifact and enchantment on the table, looped into a storm turn.',
@@ -684,6 +783,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Kiki-Jiki, Mirror Breaker',
+      colors: ['R'],
       mv: 5,
       cost: 5,
       effect: 'With Zealous Conscripts or Pestermite: infinite hasty attackers.',
@@ -691,6 +791,7 @@ export const CITATIONS: CitationTable = {
     },
     {
       name: 'Food Chain',
+      colors: ['G'],
       mv: 3,
       cost: 3,
       effect: 'With a creature that casts from exile: infinite mana into their commander.',

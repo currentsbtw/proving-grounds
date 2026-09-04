@@ -15,6 +15,15 @@
  * on the tuning. The bands are sized for 1000 runs per bracket; at much smaller
  * run counts sampling noise alone will trip them.
  *
+ * Three of the checks are rules rather than bands, and fail the probe on their
+ * own however well the curves fit: no event fires without a card citation, no
+ * seat cites a card outside its colour identity (events and the counter pick
+ * both), and `neutral` is never dealt to a seat. The last row of `TARGETS` is a
+ * rule wearing a band — `archetypeGap` measures how much more often the aggro
+ * seat attacks than the control seat, per bracket, because every other metric
+ * here sums over the whole table and would happily pass with three identical
+ * seats at it.
+ *
  * The player is a fiction, and every number below is a consequence of that
  * fiction as much as of the engine, so the assumptions are printed with the
  * results. They are deliberately plain — a mid-speed deck that keeps developing
@@ -31,8 +40,11 @@
  */
 import { createRng } from '../src/domain/rng.ts';
 import { PRESSURE } from '../src/data/pressure.ts';
+import { PROFILES, PROFILE_IDS, type SeatProfileId } from '../src/data/profiles.ts';
 import {
   applyDamageToSeat,
+  chooseCounterCitation,
+  drawProfiles,
   emptySilhouette,
   initialThreat,
   resolveWindow,
@@ -44,7 +56,7 @@ import {
   type PlayerSummary,
   type SeatSnapshot,
 } from '../src/engine/pressure.ts';
-import type { ClockState, CounterArmed, SeatId } from '../src/domain/types.ts';
+import type { ClockState, CounterArmed, EventType, SeatId } from '../src/domain/types.ts';
 
 const RUNS = Math.max(1, Number.parseInt(process.argv[2] ?? '', 10) || 2000);
 const BRACKETS = [1, 2, 3, 4, 5];
@@ -167,6 +179,14 @@ interface Tally {
    * number but zero means an event escaped the citation table.
    */
   citationMissing: number;
+  /**
+   * Seat-runs and turn-6-to-10 combat events per archetype, *at this bracket*.
+   * The pooled table at the bottom of the report cannot catch a profile that
+   * has stopped mattering inside one bracket, which is exactly how the hazard
+   * cap swallowed the multipliers — see the `archetypeGap` metric.
+   */
+  seatRunsHere: ProfileCounts;
+  combat6to10Here: ProfileCounts;
 }
 
 function freshTally(): Tally {
@@ -193,17 +213,151 @@ function freshTally(): Tally {
     sacrificeEvents: 0,
     taxEvents: 0,
     citationMissing: 0,
+    seatRunsHere: zeroProfileCounts(),
+    combat6to10Here: zeroProfileCounts(),
   };
 }
 
+/**
+ * Three seats with three different archetypes, dealt off the run's own rng in
+ * the store's order: one opening threat per seat, then the three profile draws.
+ *
+ * This mirrors the store's seat deal, not a whole run start — the app also
+ * shuffles the library off the same rng before any of this, so a probe seed and
+ * an app seed of the same string are different streams by design. What has to
+ * match is the *relative* order here, because the engine's own draw order is
+ * what the probe is measuring and a seat table dealt in the wrong order would
+ * measure a different pod than the app plays.
+ */
 function freshSeats(rng: () => number): SeatSnapshot[] {
-  return SEAT_IDS.map((id) => ({
+  const seats = SEAT_IDS.map((id) => ({
     id,
     life: STARTING_SEAT_LIFE,
     eliminated: false,
     threat: initialThreat(rng),
     silhouette: emptySilhouette(),
-  }));
+  })) satisfies SeatSnapshot[];
+  const profiles = drawProfiles(rng);
+  return seats.map((seat, i) => ({ ...seat, profile: profiles[i] }));
+}
+
+// ---------------------------------------------------------------------------
+// Profile attribution
+// ---------------------------------------------------------------------------
+// Which archetype produced which events, pooled across every bracket: a seat
+// profile is not a bracket dial, so its shape should read the same wherever it
+// sits, and pooling gives each of the six enough seat-runs to be worth reading.
+// A "seat-run" is one seat holding one profile for one simulated run.
+
+type ProfileCounts = Record<SeatProfileId, number>;
+type ProfileEvents = Record<SeatProfileId, Record<EventType, number>>;
+
+// Seeded over every key of `PROFILES`, not over `PROFILE_IDS`: `neutral` is
+// never dealt, so a nonzero count against it is a bug worth seeing as a zero
+// that became a one rather than as an `undefined` turning every sum into NaN.
+function zeroProfileCounts(): ProfileCounts {
+  return Object.fromEntries(profileKeys().map((id) => [id, 0])) as ProfileCounts;
+}
+
+function zeroProfileEvents(): ProfileEvents {
+  return Object.fromEntries(
+    profileKeys().map((id) => [id, zeroFiredCounts()]),
+  ) as ProfileEvents;
+}
+
+function profileKeys(): SeatProfileId[] {
+  return Object.keys(PROFILES) as SeatProfileId[];
+}
+
+const seatRunsByProfile = zeroProfileCounts();
+const eventsByProfile = zeroProfileEvents();
+
+/**
+ * Citations cast outside the caster's colour identity. Not a band and not a
+ * tuning question: a seat citing a card it could not be running is a visible
+ * bug, so any breach fails the probe on its own.
+ */
+let colorBreaches = 0;
+const colorBreachSamples: string[] = [];
+
+function checkCitationColors(
+  seatId: SeatId,
+  profile: SeatProfileId,
+  type: EventType,
+  card: { name: string; colors: readonly string[] } | undefined,
+): void {
+  if (!card) return;
+  const allowed = PROFILES[profile].colors as readonly string[];
+  const wrong = card.colors.filter((c) => !allowed.includes(c));
+  if (wrong.length === 0) return;
+  colorBreaches += 1;
+  if (colorBreachSamples.length < 5) {
+    colorBreachSamples.push(
+      `seat ${seatId} (${profile}, ${allowed.join('')}) cited ${card.name} [${card.colors.join('')}] on a ${type}`,
+    );
+  }
+}
+
+/**
+ * The counter citation is the one selection the window's rng never makes: the
+ * store raises counters on the player's own cast, which is not a point in the
+ * draw order, so `chooseCounterCitation` indexes a hash instead of drawing. That
+ * puts it outside every loop above — no simulated player casts anything — so it
+ * is exercised here directly, over every archetype's colours against a spread
+ * of spell shapes, brackets, turns and open mana.
+ *
+ * Same rule as the events: a citation outside the holder's colour identity is
+ * not a tuning question, it is a seat holding a card it could not be running.
+ */
+const COUNTER_PROBE_SPELLS = [
+  { name: 'Probe Beast', manaValue: 4, typeLine: 'Creature — Probe Beast' },
+  { name: 'Probe Ritual', manaValue: 3, typeLine: 'Sorcery' },
+  { name: 'Probe Aura', manaValue: 5, typeLine: 'Enchantment' },
+  { name: 'Probe Avatar', manaValue: 6, typeLine: 'Legendary Creature — Probe Avatar' },
+  { name: 'Probe Signet', manaValue: 2, typeLine: 'Artifact' },
+];
+
+interface CounterCheck {
+  calls: number;
+  cited: number;
+  breaches: number;
+  samples: string[];
+}
+
+function checkCounterCitationColors(): CounterCheck {
+  const out: CounterCheck = { calls: 0, cited: 0, breaches: 0, samples: [] };
+  for (const id of PROFILE_IDS) {
+    const allowed = PROFILES[id].colors as readonly string[];
+    for (const bracket of BRACKETS) {
+      for (let turn = FIRST_TURN; turn <= LAST_TURN; turn++) {
+        for (let mana = 0; mana <= 10; mana++) {
+          for (let i = 0; i < COUNTER_PROBE_SPELLS.length; i++) {
+            const spell = COUNTER_PROBE_SPELLS[i];
+            out.calls += 1;
+            const card = chooseCounterCitation(
+              turn - FIRST_TURN + 1,
+              turn,
+              bracket,
+              mana,
+              spell,
+              PROFILES[id].colors,
+            );
+            if (!card) continue;
+            out.cited += 1;
+            const wrong = card.colors.filter((c) => !allowed.includes(c));
+            if (wrong.length === 0) continue;
+            out.breaches += 1;
+            if (out.samples.length < 5) {
+              out.samples.push(
+                `${id} (${allowed.join('')}) would counter ${spell.name} with ${card.name} [${card.colors.join('')}]`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  return out;
 }
 
 /** Mean threat across the seats still in the game. */
@@ -240,6 +394,12 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
   let expired = false;
 
   tally.runs += 1;
+  for (const seat of seats) {
+    if (seat.profile) {
+      seatRunsByProfile[seat.profile] += 1;
+      tally.seatRunsHere[seat.profile] += 1;
+    }
+  }
 
   for (let turn = FIRST_TURN; turn <= LAST_TURN; turn++) {
     const windowIndex = turn - FIRST_TURN + 1;
@@ -290,6 +450,11 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
       // Combat is the silhouette turning sideways rather than a spell; every
       // other event has to name the card it came off.
       if (event.type !== 'combat' && !event.card) tally.citationMissing += 1;
+      const profile = seats.find((s) => s.id === event.seatId)?.profile;
+      if (profile) {
+        eventsByProfile[profile][event.type] += 1;
+        checkCitationColors(event.seatId, profile, event.type, event.card);
+      }
       switch (event.type) {
         case 'wipe':
           if (firstWipeTurn === null) firstWipeTurn = event.turn;
@@ -301,6 +466,12 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
         case 'combat':
           tally.combatEvents += 1;
           if (event.turn <= 10) tally.combatDamageByTurn10 += event.severity.damage ?? 0;
+          // Turns 6-10 on purpose: that is the stretch where the hazard ramps
+          // meet their bracket ceilings, so it is where a mis-placed profile
+          // multiplier stops showing up at all.
+          if (profile && event.turn >= 6 && event.turn <= 10) {
+            tally.combat6to10Here[profile] += 1;
+          }
           break;
         case 'resource':
           tally.resourceEvents += 1;
@@ -466,7 +637,56 @@ const TARGETS: Metric[] = [
     targets: [3.2, 4.5, 6.0, 7.5, 9.0],
     value: (t) => mean(t.threatAtTurn10, t.threatAtTurn10Samples),
   },
+  {
+    // The archetype gap, and the only row here that is about seats rather than
+    // about the pod. Every other metric sums over the table, so all three seats
+    // could quietly converge on the same behaviour without moving one of them.
+    // That is precisely what happened when a profile multiplier was applied
+    // before the hazard's bracket ceiling: from turn 5 at bracket 4 the aggro
+    // seat (1.6x) and the tokens seat (1.4x) both pinned at the same 0.9, and
+    // an aggro seat that attacks exactly as often as a control seat is not an
+    // archetype, it is a label.
+    //
+    // The fiction: aggro is the seat that turns creatures sideways and control
+    // is the seat that would rather not, so over the turns where both have a
+    // board — 6 to 10, which is also where the ramps are up against their
+    // ceilings — aggro should be attacking a clear multiple as often. The ratio
+    // is per seat-run, so it does not care how many of each the shuffle dealt.
+    //
+    // The band is really a floor with an upper edge attached: every lower edge
+    // is 2.0 or above, so "the archetypes collapsed together" fails here long
+    // before a player could see it, and the upper edge still holds the gap to a
+    // multiplier on a shared curve rather than letting the control seat stop
+    // blocking entirely. The gap narrows with the bracket because the ceilings
+    // do the narrowing — at bracket 4 both curves spend the late turns pressed
+    // against `max`, which is the least room the two archetypes ever have.
+    //
+    // Bands are per bracket because the noise is proportional and the value is
+    // not: at bracket 1 the control seat almost never has the board to attack
+    // with, so the denominator is small and the ratio is both large and loose.
+    key: 'archetypeGap',
+    label: 'aggro:control combat, t6-10',
+    kind: 'num',
+    digits: 2,
+    band: 1.1,
+    bands: [2.5, 1.8, 1.1, 0.8, 1.1],
+    targets: [7.0, 5.8, 3.8, 2.8, 3.7],
+    value: (t) => combatRatio(t, 'aggro', 'control'),
+  },
 ];
+
+/**
+ * Combat events per seat-run for one archetype against another, over turns 6
+ * to 10. Null rather than Infinity when the denominator saw no combat at all —
+ * a bracket where the control seat never attacks is a result to read, not a
+ * number to divide by.
+ */
+function combatRatio(tally: Tally, over: SeatProfileId, under: SeatProfileId): number | null {
+  const a = mean(tally.combat6to10Here[over], tally.seatRunsHere[over]);
+  const b = mean(tally.combat6to10Here[under], tally.seatRunsHere[under]);
+  if (a === null || b === null || b === 0) return null;
+  return a / b;
+}
 
 /** Rows worth reading that nothing is fitted to. */
 const DIAGNOSTICS: Diagnostic[] = [
@@ -487,9 +707,21 @@ interface Metric {
   digits: number;
   /** Half-width of the pass band, in the metric's own unit. */
   band: number;
+  /**
+   * Per-bracket half-widths, indexed `bracket - 1`, overriding `band`. For a
+   * metric whose value is a ratio rather than a rate: the same proportional
+   * noise is a much wider absolute band at a bracket where the ratio is 5 than
+   * at one where it is 2, so one number cannot serve both.
+   */
+  bands?: number[];
   /** One target per bracket, indexed `bracket - 1`. */
   targets: number[];
   value: (tally: Tally) => number | null;
+}
+
+/** The band this metric is judged against at one bracket. */
+function bandAt(metric: Metric, bracket: number): number {
+  return metric.bands?.[bracket - 1] ?? metric.band;
 }
 
 interface Diagnostic {
@@ -519,9 +751,10 @@ function report(bracket: number, tally: Tally): string[] {
   for (const metric of TARGETS) {
     const value = metric.value(tally);
     const target = metric.targets[bracket - 1];
-    const ok = value !== null && Math.abs(value - target) <= metric.band;
+    const half = bandAt(metric, bracket);
+    const ok = value !== null && Math.abs(value - target) <= half;
     if (!ok) missed.push(metric.key);
-    const band = `±${metric.band}${metric.kind === 'pct' ? ' pts' : ''}`;
+    const band = `±${half}${metric.kind === 'pct' ? ' pts' : ''}`;
     console.log(
       `  ${metric.label.padEnd(34)}${fmt(value, metric.digits, metric.kind).padStart(8)}` +
         `${fmt(target, metric.digits, metric.kind).padStart(9)}${band.padStart(9)}  ${ok ? 'PASS' : 'MISS'}`,
@@ -539,6 +772,58 @@ function report(bracket: number, tally: Tally): string[] {
       (missed.length > 0 ? `  ·  MISS: ${missed.join(', ')}` : ''),
   );
   return missed;
+}
+
+/**
+ * Events per 1000 seat-runs, one row per archetype, pooled across brackets.
+ * This is the table a profile tuning pass reads: the bracket rows above say how
+ * much pressure the pod produced, and this one says who produced it.
+ */
+function reportProfiles(): void {
+  const types: EventType[] = ['wipe', 'removal', 'combat', 'resource', 'clock'];
+  console.log('');
+  console.log('═'.repeat(56));
+  console.log('Seat archetypes  (events per 1000 seat-runs, all brackets pooled)');
+  console.log(
+    `  ${'profile'.padEnd(10)}${'colours'.padStart(8)}${'seat-runs'.padStart(11)}` +
+      types.map((t) => t.padStart(9)).join(''),
+  );
+  console.log('  ' + '─'.repeat(66));
+  for (const id of PROFILE_IDS) {
+    const runs = seatRunsByProfile[id];
+    const per1000 = (n: number): string => (runs === 0 ? 'n/a' : ((n * 1000) / runs).toFixed(1));
+    console.log(
+      `  ${id.padEnd(10)}${PROFILES[id].colors.join('').padStart(8)}${String(runs).padStart(11)}` +
+        types.map((t) => per1000(eventsByProfile[id][t]).padStart(9)).join(''),
+    );
+  }
+  console.log('  ' + '─'.repeat(66));
+  console.log(
+    `  citations outside the caster's colours: ${colorBreaches}` +
+      (colorBreaches === 0 ? '  (PASS)' : '  (FAIL)'),
+  );
+  for (const sample of colorBreachSamples) console.log(`    ${sample}`);
+  console.log(
+    `  neutral profiles dealt to a seat: ${seatRunsByProfile.neutral}` +
+      (seatRunsByProfile.neutral === 0 ? '  (PASS)' : '  (FAIL)'),
+  );
+}
+
+/** The counter-citation colour check, printed as its own short section. */
+function reportCounterColors(check: CounterCheck): void {
+  console.log('');
+  console.log('═'.repeat(56));
+  console.log('Counter citations  (chooseCounterCitation, outside the rng stream)');
+  console.log(
+    `  ${check.calls} calls across ${PROFILE_IDS.length} archetypes x ${BRACKETS.length} brackets` +
+      ` x turns ${FIRST_TURN}-${LAST_TURN} x mana 0-10 x ${COUNTER_PROBE_SPELLS.length} spell shapes`,
+  );
+  console.log(`  calls that produced a citation: ${check.cited}`);
+  console.log(
+    `  citations outside the holder's colours: ${check.breaches}` +
+      (check.breaches === 0 ? '  (PASS)' : '  (FAIL)'),
+  );
+  for (const sample of check.samples) console.log(`    ${sample}`);
 }
 
 function main(): void {
@@ -564,6 +849,10 @@ function main(): void {
     citationMisses += tally.citationMissing;
   }
 
+  reportProfiles();
+  const counterCheck = checkCounterCitationColors();
+  reportCounterColors(counterCheck);
+
   const checks = TARGETS.length * BRACKETS.length;
   console.log('');
   console.log('═'.repeat(56));
@@ -577,8 +866,29 @@ function main(): void {
   if (citationMisses > 0) {
     console.log(`FAIL — ${citationMisses} event(s) fired without a card citation.`);
   }
+  // Same class of rule: a seat may only cite cards inside its colour identity.
+  if (colorBreaches > 0) {
+    console.log(`FAIL — ${colorBreaches} citation(s) outside the caster's colours.`);
+  }
+  if (counterCheck.breaches > 0) {
+    console.log(
+      `FAIL — ${counterCheck.breaches} counter citation(s) outside the holder's colours.`,
+    );
+  }
+  // And `neutral` is the shape of "no profile", not an opponent: dealing it to a
+  // seat would put an archetype-less seat at the table.
+  if (seatRunsByProfile.neutral > 0) {
+    console.log(`FAIL — neutral was dealt to ${seatRunsByProfile.neutral} seat-run(s).`);
+  }
   console.log('');
-  process.exitCode = missTotal === 0 && citationMisses === 0 ? 0 : 1;
+  process.exitCode =
+    missTotal === 0 &&
+    citationMisses === 0 &&
+    colorBreaches === 0 &&
+    counterCheck.breaches === 0 &&
+    seatRunsByProfile.neutral === 0
+      ? 0
+      : 1;
 }
 
 main();

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { PROFILES, colorLetters } from '../../data/profiles';
 import type { Seat, SeatId } from '../../domain/types';
 import { highestThreatSeat, livingSeats } from '../../engine/pressure';
 import { LETHAL_COMMANDER_DAMAGE, useGameStore } from '../../state/gameStore';
@@ -129,16 +130,30 @@ export default function SeatFrame({
 
   // The frame carries the whole reading, so nothing inside it is announced
   // twice: the meter, the chips and the caption are all hidden from the tree.
+  // The archetype the seat is piloting. Absent on a run started before profiles
+  // existed, and the frame simply says nothing extra when it is.
+  const profile = seat.profile ? PROFILES[seat.profile] : null;
+  const profileTitle = profile
+    ? `${profile.label}. ${profile.blurb} Colours ${colorLetters(profile.colors)}`
+    : undefined;
+
   const states = [
     dead ? 'out' : null,
     !dead && hasClock ? 'clock' : null,
     !dead && armedThreshold !== null ? `armed, counters ${armedThreshold} or more mana` : null,
     !dead && hit ? 'the seat to hit' : null,
   ].filter(Boolean);
+  // The colours go in the label, not only in the chip's `title`: the chip is
+  // aria-hidden, a title is not reliably announced, and a seat's colour identity
+  // is the thing a player checks before deciding what the seat can be holding.
+  // Never colour alone, and never a tooltip alone either.
+  const named = profile
+    ? `${seatLabel(seat.id)}, ${profile.label}, colours ${colorLetters(profile.colors)}`
+    : seatLabel(seat.id);
   const label = dead
-    ? `${seatLabel(seat.id)}: eliminated`
+    ? `${named}: eliminated`
     : [
-        `${seatLabel(seat.id)}: ${seat.life} life`,
+        `${named}: ${seat.life} life`,
         `threat ${filled} of ${THREAT_SEGMENTS}, ${trend}`,
         ...states,
       ].join(', ');
@@ -165,6 +180,14 @@ export default function SeatFrame({
           <span className="hud-seat-id" aria-hidden="true">
             {seat.id}
           </span>
+          {/* The archetype rides with the letter, because it names the same
+              thing: which opponent this is. Its own title carries the line the
+              chip has no room for. */}
+          {profile && (
+            <span className="rd-chip is-profile" aria-hidden="true" title={profileTitle}>
+              {profile.label}
+            </span>
+          )}
           <span className="hud-life num" aria-hidden="true">
             {seat.life}
           </span>

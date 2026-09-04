@@ -67,7 +67,7 @@ export const HOTKEY_ACTIONS: readonly HotkeyAction[] = [
   },
   {
     id: 'respondOne',
-    label: 'Event: answer it',
+    label: 'Event: answer it (pick the card)',
     note: 'only while an event is waiting',
     defaultKey: '1',
   },

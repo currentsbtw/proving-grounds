@@ -1,5 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getCachedCardsByName, listRuns } from '../../db/db';
+import { cardStats } from '../../engine/cardStats';
+import type { CardStats } from '../../engine/cardStats';
 import { scoreRun } from '../../engine/scorecard';
 import type { Scorecard } from '../../engine/scorecard';
 import { reviewRun } from '../../engine/review';
@@ -30,6 +32,39 @@ const cache = new Map<string, Scorecard>();
  * would flag nothing at all.
  */
 const reviews = new Map<string, Review>();
+
+/**
+ * Card stats are a third replay, over the whole deck's history at once rather
+ * than one run at a time — so the key is the set of runs, not a run. Runs are
+ * immutable after `endRun`, so the sorted ids joined are that set: a new run of
+ * the deck (or a deleted one) changes the key and nothing else does. The order
+ * they arrive in does not, which is why the ids are sorted: `cardStats` folds
+ * every run into the same tallies and sorts the result by name.
+ *
+ * One slot rather than a map, because `cardStats` exposes no per-run fold: a new
+ * run replays the whole history whatever we keep, so every superseded set is a
+ * dead entry that will never be read again. A map of them would grow by one per
+ * run played. The cost is a caller alternating between two decks, who pays one
+ * replay per switch — the panel shows one deck at a time.
+ *
+ * Legacy runs need no fact lookup here. `cardStats` counts only runs that carry
+ * a roster and reports the rest as `runsSkipped`, so nothing about this key
+ * depends on what the Scryfall cache has resolved yet.
+ */
+let cardStatsSlot: { key: string; value: CardStats } | null = null;
+
+const NO_CARD_STATS: CardStats = { cards: [], runsScored: 0, runsSkipped: 0 };
+
+function cardStatsCached(runs: RunRecord[]): CardStats {
+  const key = runs
+    .map((run) => run.id)
+    .sort()
+    .join('|');
+  if (cardStatsSlot?.key === key) return cardStatsSlot.value;
+  const value = cardStats(runs);
+  cardStatsSlot = { key, value };
+  return value;
+}
 
 /** Immutable per run, and per how many names resolved while the run is legacy. */
 function cacheKey(run: RunRecord, facts: Map<string, RosterEntry> | undefined): string {
@@ -134,14 +169,34 @@ export function useScorecard(runId: string | null): ScoredLookup | undefined {
 export interface DeckScorecards {
   runs: RunRecord[];
   cards: Scorecard[];
+  /** Per-card tallies across those same runs. */
+  cardStats: CardStats;
 }
 
-/** Every run of a deck, newest first, with its scorecard. `undefined` while loading. */
+/**
+ * Every run of a deck, newest first, with its scorecard and the deck's per-card
+ * tallies. `undefined` while loading.
+ *
+ * The three readings come off one subscription on purpose: they are all derived
+ * from the same `listRuns(deckId)`, and a second live query for the card table
+ * would clone every log of the deck out of IndexedDB a second time on open and
+ * again on every write to `runs`.
+ *
+ * Same stale-value caveat as `useScorecard`: `useLiveQuery` hands back the
+ * previous subscription's value until the new one lands, so a caller that can
+ * switch decks in place would show the old deck's runs for a frame. The
+ * scorecard panel is remounted per run, which resets it — a caller that is not
+ * should carry its own stamp the way `ScoredLookup` does.
+ */
 export function useDeckScorecards(deckId: string | null): DeckScorecards | undefined {
-  return useLiveQuery(async () => {
-    if (!deckId) return { runs: [], cards: [] };
+  return useLiveQuery(async (): Promise<DeckScorecards> => {
+    if (!deckId) return { runs: [], cards: [], cardStats: NO_CARD_STATS };
     const runs = await listRuns(deckId);
     const facts = await factsForLegacy(runs);
-    return { runs, cards: runs.map((run) => scoreCached(run, facts)) };
+    return {
+      runs,
+      cards: runs.map((run) => scoreCached(run, facts)),
+      cardStats: cardStatsCached(runs),
+    };
   }, [deckId]);
 }
