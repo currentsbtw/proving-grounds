@@ -208,6 +208,28 @@ export function renderTableContext(table: JudgeTableContext): string {
       ? 'eliminated'
       : `${seat.life} life, threat ${seat.threat}, ${sil.creatures} creatures for ${sil.power} power, ${sil.artifacts} artifacts, ${sil.openMana} open mana`;
     out.push(`Seat ${seat.id}: ${state}`);
+    // A hate piece is a permanent standing on that seat's side of the table, so
+    // it prints indented under the seat that owns it rather than in a list of
+    // its own: the seat is what makes it a fact about the board. The effect
+    // carries a label because it is table-talk and not the card: a piece is not
+    // in the player's deck, so the snapshot has no oracle text for it, and the
+    // policy prompt tells the judge that card text in the context is what the
+    // card says. The label is what keeps a paraphrase from being read as the
+    // printed words. A dead seat prints none, and neither does a seat holding
+    // nothing: the store retires a seat's pieces as it dies, and this is the
+    // floor under that for a client the server cannot check.
+    if (seat.eliminated) continue;
+    for (const piece of seat.hate ?? []) {
+      const parts = [
+        piece.name,
+        `since turn ${piece.sinceTurn}`,
+        `summary, not oracle text: ${piece.effect.replace(/\n+/g, ' / ')}`,
+      ];
+      // `permanent` is which wipe sweeps the piece clear, not a type line, so it
+      // prints as the clause it is rather than in the slot a type would sit in.
+      if (piece.permanent) parts.push(`swept by ${piece.permanent} wipes`);
+      out.push(`  standing: ${parts.join(' | ')}`);
+    }
   }
 
   return out.join('\n');

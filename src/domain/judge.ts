@@ -37,6 +37,26 @@ export interface JudgeSeatContext {
   eliminated: boolean;
   threat: number;
   silhouette: { creatures: number; power: number; artifacts: number; openMana: number };
+  /**
+   * Hate pieces standing on this seat's side of the table: Rest in Peace, Blood
+   * Moon, Thalia, Torpor Orb and the rest. They are real permanents the player
+   * is honouring by hand, and a question answered as though they were not there
+   * is answered about a different table -- "can I cast Reanimate?" has one
+   * answer under Rest in Peace and another without it.
+   *
+   * `effect` rather than oracle text because a hate piece is not in the player's
+   * deck, so `state.cardData` has nothing cached for it; the citation's one-line
+   * effect is the whole of what can be said about the card, and it is what the
+   * player is honouring anyway. `permanent` is the sweep category the citation
+   * tags the card with -- which wipe clears it, not a type line, so an artifact
+   * creature is tagged `creature` -- and `sinceTurn` is the player turn it
+   * landed on.
+   *
+   * Omitted, not empty, when a seat has none. The store drops a piece on named
+   * removal, on a wrath wide enough to sweep it, and on the seat's elimination,
+   * so this list is exactly what is standing right now.
+   */
+  hate?: { name: string; effect: string; permanent?: string; sinceTurn: number }[];
 }
 
 /** Compact snapshot of the run, built client-side. The library is never sent. */

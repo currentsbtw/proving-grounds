@@ -110,6 +110,32 @@ const FIXTURE: JudgeTableContext = {
   ],
 };
 
+/**
+ * `FIXTURE` with a piece standing: Seat B is holding Rest in Peace, a permanent
+ * on its side of the table that the player is honouring by hand, and the one
+ * part of a seat line a rules question can turn on. Separate from `FIXTURE`
+ * because every retrieval assertion below scores against that table, and a
+ * piece added to it would change inputs the older checks were written against.
+ */
+const HATE_FIXTURE: JudgeTableContext = {
+  ...FIXTURE,
+  seats: FIXTURE.seats.map((seat) =>
+    seat.id === 'B'
+      ? {
+          ...seat,
+          hate: [
+            {
+              name: 'Rest in Peace',
+              effect: 'Exile all graveyards. Cards go to exile instead of a graveyard.',
+              permanent: 'enchantment',
+              sinceTurn: 5,
+            },
+          ],
+        }
+      : seat,
+  ),
+};
+
 interface StubReply {
   status: 'answer' | 'decline';
   answer: string;
@@ -295,6 +321,78 @@ async function offline() {
     rendered.split('\n').find((line) => line.includes('Swords to Plowshares')) ?? 'no line',
   );
   check('marks the dead seat', rendered.includes('Seat C: eliminated'));
+  // A hate piece is a permanent on a seat's side of the table, so it prints
+  // under that seat and changes nothing about the seat's own line. The checks
+  // are: the seat line still reads exactly as it did, the piece follows it with
+  // name, turn, a labelled effect and its sweep category, a seat holding nothing
+  // prints nothing, and a dead seat prints nothing however much it is carrying.
+  const renderedHate = renderTableContext(HATE_FIXTURE).split('\n');
+  const seatBAt = renderedHate.findIndex((line) => line.startsWith('Seat B: '));
+  check(
+    'the seat line is unchanged by a standing piece',
+    renderedHate[seatBAt] ===
+      'Seat B: 33 life, threat 6, 4 creatures for 11 power, 0 artifacts, 2 open mana',
+    renderedHate[seatBAt] ?? 'no Seat B line',
+  );
+  check(
+    'and the standing piece follows it, its effect labelled a summary',
+    renderedHate[seatBAt + 1] ===
+      '  standing: Rest in Peace | since turn 5 | summary, not oracle text: Exile all graveyards. Cards go to exile instead of a graveyard. | swept by enchantment wipes',
+    renderedHate[seatBAt + 1] ?? 'no line after Seat B',
+  );
+  const seatAAt = renderedHate.findIndex((line) => line.startsWith('Seat A: '));
+  check(
+    'a seat with no pieces prints no standing line',
+    seatAAt >= 0 && !(renderedHate[seatAAt + 1] ?? '').startsWith('  standing:'),
+    seatAAt >= 0 ? (renderedHate[seatAAt + 1] ?? 'no line after Seat A') : 'no Seat A line',
+  );
+  // Seat C is out. The store retires a seat's pieces as it dies, so a client
+  // sending one is a client the server cannot trust, and the render is the floor.
+  const deadHolding = renderTableContext({
+    ...HATE_FIXTURE,
+    seats: HATE_FIXTURE.seats.map((seat) =>
+      seat.id === 'C'
+        ? { ...seat, hate: [{ name: 'Blood Moon', effect: 'Nonbasic lands are Mountains.', sinceTurn: 3 }] }
+        : seat,
+    ),
+  }).split('\n');
+  const seatCAt = deadHolding.findIndex((line) => line.startsWith('Seat C: '));
+  check(
+    'and a dead seat prints none even when it is carrying one',
+    seatCAt >= 0 && !(deadHolding[seatCAt + 1] ?? '').startsWith('  standing:'),
+    seatCAt >= 0 ? (deadHolding[seatCAt + 1] ?? 'no line after Seat C') : 'no Seat C line',
+  );
+  // Multi-line text flattens the way it does everywhere else in the render, so
+  // one piece never becomes two lines and the indent stays a piece marker.
+  const wrapped = renderTableContext({
+    ...FIXTURE,
+    seats: FIXTURE.seats.map((seat) =>
+      seat.id === 'A'
+        ? { ...seat, hate: [{ name: 'Thalia', effect: 'First strike.\n\nNoncreature spells cost {1} more.', sinceTurn: 2 }] }
+        : seat,
+    ),
+  });
+  check(
+    'a standing piece with wrapped text flattens onto one line',
+    wrapped.includes(
+      '  standing: Thalia | since turn 2 | summary, not oracle text: First strike. / Noncreature spells cost {1} more.',
+    ),
+    wrapped.split('\n').find((line) => line.startsWith('  standing: Thalia')) ?? 'no Thalia line',
+  );
+  // And the snapshot shapes that predate hate pieces still render byte for byte
+  // as they did: an absent `hate` and an empty one are the same table, and both
+  // are the standing table with the standing lines taken out again.
+  const withoutStanding = renderedHate.filter((line) => !line.startsWith('  standing:')).join('\n');
+  const emptyHate = renderTableContext({
+    ...FIXTURE,
+    seats: FIXTURE.seats.map((seat) => ({ ...seat, hate: [] })),
+  });
+  check(
+    'a snapshot with no hate field renders as it did before',
+    rendered === withoutStanding,
+    rendered === withoutStanding ? 'identical' : 'differs',
+  );
+  check('and an empty hate list renders the same as no field', emptyHate === rendered);
   // The guard is against a library *section*, not against the word: real oracle
   // text says "search your library" constantly and always will.
   check('omits the library zone', !/^\s*(your )?library\b/im.test(rendered));
@@ -906,6 +1004,75 @@ async function offline() {
   check(
     'a question with no delayed-trigger cue does not pull 603.7 in',
     !buildExcerpt(corpus, { question: trampleQ }).ruleIds.some((id) => id.startsWith('603.7')),
+  );
+
+  // Standing hate pieces. A piece is a permanent on a seat's side of the table,
+  // so its name and effect score the way a battlefield card's do. The pair below
+  // is the same table twice, differing only in whether Seat B is holding Rest in
+  // Peace, so what the piece brought is the only thing that can differ.
+  const hateTable = { ...HATE_FIXTURE, cards: [], stack: [], activeEvent: undefined };
+  const noHateTable = { ...FIXTURE, cards: [], stack: [], activeEvent: undefined };
+  const hateQ = 'With Rest in Peace standing, what happens to my creature when it dies?';
+  const withPiece = buildExcerpt(corpus, { question: hateQ, table: hateTable });
+  const withoutPiece = buildExcerpt(corpus, { question: hateQ, table: noHateTable });
+  const gained = withPiece.ruleIds.filter((id) => !withoutPiece.ruleIds.includes(id));
+  note(
+    'standing-piece excerpt',
+    `with ${withPiece.ruleIds.length} rules / ${withPiece.text.length} chars, without ${withoutPiece.ruleIds.length} / ${withoutPiece.text.length}`,
+  );
+  check(
+    'a standing piece pulls rules the same question without it does not',
+    gained.length > 0,
+    gained.slice(0, 8).join(', ') || 'nothing gained',
+  );
+  // The piece's effect is written as a replacement ("cards go to exile instead
+  // of a graveyard"), and 616 is the rule about interacting replacement effects.
+  // That family arriving only when the piece is standing is the effect text
+  // reaching scoring rather than the question doing it alone.
+  check(
+    'and reaches the replacement-effect rules its effect is written as',
+    withPiece.ruleIds.includes('616.1') && !withoutPiece.ruleIds.includes('616.1'),
+    withPiece.ruleIds.filter((id) => id.startsWith('616.')).join(', ') || 'no 616 family',
+  );
+
+  // The cue gate on a standing piece, which is the battlefield rule: a piece's
+  // effect is a cue only once the question names the piece. No card in the hate
+  // table carries a phrase `CUE_BOOSTS` reads, so the piece below borrows
+  // Kiki-Jiki's words to exercise the gate -- a `hate` entry is a name and a
+  // line of effect text, and what is under test is the gate, not the card.
+  const withKikiPiece = (question: string) =>
+    buildExcerpt(corpus, {
+      question,
+      table: {
+        ...hateTable,
+        seats: hateTable.seats.map((seat) =>
+          seat.id === 'B'
+            ? {
+                ...seat,
+                hate: [
+                  {
+                    name: 'Kiki-Jiki, Mirror Breaker',
+                    effect: kikiCard.oracleText,
+                    permanent: 'creature',
+                    sinceTurn: 4,
+                  },
+                ],
+              }
+            : seat,
+        ),
+      },
+    });
+  const namedPiece = withKikiPiece(namedQ);
+  check(
+    'the cue is read off a standing piece the question names',
+    namedPiece.ruleIds.includes('603.7') && namedPiece.ruleIds.includes('603.7a'),
+    namedPiece.ruleIds.filter((id) => id.startsWith('603.7')).join(', ') || 'no 603.7 family',
+  );
+  const unnamedPiece = withKikiPiece(trampleQ);
+  check(
+    'a standing piece the question never names does not fire the cue',
+    !unnamedPiece.ruleIds.some((id) => id.startsWith('603.7')),
+    unnamedPiece.ruleIds.filter((id) => id.startsWith('603.7')).join(', ') || 'no 603.7 family',
   );
 
   // A cue is a floor and must never be a promotion past the top hit: selection

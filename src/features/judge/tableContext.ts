@@ -107,19 +107,42 @@ function commanderTaxOf(state: GameState): number | undefined {
   return tax;
 }
 
+/**
+ * Seats, each carrying the hate pieces standing on its side of the table. The
+ * store keeps only pieces that have resolved and are still out, so this is a
+ * filter and nothing more. A piece travels as its citation's one-line effect
+ * rather than as oracle text: the card is not in the player's deck, so there is
+ * nothing in `state.cardData` to look up.
+ */
 function toSeatContext(state: GameState): JudgeSeatContext[] {
-  return state.seats.map((seat) => ({
-    id: seat.id,
-    life: seat.life,
-    eliminated: seat.eliminated,
-    threat: seat.threat,
-    silhouette: {
-      creatures: seat.silhouette.creatures,
-      power: seat.silhouette.power,
-      artifacts: seat.silhouette.artifacts,
-      openMana: seat.silhouette.openMana,
-    },
-  }));
+  return state.seats.map((seat) => {
+    const entry: JudgeSeatContext = {
+      id: seat.id,
+      life: seat.life,
+      eliminated: seat.eliminated,
+      threat: seat.threat,
+      silhouette: {
+        creatures: seat.silhouette.creatures,
+        power: seat.silhouette.power,
+        artifacts: seat.silhouette.artifacts,
+        openMana: seat.silhouette.openMana,
+      },
+    };
+    // A dead seat sends none, the same floor the readout keeps: the store
+    // retires a seat's pieces as it dies, and a piece travelling under a seat
+    // that is out would be a fact about the table that is no longer true.
+    if (seat.eliminated) return entry;
+    const hate = state.hazards
+      .filter((hazard) => hazard.seatId === seat.id)
+      .map((hazard) => ({
+        name: hazard.card.name,
+        effect: hazard.card.effect,
+        ...(hazard.card.permanent ? { permanent: hazard.card.permanent } : {}),
+        sinceTurn: hazard.spawnedTurn,
+      }));
+    if (hate.length > 0) entry.hate = hate;
+    return entry;
+  });
 }
 
 /** A compact, library-free snapshot of the run for one question. */

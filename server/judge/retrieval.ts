@@ -316,9 +316,10 @@ interface Query {
 
 /**
  * The question plus everything on the table that is made of rules text: card
- * names, type lines, oracle text, the stack tray, the active event. Seat lines
- * are life totals and threat meters, which no rule is about, so they are skipped
- * rather than diluting the scores.
+ * names, type lines, oracle text, the stack tray, the active event, and the hate
+ * pieces standing on the seats. The rest of a seat line is life totals and
+ * threat meters, which no rule is about, so those are skipped rather than
+ * diluting the scores.
  */
 function buildQuery(req: JudgeRequest): Query {
   const question = req.question ?? '';
@@ -359,6 +360,12 @@ function buildQuery(req: JudgeRequest): Query {
         cueParts.push(table.activeEvent.card.effect);
       }
     }
+    for (const seat of table.seats) {
+      for (const piece of seat.hate ?? []) {
+        context.push(piece.name, piece.effect);
+        if (asked.includes(piece.name.toLowerCase())) cueParts.push(piece.effect);
+      }
+    }
   }
   for (const token of tokenize(context.join(' '))) {
     if (!terms.has(token)) terms.set(token, CONTEXT_WEIGHT);
@@ -377,7 +384,10 @@ function buildQuery(req: JudgeRequest): Query {
   // than in the question, and naming it is how the player says which one; and
   // the stack tray and the active event, which are what is happening right now
   // whether the question spells them out or not. The eval sends the card's words
-  // appended to the question, so both request shapes reach the same rules.
+  // appended to the question, so both request shapes reach the same rules. A
+  // hate piece standing on a seat is read the same way a battlefield card is,
+  // and for the same reason: it is a permanent sitting there, not what is
+  // happening right now, so its effect is a cue only once the question names it.
   const cueText = cueParts.join(' ');
   const cueRules = CUE_BOOSTS.filter((boost) => boost.cues.test(cueText)).map((boost) => boost.rule);
 
