@@ -674,6 +674,14 @@
   --sc-evt: var(--mana-g);
 }
 
+/* A hate piece is colourless in the game's own vocabulary, so it wears Magic's
+   colourless grey here. The letter H beside it is what carries the class; the
+   hue is only the mnemonic. */
+.sc-evt.type-hate,
+.sc-evt-mark.type-hate {
+  --sc-evt: var(--mana-c);
+}
+
 .sc-evt {
   display: inline-block;
   padding: 0 6px;

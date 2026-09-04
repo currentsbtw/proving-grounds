@@ -87,6 +87,10 @@ function eventDetail(row: EventLedgerRow): string {
       return `deadline turn ${s.deadlineTurn ?? '?'}`;
     case 'resource':
       return row.variant ?? 'tax';
+    case 'hate':
+      // Nothing is enforced: the piece is a standing tell, and what it says is
+      // already printed under the card name in the event column.
+      return 'stands until answered';
     default:
       return row.variant ?? '';
   }
@@ -116,6 +120,17 @@ function eventOutcome(row: EventLedgerRow): string {
       const offered = readNum(o, 'offered') ?? taken;
       return taken < offered ? `took ${taken} of ${offered}` : `took ${taken}`;
     }
+    case 'hate':
+      // The event resolved either way — the piece stood. What is printed is what
+      // happened to it afterwards, which is a separate fact from the answer the
+      // player did not give at the time.
+      if (row.removedTurn !== undefined) {
+        return row.removedWith
+          ? `removed T${row.removedTurn} with ${row.removedWith}`
+          : `removed T${row.removedTurn}`;
+      }
+      if (row.sweptTurn !== undefined) return `swept T${row.sweptTurn}`;
+      return 'stands';
     case 'resource': {
       const mode = readStr(o, 'mode') ?? 'tax';
       if (o?.noTarget) return `nothing to ${mode}`;
@@ -160,6 +175,15 @@ function MetricTiles({ card }: { card: Scorecard }) {
   const killed = card.seats.filter((seat) => seat.eliminatedTurn !== null).length;
   const terminal = card.answers.total.responded + card.answers.total.resolved;
 
+  // Runs scored before hate pieces existed carry no `hazards` at all; an absent
+  // count is "none faced", which is the honest reading of a run that could not
+  // have faced one.
+  const hazards = card.hazards ?? { faced: 0, stood: 0, removed: 0, swept: 0, turnsStanding: [] };
+  const avgStanding =
+    hazards.turnsStanding.length > 0
+      ? hazards.turnsStanding.reduce((a, b) => a + b, 0) / hazards.turnsStanding.length
+      : null;
+
   return (
     <div className="sc-tiles">
       <Tile
@@ -196,6 +220,17 @@ function MetricTiles({ card }: { card: Scorecard }) {
           !card.clock.faced
             ? 'no seat ever threatened to win'
             : `spawned T${card.clock.spawnedTurn ?? '?'} · deadline T${card.clock.deadlineTurn ?? '?'}`
+        }
+      />
+      <Tile
+        label="Hate pieces"
+        value={hazards.faced === 0 ? 'none' : `${hazards.faced} faced · ${hazards.removed} removed`}
+        sub={
+          hazards.faced === 0
+            ? 'no seat cast a persistent piece this run'
+            : hazards.stood === 0
+              ? 'every one was answered on the stack'
+              : `${hazards.stood} stood · ${turns(avgStanding)} on average · ${hazards.swept} swept`
         }
       />
       <Tile
@@ -273,6 +308,12 @@ function Seats({ card }: { card: Scorecard }) {
               ? `${seat.commanderDamageDealt} commander damage`
               : 'no commander damage'}
           </span>
+          {/* What the pod did to this seat while the player untapped. Printed
+              only when it happened, and kept plainly apart from the damage
+              above it, which is the player's. */}
+          {seat.podDamageTaken > 0 && (
+            <span className="sc-seat-sub">pod dmg taken {seat.podDamageTaken}</span>
+          )}
           <span className="sc-seat-sub">
             {seat.eliminatedTurn === null
               ? 'survived'
@@ -367,6 +408,17 @@ function Profile({ cards }: { cards: Scorecard[] }) {
           <dt>Clocks</dt>
           <dd className="num">
             {profile.clocksBeaten}/{profile.clocksFaced} beaten
+          </dd>
+        </div>
+        <div>
+          <dt>Hate faced</dt>
+          <dd className="num">{profile.hateFaced}</dd>
+        </div>
+        <div>
+          <dt>Hate removed</dt>
+          <dd>
+            <Figure value={pct(profile.hateRemovedRate)} />{' '}
+            <span className="sc-dim">(of {profile.hateStood} stood)</span>
           </dd>
         </div>
         <div>

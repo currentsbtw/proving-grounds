@@ -37,13 +37,17 @@ import type {
  */
 
 /**
- * 3 — `EventTally.nameable` joins the shape, and `AnswerRate.namedRate` is read
- * against it rather than against every answer: a paid tax is an answer with no
- * card in it, so counting it in the denominator made naming look worse than it
- * was. 2 added `EventTally.named`, `AnswerRate.namedRate` and the ledger's
- * `answerCard`, when answers first bound to the card that made them.
+ * 4 — standing hate pieces and pod combat. `Scorecard.hazards` counts the pieces
+ * a run faced and how long each one stood, the ledger's hate rows say how each
+ * one left the table, and `SeatOutcome.podDamageTaken` holds the damage seats
+ * dealt each other — which is deliberately *not* damage the player dealt. 3
+ * added `EventTally.nameable`, and read `AnswerRate.namedRate` against it rather
+ * than against every answer: a paid tax is an answer with no card in it, so
+ * counting it in the denominator made naming look worse than it was. 2 added
+ * `EventTally.named`, `AnswerRate.namedRate` and the ledger's `answerCard`, when
+ * answers first bound to the card that made them.
  */
-export const SCORECARD_VERSION = 3;
+export const SCORECARD_VERSION = 4;
 
 export interface TurnRow {
   turn: number;
@@ -136,8 +140,38 @@ export interface SeatOutcome {
   profile?: string;
   damageDealt: number;
   commanderDamageDealt: number;
+  /**
+   * Damage this seat took from *another seat*. The pod hits itself while the
+   * player untaps, and none of that is the player's work — it is kept out of
+   * `damageDealt` and printed on its own so a seat that died to the table is not
+   * read as a seat the deck raced down.
+   */
+  podDamageTaken: number;
   eliminatedTurn: number | null;
   eliminationReason: 'life' | 'commander-damage' | null;
+}
+
+/**
+ * Standing hate pieces, counted over the whole run.
+ *
+ * `faced` is every hate event the pod offered; `stood` is the ones the player
+ * let resolve, which are the only ones that ever became a piece on the table.
+ * `removed` and `swept` say how those left — by the player naming an answer, or
+ * by a wrath reaching them. A piece retired with its seat is neither, and a
+ * piece still standing when the run ended is neither either; both still
+ * contribute the turns they stood.
+ */
+export interface HazardStats {
+  faced: number;
+  stood: number;
+  removed: number;
+  swept: number;
+  /**
+   * One entry per piece that stood: spawn turn to the turn it left, or to the
+   * last turn played when it never did. Same arithmetic the store logs a
+   * removal's `turnsStanding` with, so the two never disagree.
+   */
+  turnsStanding: number[];
 }
 
 export type ClockOutcome =
@@ -181,6 +215,21 @@ export interface EventLedgerRow {
   answerCard?: string;
   /** Where that card went — absent when it answered from the battlefield and stayed. */
   answerTo?: string;
+  /**
+   * Hate rows only: the turn the player took the standing piece off the table,
+   * and the card they named doing it.
+   *
+   * A removal is deliberately *not* an answer to the event. The prompt asked
+   * "respond or it stands", the player let it stand, and the event resolved —
+   * that is the terminal state, and it stays `resolved`. What happened three
+   * turns later is a second fact about the same card, so it is recorded here and
+   * nowhere near the answer tallies: counting it as an answer would rewrite a
+   * question the player did not answer into one they did.
+   */
+  removedTurn?: number;
+  removedWith?: string;
+  /** Hate rows only: the turn a wrath swept the standing piece away. */
+  sweptTurn?: number;
 }
 
 export interface Scorecard {
@@ -209,6 +258,8 @@ export interface Scorecard {
   wipes: WipeRecovery[];
   commander: CommanderStats;
   answers: AnswerRate;
+  /** Standing hate pieces: how many were faced, how many stood, and for how long. */
+  hazards: HazardStats;
   seats: SeatOutcome[];
   clock: ClockStats;
   keep: KeepQuality;
@@ -310,6 +361,19 @@ function isLandType(typeLine: string): boolean {
 // The replay
 // ---------------------------------------------------------------------------
 
+/**
+ * One standing piece, from the turn it landed to the turn it left. `fate` is
+ * null while it is still on the table — a run that ends with it there closes the
+ * span at the last turn played, because "stood to the end" is the reading, not
+ * "stood forever".
+ */
+interface HazardSpan {
+  eventId: string;
+  spawnedTurn: number;
+  endTurn: number | null;
+  fate: 'removed' | 'swept' | 'retired' | null;
+}
+
 /** Everything one pass over the log produces. `scoreRun` does the arithmetic. */
 interface Replay {
   zones: Map<string, ZoneId>;
@@ -320,6 +384,8 @@ interface Replay {
   /** Turn each event id belongs to, before clamping to the last turn played. */
   eventTurns: Map<string, number>;
   wipes: WipeRecovery[];
+  /** Keyed by hazard id, in the order the pieces landed. */
+  hazards: Map<string, HazardSpan>;
   commander: CommanderStats;
   seats: Map<SeatId, SeatOutcome>;
   clock: ClockStats;
@@ -438,6 +504,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
   const events = new Map<string, EventLedgerRow>();
   const eventTurns = new Map<string, number>();
   const wipes: WipeRecovery[] = [];
+  const hazards = new Map<string, HazardSpan>();
   const seats = new Map<SeatId, SeatOutcome>(SEAT_IDS.map((id) => [id, emptySeatOutcome(id)]));
 
   const commander: CommanderStats = {
@@ -736,11 +803,21 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
           break;
         }
         const amount = readNumber(p, 'amount');
-        if (amount !== undefined && amount > 0 && !undone.has(entry.seq)) {
-          // Commander damage costs life too, and the store logs it only here —
-          // so this is the whole hit, not a second helping of a 'life' entry.
-          noteDamage(seatId, entry.turn, amount, amount);
+        if (amount === undefined || amount <= 0 || undone.has(entry.seq)) break;
+        if (isTrue(p, 'podCombat')) {
+          // A seat swinging at another seat. `seatId` is the *defender* here, and
+          // none of this is the player's damage: it must not reach `damageDealt`,
+          // `commanderDamageDealt` or the timeline's per-turn damage row, or a
+          // deck that sat still while the pod ate itself would read as a deck
+          // that raced. It is the one thing the pod does to itself that the
+          // scorecard records at all, so it gets its own column.
+          const seat = seats.get(seatId);
+          if (seat) seat.podDamageTaken += amount;
+          break;
         }
+        // Commander damage costs life too, and the store logs it only here —
+        // so this is the whole hit, not a second helping of a 'life' entry.
+        noteDamage(seatId, entry.turn, amount, amount);
         break;
       }
 
@@ -792,6 +869,21 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
         const note = readString(p, 'note');
         if (note) row.note = note;
 
+        if (row.type === 'hate' && outcome && isTrue(outcome, 'standing')) {
+          // The player let it through, so a piece is now on the table. The store
+          // names it; a log written without the id still has the deterministic
+          // one the store builds, so the span is never orphaned.
+          const hazardId = readString(outcome, 'hazardId') ?? `hz-${row.eventId}`;
+          if (!hazards.has(hazardId)) {
+            hazards.set(hazardId, {
+              eventId: row.eventId,
+              spawnedTurn: entry.turn,
+              endTurn: null,
+              fate: null,
+            });
+          }
+        }
+
         if (row.type === 'wipe' && outcome) {
           // The sweep's moves are logged *before* this entry, so the board is
           // already empty here. Add the victims back to recover the "before".
@@ -812,6 +904,28 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
       }
 
       case 'respond': {
+        if (readString(p, 'reason') === 'removed-hazard') {
+          // A standing piece taken off the table, turns after the event that put
+          // it there already ended. It carries an event id and a bound answer, so
+          // it would otherwise fall straight through the answer path below and
+          // flip a resolved hate row to `responded` — one card answering an event
+          // the player had already declined to answer. It files on the row as
+          // what it is, and the tallies never see it.
+          const hazardId = readString(p, 'hazardId');
+          const span = hazardId === undefined ? undefined : hazards.get(hazardId);
+          if (span && span.endTurn === null) {
+            span.endTurn = entry.turn;
+            span.fate = 'removed';
+          }
+          const eventId = readString(p, 'eventId');
+          const row = eventId === undefined ? undefined : events.get(eventId);
+          if (row) {
+            row.removedTurn = entry.turn;
+            const named = readString(p, 'answerName');
+            if (named) row.removedWith = named;
+          }
+          break;
+        }
         if (readString(p, 'reason') === 'declared-interaction') {
           // No eventId on this one: it answers the clock itself, not a prompt.
           clock.faced = true;
@@ -910,6 +1024,23 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
             if (outcome && profile) outcome.profile = profile;
           }
         }
+        // A standing piece leaving without the player: a wrath reached it, or the
+        // seat holding it died. Either way the span closes, and neither is a
+        // removal — the player spent nothing on it.
+        const hazardId = readString(p, 'hazardId');
+        if (hazardId !== undefined && isTrue(p, 'canceled')) {
+          const span = hazards.get(hazardId);
+          const swept = readString(p, 'reason') === 'wiped';
+          if (span && span.endTurn === null) {
+            span.endTurn = entry.turn;
+            span.fate = swept ? 'swept' : 'retired';
+          }
+          const eventId = readString(p, 'eventId');
+          const row = eventId === undefined ? undefined : events.get(eventId);
+          if (row && swept) row.sweptTurn = entry.turn;
+          break;
+        }
+
         if (isTrue(p, 'canceled') && readString(p, 'reason') === 'elimination') {
           clockClearedBy = 'eliminated-seat';
           clockClearedTurn = entry.turn;
@@ -964,6 +1095,7 @@ function replayRun(run: RunRecord, options?: ScoreOptions): Replay {
     events,
     eventTurns,
     wipes,
+    hazards,
     commander,
     seats,
     clock,
@@ -998,6 +1130,7 @@ function emptySeatOutcome(seatId: SeatId): SeatOutcome {
     seatId,
     damageDealt: 0,
     commanderDamageDealt: 0,
+    podDamageTaken: 0,
     eliminatedTurn: null,
     eliminationReason: null,
   };
@@ -1065,6 +1198,24 @@ export function scoreRun(run: RunRecord, options?: ScoreOptions): Scorecard {
   }
   const terminal = total.responded + total.resolved;
 
+  // --- standing hate pieces -------------------------------------------------
+  // A piece still on the table when the run stopped is measured to the last turn
+  // played. It is not "still standing" in any sense the scorecard can act on —
+  // the run is over — and leaving it out of the average would flatter exactly the
+  // pieces that were never dealt with.
+  const hazards: HazardStats = {
+    faced: byType.hate.offered,
+    stood: replay.hazards.size,
+    removed: 0,
+    swept: 0,
+    turnsStanding: [],
+  };
+  for (const span of replay.hazards.values()) {
+    if (span.fate === 'removed') hazards.removed += 1;
+    if (span.fate === 'swept') hazards.swept += 1;
+    hazards.turnsStanding.push(Math.max(0, (span.endTurn ?? turns) - span.spawnedTurn));
+  }
+
   // --- deployment -----------------------------------------------------------
   const cumulativeMv: number[] = [];
   const landsByTurn: number[] = [];
@@ -1103,6 +1254,7 @@ export function scoreRun(run: RunRecord, options?: ScoreOptions): Scorecard {
       rate: terminal > 0 ? total.responded / terminal : null,
       namedRate: total.nameable > 0 ? total.named / total.nameable : null,
     },
+    hazards,
     seats: SEAT_IDS.map((id) => replay.seats.get(id) ?? emptySeatOutcome(id)),
     clock: replay.clock,
     keep: replay.keep,
@@ -1155,6 +1307,17 @@ export interface DeckProfile {
   namedAnswerRate: number | null;
   clocksFaced: number;
   clocksBeaten: number;
+  /** Hate pieces the pod offered across those runs, answered on the stack or not. */
+  hateFaced: number;
+  /** Of those, the ones the player let resolve — the pieces that actually stood. */
+  hateStood: number;
+  /**
+   * Removed / stood, pooled across runs, null when nothing ever stood. Read
+   * against what stood rather than what was faced: a piece answered on the stack
+   * never needed removing, and counting it here would credit the deck twice for
+   * one counterspell.
+   */
+  hateRemovedRate: number | null;
   mulliganRate: number | null;
   avgLandsInKeep: number | null;
   /** Short human-readable tags from the thresholds in `src/data/scorecard.ts`. */
@@ -1193,6 +1356,13 @@ export function aggregateProfile(cards: Scorecard[]): DeckProfile {
   const clocksFaced = cards.filter((c) => c.clock.faced).length;
   const clocksBeaten = cards.filter((c) => c.clock.beatClock).length;
 
+  // Pooled, like the answer rate: three runs that each stood one piece are three
+  // pieces, not three rates averaged into a number no run ever produced. Cards
+  // scored before hate pieces existed carry no `hazards` at all.
+  const hateFaced = cards.reduce((n, c) => n + (c.hazards?.faced ?? 0), 0);
+  const hateStood = cards.reduce((n, c) => n + (c.hazards?.stood ?? 0), 0);
+  const hateRemoved = cards.reduce((n, c) => n + (c.hazards?.removed ?? 0), 0);
+
   const profile: DeckProfile = {
     deckId: cards[0]?.deckId ?? '',
     runs,
@@ -1218,6 +1388,9 @@ export function aggregateProfile(cards: Scorecard[]): DeckProfile {
     namedAnswerRate: nameable > 0 ? named / nameable : null,
     clocksFaced,
     clocksBeaten,
+    hateFaced,
+    hateStood,
+    hateRemovedRate: hateStood > 0 ? hateRemoved / hateStood : null,
     mulliganRate: runs > 0 ? cards.filter((c) => c.keep.mulligans > 0).length / runs : null,
     avgLandsInKeep: mean(cards.map((c) => c.keep.landsInKeptHand)),
     tags: [],
@@ -1275,6 +1448,16 @@ function tagsFor(p: DeckProfile): string[] {
   if (p.mulliganRate !== null && p.mulliganRate >= t.mulliganRate) {
     tags.push(label.mulligansOften);
   }
+  // A deck that keeps letting pieces land and then leaves them there. It is a
+  // reading about the list — no answers for a Blood Moon is a decklist fact, not
+  // a piloting one — which is what earns it a tag rather than a verdict line.
+  if (
+    p.hateStood >= t.hateMinStood &&
+    p.hateRemovedRate !== null &&
+    p.hateRemovedRate < t.hateRemovedRate
+  ) {
+    tags.push(label.letsHateStand);
+  }
   return tags;
 }
 
@@ -1310,6 +1493,18 @@ function firstWipeRecovery(card: Scorecard): number | null {
 
 function totalDamage(card: Scorecard): number {
   return card.seats.reduce((sum, seat) => sum + seat.damageDealt, 0);
+}
+
+/**
+ * Removed / stood for one run, null when nothing stood — the same reading
+ * `DeckProfile.hateRemovedRate` pools. A run that faced no hate piece has no
+ * opinion about hate pieces, and the comparison prints that as n/a rather than
+ * as a zero the other column can beat.
+ */
+function hateRemovedRate(card: Scorecard): number | null {
+  const hazards = card.hazards;
+  if (!hazards || hazards.stood === 0) return null;
+  return hazards.removed / hazards.stood;
 }
 
 function seatsEliminated(card: Scorecard): number {
@@ -1355,6 +1550,13 @@ export function compareScorecards(a: Scorecard, b: Scorecard): Comparison {
       false,
     ),
     metric('answerRate', 'Answer rate', a.answers.rate, b.answers.rate, true),
+    metric(
+      'hateRemovedRate',
+      'Hate pieces removed',
+      hateRemovedRate(a),
+      hateRemovedRate(b),
+      true,
+    ),
     metric('totalDamage', 'Damage dealt', totalDamage(a), totalDamage(b), true),
     metric('seatsEliminated', 'Seats eliminated', seatsEliminated(a), seatsEliminated(b), true),
     // Coarse convention: a keep with more lands is the more castable keep. It is

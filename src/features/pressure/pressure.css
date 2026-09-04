@@ -122,6 +122,11 @@
 .pgp-dock.type-clock {
   --pgp-accent: var(--mana-g);
 }
+/* A hate piece wears colourless, because that is what most of them print as —
+   and the chip beside it still says HATE PIECE. */
+.pgp-dock.type-hate {
+  --pgp-accent: var(--mana-c);
+}
 
 @keyframes pgp-dock-in {
   from {
@@ -248,6 +253,18 @@
   color: var(--muted);
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
+}
+
+/* What the player will keep honouring if the piece stands. It is a consequence
+   rather than card text, so it is printed in ink under the effect's muted grey
+   and kept whole — this is the sentence the run is actually asking about. */
+.pgp-cite-tell {
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 /* A short foot has to keep both response buttons on screen: the effect drops to

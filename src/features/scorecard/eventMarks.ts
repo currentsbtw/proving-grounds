@@ -11,7 +11,8 @@ import type { EventType } from '../../domain/types';
  *
  * The letters are deliberately not the class names' initials: BOARD WIPE,
  * REMOVAL, RESOURCE and RACE CLOCK would all be R or B, and COUNTERSPELL and
- * COMBAT would both be C.
+ * COMBAT would both be C. HATE PIECE is the one class whose initial was still
+ * free, so it keeps it.
  */
 export const EVENT_MARK: Record<EventType, string> = {
   wipe: 'W',
@@ -20,6 +21,7 @@ export const EVENT_MARK: Record<EventType, string> = {
   counter: 'C',
   combat: 'A',
   clock: 'K',
+  hate: 'H',
 };
 
 /** The key, in the reading order both charts print it in. */
@@ -27,6 +29,7 @@ export const EVENT_MARK_KEY: { type: EventType; word: string }[] = [
   { type: 'wipe', word: 'wrath' },
   { type: 'removal', word: 'removal' },
   { type: 'resource', word: 'resource' },
+  { type: 'hate', word: 'hate piece' },
   { type: 'counter', word: 'counter' },
   { type: 'combat', word: 'attack' },
   { type: 'clock', word: 'clock' },

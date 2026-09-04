@@ -554,6 +554,132 @@ function playUnfinishedRun(seed: string): RunRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Run F — a hate piece, and the three ways it can leave
+// ---------------------------------------------------------------------------
+
+const HATE_LANDS = ['hate-l1', 'hate-l2', 'hate-l3', 'hate-l4', 'hate-l5', 'hate-l6', 'hate-l7', 'hate-l8'];
+const HATE_ROSTER: Record<string, RosterEntry> = Object.fromEntries(
+  HATE_LANDS.map((iid) => [iid, rosterEntry(LAND)]),
+);
+const HATE_TURNS = HATE_LANDS.length;
+/** The turn the piece lands, and the turn it leaves when it leaves at all. */
+const HATE_TURN = 2;
+const HATE_END_TURN = 7;
+const HATE_CARD = 'Blood Moon';
+const HATE_EVENT_ID = 'evt-hate-b';
+const HATE_ID = `hz-${HATE_EVENT_ID}`;
+
+type HateFate = 'stands' | 'removed' | 'removed-late' | 'swept';
+
+/**
+ * Eight turns of land drops with an empty hand — nothing else in the run is
+ * worth a miss — and one hate piece on T2 that leaves four different ways:
+ * never (it is still there when the run ends), to the player's own answer the
+ * next turn, to the player's answer five turns later, or to a wrath on T7.
+ *
+ * It is written by hand for the same reason run D is: whether a seed offers a
+ * hate piece at all is the pod's business, and no scripted run can make one seat
+ * cast a piece and then meet all four fates. The payload shapes are the store's
+ * own — `resolveActiveEvent`'s standing outcome, `removeHazard`'s respond entry,
+ * and the 'threat' entry a sweep writes.
+ */
+function playHatePieceRun(seed: string, fate: HateFate): RunRecord {
+  const id = `verify-review-hate-${fate}`;
+  const log: LogEntry[] = [];
+  let turn = 1;
+
+  function add(kind: LogKind, message: string, payload: Record<string, unknown>, phase: Phase = 'main1'): void {
+    log.push({ seq: log.length + 1, turn, phase, kind, message, payload, at: 0 });
+  }
+
+  add('run', `Run started: Hate Piece (seed ${seed})`, {
+    runId: id,
+    deckId: 'verify-review-deck',
+    deckName: 'Hate Piece',
+    seed,
+    bracket: 3,
+    librarySize: HATE_LANDS.length,
+  });
+  add('draw', `Drew ${HATE_LANDS.length}`, {
+    iids: [...HATE_LANDS],
+    names: HATE_LANDS.map(() => LAND.name),
+    count: HATE_LANDS.length,
+  });
+
+  for (let i = 0; i < HATE_TURNS; i++) {
+    if (i > 0) {
+      turn = i + 1;
+      add('turn', `Turn ${turn}`, { turn, previousTurn: turn - 1 });
+    }
+    add('move', `${LAND.name} → battlefield`, {
+      iid: HATE_LANDS[i],
+      name: LAND.name,
+      from: 'hand',
+      to: 'battlefield',
+    });
+
+    if (turn === HATE_TURN) {
+      add('event', `Seat B casts ${HATE_CARD}. (${HATE_CARD} stands)`, {
+        eventId: HATE_EVENT_ID,
+        eventType: 'hate',
+        seatId: 'B',
+        eventTurn: HATE_TURN,
+        card: HATE_CARD,
+        cardEffect: 'Nonbasic lands are Mountains.',
+        severity: {},
+        resolved: true,
+        outcome: { standing: true, hazardId: HATE_ID },
+      });
+    }
+
+    const removalTurn = fate === 'removed' ? HATE_TURN + 1 : HATE_END_TURN;
+    if ((fate === 'removed' || fate === 'removed-late') && turn === removalTurn) {
+      add('respond', `Removed ${HATE_CARD} (Seat B) with Krosan Grip`, {
+        reason: 'removed-hazard',
+        hazardId: HATE_ID,
+        eventId: HATE_EVENT_ID,
+        seatId: 'B',
+        cardName: HATE_CARD,
+        spawnedTurn: HATE_TURN,
+        turnsStanding: removalTurn - HATE_TURN,
+        answerIid: 'hate-answer',
+        answerName: 'Krosan Grip',
+        answerZone: 'hand',
+        answerTo: 'graveyard',
+        answerMv: 3,
+        bound: true,
+      });
+    }
+    if (fate === 'swept' && turn === HATE_END_TURN) {
+      add('threat', `${HATE_CARD} (Seat B) swept by Farewell`, {
+        hazardId: HATE_ID,
+        eventId: HATE_EVENT_ID,
+        seatId: 'B',
+        cardName: HATE_CARD,
+        canceled: true,
+        reason: 'wiped',
+        byEventId: 'evt-wipe-1',
+      });
+    }
+  }
+
+  add('run', 'Run ended: concede', { result: 'concede', endedAt: 0, turns: turn }, 'end');
+
+  return {
+    id,
+    deckId: 'verify-review-deck',
+    deckName: 'Hate Piece',
+    seed,
+    bracket: 3,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'concede',
+    roster: HATE_ROSTER,
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
 
@@ -791,6 +917,112 @@ function main(): void {
     );
   }
   checkEvidence('E', e, unfinishedRecord);
+
+  // --- run F: the hate piece -----------------------------------------------
+  const standing = playHatePieceRun(`${SEED}-f`, 'stands');
+  const f = review(standing);
+  const standingCard = scoreRun(standing);
+
+  summary.push('');
+  summary.push(
+    `run F (hand-written log, ${HATE_CARD} standing from T${HATE_TURN} to the end of T${HATE_TURNS})`,
+  );
+  summary.push(...describe(f));
+
+  const stood = find(f, 'hate-stood');
+  check('F: the standing piece is reported', stood !== undefined, 'no hate-stood finding');
+  checkEqual('F: it is a miss', stood?.kind, 'miss');
+  checkEqual(
+    'F: it says how long the piece stood',
+    stood?.title,
+    `${HATE_CARD} stood ${HATE_TURNS - HATE_TURN} turns`,
+  );
+  check(
+    'F: the detail names the turn it landed and says nothing answered it',
+    (stood?.detail.includes(`T${HATE_TURN}`) ?? false) && (stood?.detail.includes('No answer') ?? false),
+    stood?.detail ?? '',
+  );
+  checkEqual('F: the scorecard agrees the piece stood', standingCard.hazards.stood, 1);
+  checkEqual('F: and that nothing removed it', standingCard.hazards.removed, 0);
+  checkEqual(
+    'F: a piece still there at the end is measured to the last turn',
+    standingCard.hazards.turnsStanding,
+    [HATE_TURNS - HATE_TURN],
+  );
+  check(
+    'F: no good is claimed for a piece nobody removed',
+    find(f, 'hate-removed-fast') === undefined,
+    'hate-removed-fast on a run that removed nothing',
+  );
+  checkEvidence('F', f, standing);
+
+  const removed = playHatePieceRun(`${SEED}-f`, 'removed');
+  const fRemoved = review(removed);
+  const removedCard = scoreRun(removed);
+
+  summary.push('');
+  summary.push(`run F' (the same piece, removed on T${HATE_TURN + 1})`);
+  summary.push(...describe(fRemoved));
+
+  const quick = find(fRemoved, 'hate-removed-fast');
+  check('F′: the quick removal is credited', quick !== undefined, 'no hate-removed-fast finding');
+  checkEqual('F′: it is a good', quick?.kind, 'good');
+  checkEqual(
+    'F′: it names the piece',
+    quick?.title,
+    `Removed ${HATE_CARD} the turn after it landed`,
+  );
+  check(
+    'F′: the detail names the card the player spent',
+    quick?.detail.includes('Krosan Grip') ?? false,
+    quick?.detail ?? '',
+  );
+  check(
+    'F′: nothing is flagged for a piece that stood one turn',
+    find(fRemoved, 'hate-stood') === undefined,
+    'hate-stood on a piece removed the next turn',
+  );
+  checkEqual('F′: the scorecard counts the removal', removedCard.hazards.removed, 1);
+  // The event still resolved: the player let the piece land and answered it
+  // later, which is not an answer to the prompt the event made.
+  checkEqual(
+    'F′: the removal is not counted as an answer',
+    removedCard.answers.byType.hate.responded,
+    0,
+  );
+  checkEqual(
+    'F′: the hate row keeps its resolved terminal',
+    removedCard.events.find((e) => e.eventId === HATE_EVENT_ID)?.terminal,
+    'resolved',
+  );
+  checkEvidence("F'", fRemoved, removed);
+
+  // Removed, but five turns after it landed: the piece still sat there, so the
+  // miss stands and the good is not earned.
+  const lateRemoval = review(playHatePieceRun(`${SEED}-f`, 'removed-late'));
+  check(
+    'F″: a late removal earns no good',
+    find(lateRemoval, 'hate-removed-fast') === undefined,
+    'hate-removed-fast for a removal five turns on',
+  );
+  check(
+    'F″: and the piece is still not flagged as unanswered',
+    find(lateRemoval, 'hate-stood') === undefined,
+    'hate-stood on a piece the player did remove',
+  );
+
+  // Swept by a wrath: the piece stood five turns and the player never dealt
+  // with it, so it reads as a miss and says what took it.
+  const sweptRecord = playHatePieceRun(`${SEED}-f`, 'swept');
+  const swept = review(sweptRecord);
+  const sweptStood = find(swept, 'hate-stood');
+  check('F‴: a swept piece is still a miss', sweptStood !== undefined, 'no hate-stood finding');
+  check(
+    'F‴: and the detail says a wrath took it',
+    sweptStood?.detail.includes('wrath') ?? false,
+    sweptStood?.detail ?? '',
+  );
+  checkEqual('F‴: the scorecard counts the sweep', scoreRun(sweptRecord).hazards.swept, 1);
 
   // --- output --------------------------------------------------------------
   console.log('\nverify:review');

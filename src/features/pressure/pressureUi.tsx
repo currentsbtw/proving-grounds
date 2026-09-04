@@ -19,6 +19,7 @@ export const EVENT_LABEL: Record<EventType, string> = {
   combat: 'COMBAT',
   clock: 'RACE CLOCK',
   resource: 'RESOURCE',
+  hate: 'HATE PIECE',
 };
 
 /**
@@ -242,6 +243,13 @@ export function describeAnswers(
       break;
     case 'clock':
       second = 'The clock stands';
+      break;
+    // The only resolution that does not end with the event: letting it through
+    // leaves the piece on the table, so the button says the piece stands rather
+    // than that it resolves. The first answer is the ordinary 'I answer it'
+    // below — a hate piece is answered with a card like anything else.
+    case 'hate':
+      second = 'It stands';
       break;
     default:
       second = 'It resolves';

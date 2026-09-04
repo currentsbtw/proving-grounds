@@ -15,10 +15,11 @@
  * on the tuning. The bands are sized for 1000 runs per bracket; at much smaller
  * run counts sampling noise alone will trip them.
  *
- * Three of the checks are rules rather than bands, and fail the probe on their
+ * Four of the checks are rules rather than bands, and fail the probe on their
  * own however well the curves fit: no event fires without a card citation, no
  * seat cites a card outside its colour identity (events and the counter pick
- * both), and `neutral` is never dealt to a seat. The last two rows of `TARGETS`
+ * both), `neutral` is never dealt to a seat, and pod combat kills nobody, at
+ * any bracket, ever — the kill is the player's. The last two rows of `TARGETS`
  * are rules wearing bands — `archetypeGap` measures how much more often the
  * aggro seat attacks than the control seat and `counterArmGap` how much more
  * often the control seat holds up a counter than the stax seat, per bracket,
@@ -48,6 +49,7 @@ import {
   drawProfiles,
   emptySilhouette,
   initialThreat,
+  redistribute,
   resolveWindow,
   zeroFiredCounts,
   zeroLastFiredWindow,
@@ -57,7 +59,13 @@ import {
   type PlayerSummary,
   type SeatSnapshot,
 } from '../src/engine/pressure.ts';
-import type { ClockState, CounterArmed, EventType, SeatId } from '../src/domain/types.ts';
+import type {
+  ClockState,
+  CounterArmed,
+  EventType,
+  SeatId,
+  StandingHazard,
+} from '../src/domain/types.ts';
 
 const RUNS = Math.max(1, Number.parseInt(process.argv[2] ?? '', 10) || 2000);
 const BRACKETS = [1, 2, 3, 4, 5];
@@ -190,6 +198,12 @@ interface Tally {
   combat6to10Here: ProfileCounts;
   /** Windows this archetype spent holding up a counter, *at this bracket*. */
   armedHere: ProfileCounts;
+  /** Standing pieces cast. The probe never answers, so every one of these stands. */
+  hateEvents: number;
+  /** Seats swinging at each other: hits, damage, and the rare kill. */
+  podHits: number;
+  podDamageByTurn10: number;
+  podEliminations: number;
 }
 
 function freshTally(): Tally {
@@ -219,6 +233,10 @@ function freshTally(): Tally {
     seatRunsHere: zeroProfileCounts(),
     combat6to10Here: zeroProfileCounts(),
     armedHere: zeroProfileCounts(),
+    hateEvents: 0,
+    podHits: 0,
+    podDamageByTurn10: 0,
+    podEliminations: 0,
   };
 }
 
@@ -371,6 +389,31 @@ function meanLivingThreat(seats: SeatSnapshot[]): number | null {
   return living.reduce((n, s) => n + s.threat, 0) / living.length;
 }
 
+/**
+ * Kill a seat the way the store does: the board is gone, the threat is zero, and
+ * what it was holding at the moment of death flows to the survivors. The probe
+ * tracks no peaks, so the pre-death reading is what redistributes — which is the
+ * store's fallback too when a seat has never been scored.
+ */
+function eliminate(seats: SeatSnapshot[], seatId: SeatId): void {
+  const dead = seats.find((s) => s.id === seatId);
+  if (!dead || dead.eliminated) return;
+  const atDeath: SeatSnapshot = { ...dead, silhouette: { ...dead.silhouette } };
+  dead.eliminated = true;
+  dead.threat = 0;
+  dead.silhouette = emptySilhouette();
+  for (const update of redistribute(
+    seats.map((s) => (s.id === seatId ? atDeath : s)),
+    seatId,
+  )) {
+    const seat = seats.find((s) => s.id === update.id);
+    if (seat) {
+      seat.threat = update.threat;
+      seat.silhouette = update.silhouette;
+    }
+  }
+}
+
 /** The seat the player attacks: the scariest one still alive. */
 function topSeat(seats: SeatSnapshot[]): SeatSnapshot | undefined {
   let best: SeatSnapshot | undefined;
@@ -390,6 +433,10 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
 
   let clock: ClockState | null = null;
   let counterArmed: CounterArmed | null = null;
+  // The probe never answers anything, so every hate event that fires resolves
+  // and stands — which is the worst case for the seat cap and the right one to
+  // fit against, because it is the table a player who does nothing ends up at.
+  const hazards: StandingHazard[] = [];
   const firedCounts: FiredCounts = zeroFiredCounts();
   const lastFiredWindow: LastFiredWindow = zeroLastFiredWindow();
 
@@ -417,6 +464,7 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
       permanents: permanentsAt(turn),
       clock,
       counterArmed,
+      hazards,
       firedCounts,
       lastFiredWindow,
     });
@@ -442,9 +490,51 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
         seat.silhouette = update.silhouette;
       }
     }
+    // Pod hits: the engine already shrank the defender's threat and board, so
+    // what is left is the life total, which belongs to the caller in the app
+    // too. The death that could follow from it is the part that no longer can —
+    // the engine caps a hit at `life - 1` — so this keeps the elimination path
+    // wired up purely as a tripwire. `podEliminations` reading anything but
+    // zero, or the assert below firing, means the cap is gone.
+    for (const hit of result.podHits) {
+      tally.podHits += 1;
+      if (turn <= 10) tally.podDamageByTurn10 += hit.damage;
+      const defender = seats.find((s) => s.id === hit.defenderId);
+      if (!defender) continue;
+      // The engine's contract, checked one hit at a time: a hit leaves the
+      // defender on at least 1. This throws rather than tallying because a
+      // broken cap is a bug in the engine, not a curve that drifted, and the
+      // bracket tables below would be measuring the wrong game.
+      if (hit.damage > defender.life - 1) {
+        throw new Error(
+          `pod hit would take ${hit.defenderId} from ${defender.life} to ` +
+            `${defender.life - hit.damage} life on turn ${turn} (${hit.attackerId} for ` +
+            `${hit.damage}) — a pod hit must never take a seat below 1`,
+        );
+      }
+      defender.life -= hit.damage;
+      // Kept wired up as the aggregate version of the same statement: this is
+      // what the pod-elimination rule reads, and what prints 0 in every bracket.
+      if (defender.life <= 0 && !defender.eliminated) {
+        eliminate(seats, defender.id);
+        tally.podEliminations += 1;
+      }
+    }
     for (const event of result.events) {
       firedCounts[event.type] += 1;
       lastFiredWindow[event.type] = windowIndex;
+      // Nothing in the probe responds, so a hate piece that fires is a hate
+      // piece that stands: it goes on the list the next window reads, which is
+      // what keeps a seat from being dealt a second one.
+      if (event.type === 'hate' && event.card) {
+        hazards.push({
+          id: `hz-${event.id}`,
+          eventId: event.id,
+          seatId: event.seatId,
+          card: event.card,
+          spawnedTurn: event.turn,
+        });
+      }
     }
     clock = result.clock;
     counterArmed = result.counterArmed;
@@ -489,6 +579,9 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
           else if (event.variant === 'sacrifice') tally.sacrificeEvents += 1;
           else if (event.variant === 'tax') tally.taxEvents += 1;
           break;
+        case 'hate':
+          tally.hateEvents += 1;
+          break;
         case 'clock':
           if (clockSpawnTurn === null) clockSpawnTurn = event.turn;
           break;
@@ -523,11 +616,10 @@ function probeRun(bracket: number, seed: string, tally: Tally): void {
         target.life -= DAMAGE_PER_TURN;
         target.threat = shrunk.threat;
         target.silhouette = shrunk.silhouette;
-        if (target.life <= 0) {
-          target.eliminated = true;
-          target.threat = 0;
-          target.silhouette = emptySilhouette();
-        }
+        // 4 a turn from turn 5 never gets a 40-life seat there on its own, but
+        // it can finish one the pod softened up, so this goes through the same
+        // elimination the pod hits do.
+        if (target.life <= 0) eliminate(seats, target.id);
       }
     }
   }
@@ -621,6 +713,42 @@ const TARGETS: Metric[] = [
     value: (t) => mean(t.resourceEvents, t.runs),
   },
   {
+    // Standing pieces, and the one row here whose bracket schedule is set by
+    // the citation table more than by the curve: nothing in `CITATIONS.hate` is
+    // a bracket-1 card, so a bracket-1 pod produces exactly none however early
+    // `hazards.hate.startTurn` lets it roll. The target is zero because "no
+    // card, no event" says it has to be, and the row is worth keeping so that
+    // stays true if somebody adds a card.
+    key: 'hate',
+    label: 'hate pieces per run',
+    kind: 'num',
+    digits: 2,
+    band: 0.3,
+    bands: [0.05, 0.3, 0.3, 0.3, 0.3],
+    targets: [0, 0.4, 0.8, 1.15, 1.5],
+    value: (t) => mean(t.hateEvents, t.runs),
+  },
+  {
+    // Seats hitting each other. Peaks at bracket 4 and drops at 5 the same way
+    // the combat row does, and for the same reason: a cEDH seat is not racing
+    // the seat next to it.
+    //
+    // Brackets 4 and 5 used to sit under where the shape alone would put them,
+    // because the pod-elimination rule below was then the binding constraint —
+    // the player is already burning the threat leader for 4 a turn and the
+    // seats pile onto the same seat, so the last few points of a kill came
+    // free, and `podCombat.chance` had to buy the margin. The engine now caps a
+    // hit at the defender's `life - 1`, so no amount of pod combat can kill
+    // anybody and the row is free to be the shape it wants to be.
+    key: 'podHits',
+    label: 'pod hits per run',
+    kind: 'num',
+    digits: 2,
+    band: 0.4,
+    targets: [1.5, 2.5, 3.5, 4.0, 1.95],
+    value: (t) => mean(t.podHits, t.runs),
+  },
+  {
     key: 'counterArmed',
     label: 'counter-armed windows per run',
     kind: 'num',
@@ -644,7 +772,10 @@ const TARGETS: Metric[] = [
     kind: 'num',
     digits: 2,
     band: 0.6,
-    targets: [3.2, 4.5, 6.0, 7.5, 9.0],
+    // Bracket 5 recentred 9.0 -> 8.45 with pod combat (version 7): harder pod hits
+    // shed more threat off the leader than `podHitJump` hands back, and the
+    // reading is 8.44-8.45 from 1000 to 8000 runs, so it is the number, not noise.
+    targets: [3.2, 4.5, 6.0, 7.5, 8.45],
     value: (t) => mean(t.threatAtTurn10, t.threatAtTurn10Samples),
   },
   {
@@ -664,12 +795,30 @@ const TARGETS: Metric[] = [
     // is per seat-run, so it does not care how many of each the shuffle dealt.
     //
     // The band is really a floor with an upper edge attached: every lower edge
-    // is 2.0 or above, so "the archetypes collapsed together" fails here long
+    // is 4.3 or above, so "the archetypes collapsed together" fails here long
     // before a player could see it, and the upper edge still holds the gap to a
     // multiplier on a shared curve rather than letting the control seat stop
-    // blocking entirely. The gap narrows with the bracket because the ceilings
-    // do the narrowing — at bracket 4 both curves spend the late turns pressed
-    // against `max`, which is the least room the two archetypes ever have.
+    // blocking entirely.
+    //
+    // The targets roughly doubled at `PRESSURE.version` 7, and not because
+    // `hazardMult.combat` moved — pod combat did it. Only the highest-threat
+    // seat swings at the player, and a pod hit takes threat off exactly that
+    // seat while handing `threat.podHitJump` to the attacker, who is whoever has
+    // the most power. So the biggest board now inherits the front of the table
+    // over and over, and the biggest board is the aggro seat (`powerMult` 1.5).
+    // The gap is no longer only "how often would this archetype attack", it is
+    // also "how often is this archetype the seat in front", and both answers
+    // point the same way. The narrowing with the bracket went with it: the pod
+    // reshuffles the lead hardest where it hits most, which is brackets 3 and 4.
+    //
+    // The row moved again inside version 7 when `podCombat.powerShare` went
+    // from 0.2 to 0.6 — the never-kill cap is what let it — and it moved for the
+    // same reason it moved the first time, only more of it. A harder pod hit
+    // takes more threat off the seat in front and shrinks more of its board, so
+    // the lead changes hands more often, so the seat with the biggest board
+    // spends more windows at the front of the table. Bracket 5 moved the most
+    // and the targets below are all recentred on measurement rather than on
+    // that argument; the shape survived it.
     //
     // Bands are per bracket because the noise is proportional and the value is
     // not: at bracket 1 the control seat almost never has the board to attack
@@ -678,9 +827,9 @@ const TARGETS: Metric[] = [
     label: 'aggro:control combat, t6-10',
     kind: 'num',
     digits: 2,
-    band: 1.1,
-    bands: [2.5, 1.8, 1.1, 0.8, 1.1],
-    targets: [7.0, 5.8, 3.8, 2.8, 3.7],
+    band: 1.4,
+    bands: [2.5, 1.8, 1.4, 1.2, 1.6],
+    targets: [6.9, 6.8, 6.1, 5.5, 7.2],
     value: (t) => profileRatio(t.combat6to10Here, t.seatRunsHere, 'aggro', 'control'),
   },
   {
@@ -712,13 +861,22 @@ const TARGETS: Metric[] = [
     // stax seat's is still climbing. Per-bracket bands, because that narrowing
     // is real and one width would either pass a collapse at bracket 1 or fail
     // an honest bracket 5.
+    //
+    // Bracket 1 moved at `PRESSURE.version` 7 and is the loosest row in the
+    // table. The holder is scored on `openMana + threat / 10`, and below turn 9
+    // every seat represents the same land drop, so at bracket 1 the threat term
+    // decides on its own — which is precisely the ordering pod combat now
+    // reshuffles every time a seat gets hit. That, on top of a bracket that arms
+    // in half a window a run, is a wide enough spread that the old ±0.6 was
+    // noise as much as tuning: 1000 runs and 3000 runs of the same build read
+    // 2.51 and 2.02.
     key: 'counterArmGap',
     label: 'control:stax armed windows',
     kind: 'num',
     digits: 2,
     band: 0.5,
-    bands: [0.6, 0.55, 0.5, 0.6, 0.3],
-    targets: [1.95, 1.9, 1.85, 1.95, 1.65],
+    bands: [1.0, 0.55, 0.5, 0.6, 0.3],
+    targets: [2.4, 1.9, 1.85, 1.95, 1.65],
     value: (t) => profileRatio(t.armedHere, t.seatRunsHere, 'control', 'stax'),
   },
 ];
@@ -750,8 +908,43 @@ const DIAGNOSTICS: Diagnostic[] = [
   { label: 'discard events per run', value: (t) => mean(t.discardEvents, t.runs), digits: 2 },
   { label: 'sacrifice events per run', value: (t) => mean(t.sacrificeEvents, t.runs), digits: 2 },
   { label: 'tax events per run', value: (t) => mean(t.taxEvents, t.runs), digits: 2 },
+  {
+    // How much life the pod took off itself, per seat, in the turns a run is
+    // actually decided in. A diagnostic rather than a banded row because
+    // `podCombat.powerShare` is the only dial behind it and `pod hits per run`
+    // above already holds the schedule — but it is the number to read when
+    // deciding whether a hit is worth showing, and it reads about 0.9 / 1.8 /
+    // 3.5 / 4.7 / 5.6 across the brackets at `powerShare` 0.6.
+    //
+    // It does not climb much past that however hard the seats swing, which is
+    // worth knowing before anyone reaches for a bigger share. A pod hit is also
+    // capped by `combat.damageBase + combat.damagePerTurn x turn` times the
+    // bracket severity, exactly like a swing at the player, and at the low
+    // brackets by the size of the board doing the swinging. Raising `powerShare`
+    // to 2.5 — well past the point where the fraction is still the binding term
+    // — moves these only to 2.6 / 5.4 / 8.3 / 10.1 / 6.8. The low brackets in
+    // particular have nowhere to go: bracket-1 boards are small enough that the
+    // whole pod only lands 6 damage a run on the player by turn 10, and the
+    // seats are hitting each other with the same creatures.
+    label: 'pod damage per seat-run by T10',
+    value: (t) => mean(t.podDamageByTurn10, t.runs * SEAT_IDS.length),
+    digits: 2,
+  },
+  { label: 'pod eliminations per run', value: (t) => mean(t.podEliminations, t.runs), digits: 3 },
   { label: 'events missing a citation', value: (t) => t.citationMissing, digits: 0 },
 ];
+
+/**
+ * Pod combat is meant to move the threat meters, not to empty the table, and
+ * the engine caps a hit at the defender's `life - 1` so that it cannot. This is
+ * the probe's end of that: not a rate to stay under but a count that has to be
+ * zero, at every bracket, however the curves are tuned. A pod that eliminates
+ * seats is handing the player wins they did not play for — the kill is the
+ * player's — so this is a rule like the citation checks rather than a band, and
+ * one over it anywhere fails the probe. The fix is never the target; it is the
+ * cap in `resolveWindow`, which has gone missing if this ever prints.
+ */
+const MAX_POD_ELIMINATIONS = 0;
 
 interface Metric {
   key: string;
@@ -833,7 +1026,7 @@ function report(bracket: number, tally: Tally): string[] {
  * much pressure the pod produced, and this one says who produced it.
  */
 function reportProfiles(): void {
-  const types: EventType[] = ['wipe', 'removal', 'combat', 'resource', 'clock'];
+  const types: EventType[] = ['wipe', 'removal', 'combat', 'resource', 'clock', 'hate'];
   console.log('');
   console.log('═'.repeat(56));
   console.log('Seat archetypes  (events per 1000 seat-runs, all brackets pooled)');
@@ -889,17 +1082,25 @@ function main(): void {
   console.log(`  commander           on the battlefield from turn ${COMMANDER_TURN}, never leaves`);
   console.log(`  creature power      +${POWER_PER_TURN} per turn from turn ${POWER_START_TURN}`);
   console.log(`  damage dealt        ${DAMAGE_PER_TURN} per turn to the top living seat from turn ${DAMAGE_START_TURN}`);
-  console.log(`  seat life           ${STARTING_SEAT_LIFE}, so no seat dies inside the probe`);
+  console.log(
+    `  seat life           ${STARTING_SEAT_LIFE}; the pod softens seats up but never kills one,` +
+      ' so a death here is the player finishing one off',
+  );
   console.log('  answers             the player never responds; every event is taken');
+  console.log('  hate pieces         every one that fires stands, and stands all run');
   console.log('  deadlines           recorded, then played through (see the header)');
 
   let missTotal = 0;
   let citationMisses = 0;
+  const podKillBreaches: string[] = [];
   for (const bracket of BRACKETS) {
     const tally = freshTally();
     for (let i = 0; i < RUNS; i++) probeRun(bracket, `probe-b${bracket}-r${i}`, tally);
     missTotal += report(bracket, tally).length;
     citationMisses += tally.citationMissing;
+    if (tally.podEliminations > MAX_POD_ELIMINATIONS) {
+      podKillBreaches.push(`bracket ${bracket}: ${tally.podEliminations}`);
+    }
   }
 
   reportProfiles();
@@ -933,13 +1134,18 @@ function main(): void {
   if (seatRunsByProfile.neutral > 0) {
     console.log(`FAIL — neutral was dealt to ${seatRunsByProfile.neutral} seat-run(s).`);
   }
+  // And the pod may bruise itself, not empty itself.
+  if (podKillBreaches.length > 0) {
+    console.log(`FAIL — pod combat killed a seat: ${podKillBreaches.join(', ')}.`);
+  }
   console.log('');
   process.exitCode =
     missTotal === 0 &&
     citationMisses === 0 &&
     colorBreaches === 0 &&
     counterCheck.breaches === 0 &&
-    seatRunsByProfile.neutral === 0
+    seatRunsByProfile.neutral === 0 &&
+    podKillBreaches.length === 0
       ? 0
       : 1;
 }

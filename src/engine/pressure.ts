@@ -27,10 +27,12 @@ import type {
   CounterArmed,
   EventCitation,
   EventType,
+  PodHit,
   PressureEvent,
   Seat,
   SeatId,
   Silhouette,
+  StandingHazard,
 } from '../domain/types';
 
 /**
@@ -111,6 +113,13 @@ export interface WindowInput {
   permanents: PermanentSummary[];
   clock: ClockState | null;
   counterArmed: CounterArmed | null;
+  /**
+   * Hate pieces already standing when this window opens. Read-only here: the
+   * engine never creates or clears one — a piece the player has not answered yet
+   * is still an event, and resolving it is the store's job. All this list does
+   * is keep a seat that already holds one from being dealt another.
+   */
+  hazards: StandingHazard[];
   firedCounts: FiredCounts;
   lastFiredWindow: LastFiredWindow;
 }
@@ -128,6 +137,14 @@ export interface WindowResult {
   events: PressureEvent[];
   clock: ClockState | null;
   counterArmed: CounterArmed | null;
+  /**
+   * Seats that hit each other this window — at most one hit, and never the
+   * player. The threat and silhouette changes are already folded into `seats`;
+   * what the caller still owes is the defender's life, which the engine does not
+   * own. A hit's `damage` is capped at the defender's `life - 1`, so subtracting
+   * it can never eliminate a seat: the pod softens, the player kills.
+   */
+  podHits: PodHit[];
   /** The derived 0–10 player threat this window was judged against. */
   playerThreat: number;
   /** Line for the 'window' log entry. */
@@ -152,6 +169,7 @@ export const EVENT_TYPES: EventType[] = [
   'combat',
   'clock',
   'resource',
+  'hate',
 ];
 
 export function emptySilhouette(): Silhouette {
@@ -159,11 +177,11 @@ export function emptySilhouette(): Silhouette {
 }
 
 export function zeroFiredCounts(): FiredCounts {
-  return { wipe: 0, removal: 0, counter: 0, combat: 0, clock: 0, resource: 0 };
+  return { wipe: 0, removal: 0, counter: 0, combat: 0, clock: 0, resource: 0, hate: 0 };
 }
 
 export function zeroLastFiredWindow(): LastFiredWindow {
-  return { wipe: 0, removal: 0, counter: 0, combat: 0, clock: 0, resource: 0 };
+  return { wipe: 0, removal: 0, counter: 0, combat: 0, clock: 0, resource: 0, hate: 0 };
 }
 
 /** Opening threat for a seat, drawn from `PRESSURE.threat.startMin..startMax`. */
@@ -779,13 +797,18 @@ export function punishPhrase(punish: Punish | undefined, seatId: SeatId): string
  * The rng is consumed in a fixed order so a seed replays exactly:
  *   1. threat jitter, one draw per living seat
  *   2. silhouette growth, three draws per living seat
- *   3. hazard rolls in the order wipe, removal, combat, resource, then the
- *      clock (plus any sub-rolls a firing event needs, drawn immediately after
- *      its own roll, ending with the one draw that picks its card citation —
- *      no draw at all when nothing is eligible, because then nothing fires).
- *      Casters are chosen before the roll, because the roll is scaled by the
- *      caster's profile; only the resource attack's caster costs a draw, and it
- *      is taken immediately *before* that hazard's roll rather than after it.
+ *   3. hazard rolls in the order wipe, removal, combat, pod combat, resource,
+ *      hate, then the clock (plus any sub-rolls a firing event needs, drawn
+ *      immediately after its own roll, ending with the one draw that picks its
+ *      card citation — no draw at all when nothing is eligible, because then
+ *      nothing fires). Casters are chosen before the roll, because the roll is
+ *      scaled by the caster's profile; only the resource attack's caster costs a
+ *      draw, and it is taken immediately *before* that hazard's roll rather than
+ *      after it. Pod combat is the odd one: it is a single roll that creates no
+ *      event and cites no card, because the player is not being asked anything.
+ *      That roll is drawn whenever there is an attacker and a defender, even in
+ *      the windows where the hit is then withheld for being lethal — the draw is
+ *      what has to stay fixed, not the outcome.
  *   4. the counterspell arming roll
  *
  * The order is fixed, but the *number* of draws a window costs is not, and that
@@ -800,7 +823,8 @@ export function punishPhrase(punish: Punish | undefined, seatId: SeatId): string
  * attack's caster draw ahead of its own hazard roll; versions 5 and 6 change no
  * draw order at all, only where a profile multiplier meets a cap — the hazards
  * in 5, the arming roll in 6 — which is enough to change the outcome of rolls
- * near that cap.
+ * near that cap. Version 7 inserts two sites into the list above, so nothing
+ * seeded before it replays.
  *
  * When the clock's deadline has passed the function short-circuits: it reports
  * `clockExpired` and returns the seats untouched, because the run is over.
@@ -814,6 +838,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
       events: [],
       clock: input.clock,
       counterArmed: null,
+      podHits: [],
       playerThreat: playerThreatOf(input.player),
       summary: `${seatLabel(input.clock.seatId)} wins. The clock ran out after turn ${input.clock.deadlineTurn}.`,
       notes: ['clock-expired'],
@@ -855,9 +880,13 @@ export function resolveWindow(input: WindowInput): WindowResult {
   const events: PressureEvent[] = [];
   const alive = () => livingSeats(working);
 
-  function bumpThreat(seatId: SeatId, type: EventType): void {
+  function bumpThreatBy(seatId: SeatId, amount: number): void {
     const seat = working.find((s) => s.id === seatId);
-    if (seat) seat.threat = clampThreat(seat.threat + PRESSURE.threat.eventJump[type]);
+    if (seat) seat.threat = clampThreat(seat.threat + amount);
+  }
+
+  function bumpThreat(seatId: SeatId, type: EventType): void {
+    bumpThreatBy(seatId, PRESSURE.threat.eventJump[type]);
   }
 
   function makeEvent(
@@ -991,6 +1020,7 @@ export function resolveWindow(input: WindowInput): WindowResult {
   // the board it grew is the whole gate.
   const combatHazard = PRESSURE.hazards.combat;
   const attacker = highestThreatSeat(working);
+  let attackedPlayer: SeatId | null = null;
   if (
     roomLeft() &&
     !wiped &&
@@ -1019,7 +1049,90 @@ export function resolveWindow(input: WindowInput): WindowResult {
       ),
     );
     bumpThreat(attacker.id, 'combat');
+    attackedPlayer = attacker.id;
     notes.push(`combat:${attacker.id}:${damage}`);
+  }
+
+  // Pod combat — the seats swing at each other. No event: the player is not
+  // being asked anything, so there is nothing to answer and nothing to resolve.
+  // It is the reason a seat's threat can fall without the player spending a
+  // card, and the reason the pod is a pod rather than three parallel timers.
+  //
+  // The seat that just attacked the player is out of the running — it turned its
+  // creatures sideways once already this window — so the attacker here is the
+  // *second* board at the table, swinging at whoever is scariest. That is the
+  // same instinct the player has, and it means the pod polices its own leader.
+  //
+  // Gated on `wiped` for the same reason the swing at the player is: the wrath
+  // in this window takes every seat's creatures with it, so a seat hitting its
+  // neighbour with them would be attacking out of a graveyard.
+  //
+  // A pod hit never kills: see the `defender.life` cap below.
+  const podHits: PodHit[] = [];
+  const pod = PRESSURE.podCombat;
+  if (!wiped && turn >= byBracket(pod.startTurn, bracket)) {
+    const podAttacker = bestSeat(
+      alive().filter((s) => s.id !== attackedPlayer && s.silhouette.power >= pod.minPower),
+      (s) => s.silhouette.power,
+    );
+    const defender = podAttacker
+      ? bestSeat(
+          alive().filter((s) => s.id !== podAttacker.id),
+          (s) => s.threat,
+        )
+      : undefined;
+    if (
+      podAttacker &&
+      defender &&
+      rng() <
+        clamp(
+          byBracket(pod.chance, bracket) * profileOf(podAttacker).hazardMult.combat,
+          0,
+          PRESSURE.profileCeiling,
+        )
+    ) {
+      // The pod softens a seat up; it never finishes one. A seat already at 1
+      // life is left alone entirely this window, and every other hit is capped
+      // at `life - 1`. The reason is that the kill is the player's: a pod that
+      // eliminates seats hands the player wins they did not play for, and the
+      // whole point of the threat meters is that clearing the table is work.
+      //
+      // The check sits *after* the roll on purpose. Withholding the hit costs
+      // no draw, so the fixed order documented above keeps its shape and a seed
+      // still replays; skipping ahead of the roll would shift every later draw
+      // in the window depending on a life total.
+      if (defender.life > 1) {
+        // Same plausible cap and the same severity multiplier as the swing at
+        // the player, so a seat cannot hit its neighbour harder than it could
+        // hit you — then the never-kill cap on top of that.
+        const c = PRESSURE.combat;
+        const damage = Math.min(
+          Math.max(
+            1,
+            Math.round(
+              Math.min(
+                podAttacker.silhouette.power * pod.powerShare,
+                Math.min(c.damageBase + c.damagePerTurn * turn, c.damageHardCap),
+              ) * severityMult,
+            ),
+          ),
+          defender.life - 1,
+        );
+        const hit = applyDamageToSeat(
+          defender.threat,
+          defender.silhouette,
+          damage,
+          defender.life,
+        );
+        defender.threat = hit.threat;
+        defender.silhouette = hit.silhouette;
+        // Life is the store's: the engine has no business deciding who died —
+        // and after the cap above, nobody did.
+        bumpThreatBy(podAttacker.id, PRESSURE.threat.podHitJump);
+        podHits.push({ attackerId: podAttacker.id, defenderId: defender.id, damage });
+        notes.push(`pod:${podAttacker.id}>${defender.id}:${damage}`);
+      }
+    }
   }
 
   // Resource attack — discard, sacrifice, or a tax.
@@ -1069,6 +1182,53 @@ export function resolveWindow(input: WindowInput): WindowResult {
         events.push(makeEvent('resource', caster.id, prompt, { amount: 1 }, { variant, card }));
         bumpThreat(caster.id, 'resource');
         notes.push(`resource:${caster.id}:${variant}:${card.name}`);
+      }
+    }
+  }
+
+  // Hate piece — the one hazard that does not finish when the window does. The
+  // engine stops at the event: the player may still answer it, and only the
+  // store knows whether they did, so `StandingHazard` is made there. What the
+  // engine reads back is `input.hazards`, which keeps a seat that is already
+  // holding a piece from being dealt a second one.
+  const hateHazard = PRESSURE.hazards.hate;
+  if (roomLeft() && offCooldown(input, 'hate', hateHazard)) {
+    const standingPerSeat = new Map<SeatId, number>();
+    for (const hazard of input.hazards) {
+      standingPerSeat.set(hazard.seatId, (standingPerSeat.get(hazard.seatId) ?? 0) + 1);
+    }
+    const hateCandidates = casterCandidates(alive(), (seat) => {
+      if ((standingPerSeat.get(seat.id) ?? 0) >= PRESSURE.hate.maxStandingPerSeat) return null;
+      const list = baseEligible(
+        CITATIONS.hate,
+        seatMana(seat.silhouette, turn, bracket),
+        bracket,
+        turn,
+        colorsOf(seat),
+      );
+      return list.length > 0 ? list : null;
+    });
+    const entry = preferredCaster(hateCandidates, (s) => s.threat);
+    if (
+      entry &&
+      rng() < hazardChance(hateHazard, turn, bracket, 1, profileOf(entry.seat).hazardMult.hate)
+    ) {
+      const caster = entry.seat;
+      const card = pickCitation(entry.list, rng);
+      if (card) {
+        events.push(
+          makeEvent(
+            'hate',
+            caster.id,
+            [`${seatLabel(caster.id)} casts ${card.name}.`, card.tell, 'Respond or it stands.']
+              .filter(Boolean)
+              .join(' '),
+            {},
+            { card },
+          ),
+        );
+        bumpThreat(caster.id, 'hate');
+        notes.push(`hate:${caster.id}:${card.name}`);
       }
     }
   }
@@ -1157,13 +1317,14 @@ export function resolveWindow(input: WindowInput): WindowResult {
     }
   }
 
-  const summary = buildSummary(turn, working, events, counterArmed, clock);
+  const summary = buildSummary(turn, working, events, counterArmed, clock, podHits);
 
   return {
     seats: working.map((s) => ({ id: s.id, threat: s.threat, silhouette: s.silhouette })),
     events,
     clock,
     counterArmed,
+    podHits,
     playerThreat,
     summary,
     notes,
@@ -1177,6 +1338,7 @@ function buildSummary(
   events: PressureEvent[],
   counterArmed: CounterArmed | null,
   clock: ClockState | null,
+  podHits: PodHit[],
 ): string {
   const boards = livingSeats(seats)
     .map((s) => `${s.id} ${s.threat.toFixed(1)}/${s.silhouette.creatures}c ${s.silhouette.power}p`)
@@ -1184,6 +1346,9 @@ function buildSummary(
   const parts = [`Opponent window before turn ${turn}: ${boards || 'no seats left'}`];
   if (events.length > 0) parts.push(events.map((e) => e.type).join(' + '));
   else parts.push('no events');
+  for (const hit of podHits) {
+    parts.push(`${hit.attackerId} hits ${hit.defenderId} for ${hit.damage}`);
+  }
   if (counterArmed) {
     parts.push(`Seat ${counterArmed.seatId} counters at ${counterArmed.threshold}+ mana`);
   }

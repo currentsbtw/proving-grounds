@@ -24,8 +24,13 @@
  * scripted turns. Passing a different seed still exercises everything else, but
  * those checks may legitimately fail on one where the pod behaved differently.
  * It was re-picked when seat archetype profiles landed (pressure version 4),
- * which redrew every seed's stream; on the previous default the run now settles
- * on turn 11 and the twelfth scripted turn plays into an already-ending run.
+ * which redrew every seed's stream, and again for standing hate pieces and pod
+ * combat (version 7), which added two draw sites per window and so redrew them
+ * once more — on the previous default the run now settles on turn 10 and no
+ * resource attack is ever offered. The current one also has the pod cast two
+ * hate pieces the script lets stand and hit itself for seventeen, so the
+ * standing-piece and pod-damage readings are checked against a real store as
+ * well as against the hand-written fixture below.
  */
 import {
   cardsInZone,
@@ -35,6 +40,7 @@ import {
   useGameStore,
   type GameState,
 } from '../src/state/gameStore.ts';
+import { SCORING } from '../src/data/scorecard.ts';
 import {
   aggregateProfile,
   compareScorecards,
@@ -53,7 +59,7 @@ import type {
   ZoneId,
 } from '../src/domain/types.ts';
 
-const SEED = process.argv[2] ?? 'scorecard-verify-12b';
+const SEED = process.argv[2] ?? 'scorecard-verify-v7-2';
 const MULLIGAN_SEED = `${SEED}-mull`;
 const TURNS = 12;
 const BRACKET = 4;
@@ -711,6 +717,217 @@ function legacyCounteredRun(): RunRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Standing hate pieces and pod combat, written by hand
+// ---------------------------------------------------------------------------
+
+/**
+ * A hand-written log in the store's own payload shapes.
+ *
+ * Whether a seed offers a hate piece — let alone one the script can leave
+ * standing for four turns, sweep with a wrath, and retire with the seat that
+ * cast it — is the pod's business, and none of the four fates a piece can meet
+ * can be forced through the store in one scripted run. So this fixture states
+ * them, the way `verify-review.ts`'s run D states a canceled event: five hate
+ * events, one answered on the stack and four that stood, plus two seats hitting
+ * each other while the player untapped.
+ *
+ * What it is really asserting is the reading of two log shapes the scorer cannot
+ * get wrong quietly:
+ *
+ *  - a `removed-hazard` respond is *not* an answer to the event. The event
+ *    resolved — the piece stood — and the removal three turns later is a second
+ *    fact about the same card.
+ *  - a `podCombat` damage entry is the pod hitting itself, not the player
+ *    dealing damage.
+ */
+const HAZARD_RUN_TURNS = 9;
+
+interface HatePiece {
+  eventId: string;
+  hazardId: string;
+  seatId: SeatId;
+  card: string;
+  spawnedTurn: number;
+}
+
+function hazardRun(): RunRecord {
+  const log: LogEntry[] = [];
+  let turn = 1;
+
+  function add(
+    at: number,
+    kind: LogEntry['kind'],
+    message: string,
+    payload: Record<string, unknown>,
+  ): void {
+    turn = at;
+    log.push({ seq: log.length + 1, turn, phase: 'main1', kind, message, payload, at: 0 });
+  }
+
+  /** The event entry a hate piece writes when the player lets it resolve. */
+  function stands(piece: HatePiece): void {
+    add(piece.spawnedTurn, 'event', `Seat ${piece.seatId} casts ${piece.card}. (${piece.card} stands)`, {
+      eventId: piece.eventId,
+      eventType: 'hate',
+      seatId: piece.seatId,
+      eventTurn: piece.spawnedTurn,
+      card: piece.card,
+      cardEffect: 'Nonbasic lands are Mountains.',
+      severity: {},
+      resolved: true,
+      outcome: { standing: true, hazardId: piece.hazardId },
+    });
+  }
+
+  const moon: HatePiece = {
+    eventId: 'evt-hate-a',
+    hazardId: 'hz-evt-hate-a',
+    seatId: 'A',
+    card: 'Blood Moon',
+    spawnedTurn: 2,
+  };
+  const peace: HatePiece = {
+    eventId: 'evt-hate-b',
+    hazardId: 'hz-evt-hate-b',
+    seatId: 'B',
+    card: 'Rest in Peace',
+    spawnedTurn: 3,
+  };
+  const orb: HatePiece = {
+    eventId: 'evt-hate-c2',
+    hazardId: 'hz-evt-hate-c2',
+    seatId: 'C',
+    card: 'Torpor Orb',
+    spawnedTurn: 7,
+  };
+  const thalia: HatePiece = {
+    eventId: 'evt-hate-b2',
+    hazardId: 'hz-evt-hate-b2',
+    seatId: 'B',
+    card: 'Thalia, Guardian of Thraben',
+    spawnedTurn: 8,
+  };
+
+  add(1, 'run', 'Run started', {
+    runId: 'hazard-run',
+    deckId: DECK.id,
+    deckName: DECK.name,
+    seed: 'hazard-fixture',
+    bracket: BRACKET,
+    pressureVersion: 7,
+  });
+
+  stands(moon);
+  stands(peace);
+
+  // Answered on the stack: a hate event that never became a piece. It is the
+  // one hate row entitled to a place in the answer tallies.
+  add(4, 'event', 'Seat C casts Stony Silence. Respond or it stands.', {
+    eventId: 'evt-hate-c',
+    eventType: 'hate',
+    seatId: 'C',
+    eventTurn: 4,
+    card: 'Stony Silence',
+    severity: {},
+    queued: true,
+  });
+  add(4, 'respond', 'Answered with Swan Song', {
+    eventId: 'evt-hate-c',
+    eventType: 'hate',
+    seatId: 'C',
+    eventTurn: 4,
+    card: 'Stony Silence',
+    severity: {},
+    answerIid: 'ans-swan',
+    answerName: 'Swan Song',
+    answerZone: 'hand',
+    answerTo: 'graveyard',
+    answerMv: 2,
+    bound: true,
+  });
+
+  add(5, 'respond', `Removed ${moon.card} (Seat A) with Krosan Grip`, {
+    reason: 'removed-hazard',
+    hazardId: moon.hazardId,
+    eventId: moon.eventId,
+    seatId: moon.seatId,
+    cardName: moon.card,
+    spawnedTurn: moon.spawnedTurn,
+    turnsStanding: 3,
+    answerIid: 'ans-grip',
+    answerName: 'Krosan Grip',
+    answerZone: 'hand',
+    answerTo: 'graveyard',
+    answerMv: 3,
+    bound: true,
+  });
+
+  // The pod hitting itself, and the player hitting seat A, in the same turn.
+  add(6, 'damage', 'Seat B attacks Seat A for 7', {
+    seatId: 'A',
+    attackerId: 'B',
+    amount: 7,
+    podCombat: true,
+    before: 40,
+    after: 33,
+    threatBefore: 5,
+    threatAfter: 4,
+  });
+  add(6, 'life', 'Seat A: -6', { target: 'seat', seatId: 'A', delta: -6, before: 33, after: 27 });
+
+  add(7, 'threat', `${peace.card} (Seat B) swept by Farewell`, {
+    hazardId: peace.hazardId,
+    eventId: peace.eventId,
+    seatId: peace.seatId,
+    cardName: peace.card,
+    canceled: true,
+    reason: 'wiped',
+    byEventId: 'evt-wipe-1',
+  });
+  stands(orb);
+
+  stands(thalia);
+  add(8, 'damage', 'Seat C attacks Seat A for 5', {
+    seatId: 'A',
+    attackerId: 'C',
+    amount: 5,
+    podCombat: true,
+    before: 27,
+    after: 22,
+    threatBefore: 4,
+    threatAfter: 3,
+  });
+
+  add(9, 'damage', 'Seat B is out', { seatId: 'B', reason: 'life' });
+  add(9, 'threat', `${thalia.card} (Seat B) leaves with the seat`, {
+    hazardId: thalia.hazardId,
+    eventId: thalia.eventId,
+    seatId: thalia.seatId,
+    cardName: thalia.card,
+    canceled: true,
+    reason: 'seat-eliminated',
+  });
+  add(HAZARD_RUN_TURNS, 'run', 'Run ended: loss', {
+    result: 'loss',
+    endedAt: 0,
+    turns: HAZARD_RUN_TURNS,
+  });
+
+  return {
+    id: 'hazard-run',
+    deckId: DECK.id,
+    deckName: DECK.name,
+    seed: 'hazard-fixture',
+    bracket: BRACKET,
+    startedAt: 0,
+    endedAt: 0,
+    result: 'loss',
+    roster: {},
+    log,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
 
@@ -1014,6 +1231,120 @@ function main(): void {
   );
   checkEqual('the legacy run still counts its one cast', legacyCountered.commander.casts, 1);
 
+  // --- standing hate pieces and pod combat ---------------------------------
+  const hazardCard = scoreRun(hazardRun());
+  checkEqual('hate pieces faced', hazardCard.hazards.faced, 5);
+  checkEqual('hate pieces that stood', hazardCard.hazards.stood, 4);
+  checkEqual('hate pieces removed by the player', hazardCard.hazards.removed, 1);
+  checkEqual('hate pieces swept', hazardCard.hazards.swept, 1);
+  // Blood Moon T2→T5, Rest in Peace T3→T7, Torpor Orb T7→run end T9, Thalia
+  // T8→the seat's death on T9. A piece still standing is measured to the last
+  // turn played; a piece retired with its seat is measured to the retirement.
+  checkEqual('turns each piece stood', hazardCard.hazards.turnsStanding, [3, 4, 2, 1]);
+
+  const moonRow = hazardCard.events.find((e) => e.eventId === 'evt-hate-a');
+  checkEqual('a removed piece keeps its resolved terminal', moonRow?.terminal, 'resolved');
+  checkEqual('the removal turn is on the row', moonRow?.removedTurn, 5);
+  checkEqual('the card that removed it is on the row', moonRow?.removedWith, 'Krosan Grip');
+  check(
+    'a removal never becomes the answer to the event',
+    moonRow?.answerCard === undefined,
+    `answerCard ${moonRow?.answerCard}`,
+  );
+  const peaceRow = hazardCard.events.find((e) => e.eventId === 'evt-hate-b');
+  checkEqual('a swept piece records the turn the wrath reached it', peaceRow?.sweptTurn, 7);
+  const negatedRow = hazardCard.events.find((e) => e.eventId === 'evt-hate-c');
+  checkEqual('a hate piece answered on the stack is responded', negatedRow?.terminal, 'responded');
+  checkEqual('and it names the card that answered it', negatedRow?.answerCard, 'Swan Song');
+  // Four pieces stood and one was answered: exactly one answer, because a
+  // removal is not a response to the prompt the event made.
+  checkEqual('the hate tally counts one answer and four resolutions', hazardCard.answers.byType.hate, {
+    offered: 5,
+    responded: 1,
+    resolved: 4,
+    unresolved: 0,
+    named: 1,
+    nameable: 1,
+  });
+
+  const hazardSeatA = hazardCard.seats.find((s) => s.seatId === 'A');
+  checkEqual('pod damage lands on the defending seat', hazardSeatA?.podDamageTaken, 12);
+  checkEqual('pod damage stays out of the seat damage the player dealt', hazardSeatA?.damageDealt, 6);
+  checkEqual('and out of commander damage', hazardSeatA?.commanderDamageDealt, 0);
+  checkEqual(
+    'pod damage stays out of the turn timeline too',
+    hazardCard.timeline[5]?.damageBySeat.A,
+    6,
+  );
+  checkEqual(
+    'total damage dealt is the player\'s alone',
+    hazardCard.seats.reduce((sum, seat) => sum + seat.damageDealt, 0),
+    6,
+  );
+  const hazardSeatB = hazardCard.seats.find((s) => s.seatId === 'B');
+  checkEqual('the seat that died still records it', hazardSeatB?.eliminatedTurn, 9);
+
+  const hazardProfile = aggregateProfile([hazardCard, hazardCard]);
+  checkEqual('the profile pools hate faced', hazardProfile.hateFaced, 10);
+  checkEqual('the profile pools hate stood', hazardProfile.hateStood, 8);
+  checkEqual('the profile reads removed against stood', hazardProfile.hateRemovedRate, 0.25);
+  check(
+    'a deck that leaves pieces standing is tagged for it',
+    hazardProfile.tags.includes(SCORING.tagLabels.letsHateStand),
+    hazardProfile.tags.join(', ') || '(no tags)',
+  );
+  check(
+    'the comparison carries the hate removed rate',
+    compareScorecards(hazardCard, scorecard).metrics.some((m) => m.key === 'hateRemovedRate'),
+  );
+
+  // The same reading off the real store, whatever the seed did. It is 0 today
+  // because the store's pod-combat entries have not landed; the moment they do,
+  // this is the check that says the scorer and the store agree about them.
+  const podByLog: Record<SeatId, number> = { A: 0, B: 0, C: 0 };
+  for (const entry of first.record.log) {
+    if (entry.kind !== 'damage' || entry.payload.podCombat !== true) continue;
+    const seatId = entry.payload.seatId;
+    const amount = entry.payload.amount;
+    if ((seatId === 'A' || seatId === 'B' || seatId === 'C') && typeof amount === 'number') {
+      podByLog[seatId] += amount;
+    }
+  }
+  for (const seatId of SEAT_IDS) {
+    checkEqual(
+      `seat ${seatId} pod damage in the scripted run matches the log`,
+      scorecard.seats.find((s) => s.seatId === seatId)?.podDamageTaken,
+      podByLog[seatId],
+    );
+  }
+  checkEqual(
+    'the scripted run scores every hate event the log offered',
+    scorecard.hazards.faced,
+    scorecard.events.filter((e) => e.type === 'hate').length,
+  );
+  // A piece stands only where the store said it resolved onto the table, so the
+  // count is readable straight off the log without the scorer's help.
+  const stoodByLog = first.record.log.filter((entry) => {
+    if (entry.kind !== 'event' || entry.payload.resolved !== true) return false;
+    const outcome = entry.payload.outcome;
+    return (
+      outcome !== null &&
+      typeof outcome === 'object' &&
+      (outcome as Record<string, unknown>).standing === true
+    );
+  }).length;
+  checkEqual('the scripted run scores every piece that stood', scorecard.hazards.stood, stoodByLog);
+  check(
+    'the scripted run actually put a piece on the table',
+    scorecard.hazards.stood >= 1,
+    `${scorecard.hazards.faced} faced, ${scorecard.hazards.stood} stood — pick another seed`,
+  );
+  check(
+    'the pod actually hit itself on this seed',
+    SEAT_IDS.some((id) => podByLog[id] > 0),
+    'no pod combat in this run — pick another seed',
+  );
+
   // --- mulligans -----------------------------------------------------------
   // The first mulligan is free in Commander (CR 103.5c): it keeps seven. The
   // second bottoms one.
@@ -1069,6 +1400,12 @@ function main(): void {
   );
   summary.push(
     `keep                ${scorecard.keep.keptHandSize} cards, ${scorecard.keep.landsInKeptHand} lands, ${scorecard.keep.mulligans} mulligans`,
+  );
+  summary.push(
+    `hate pieces         run: ${scorecard.hazards.faced} faced, ${scorecard.hazards.stood} stood · fixture: ${hazardCard.hazards.faced} faced, ${hazardCard.hazards.stood} stood, ${hazardCard.hazards.removed} removed, ${hazardCard.hazards.swept} swept, standing ${hazardCard.hazards.turnsStanding.join('/')}`,
+  );
+  summary.push(
+    `pod combat          run: ${SEAT_IDS.map((id) => `${id} ${podByLog[id]}`).join(', ')} · fixture: A ${hazardSeatA?.podDamageTaken ?? 0} taken with ${hazardSeatA?.damageDealt ?? 0} dealt by the player`,
   );
   summary.push(`profile tags        ${profile.tags.join(', ') || '(none)'}`);
   if (parityLine) summary.push(parityLine);

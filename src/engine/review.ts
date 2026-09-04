@@ -37,11 +37,13 @@ export type FindingCode =
   | 'stuck-hand'
   | 'commander-late'
   | 'overextended'
+  | 'hate-stood'
   | 'land-drops-hit'
   | 'commander-on-time'
   | 'fast-rebuild'
   | 'answered-under-pressure'
-  | 'clock-beaten';
+  | 'clock-beaten'
+  | 'hate-removed-fast';
 
 export interface ReviewFinding {
   /** Stable within one review, so the UI can key rows without an index. */
@@ -119,6 +121,10 @@ function hasObject(payload: Payload, key: string): boolean {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function readObject(payload: Payload, key: string): Payload | undefined {
+  return hasObject(payload, key) ? (payload[key] as Payload) : undefined;
+}
+
 /**
  * Front face only, so the replay classifies a card exactly as the table did
  * while it was being played — a `Sorcery // Land` is a spell in both readings.
@@ -141,6 +147,25 @@ interface TurnSnapshot {
   lands: number;
   /** Of those, how many were untapped. */
   untappedLands: number;
+}
+
+/**
+ * One hate piece's life on the table, gathered as the log goes past. The
+ * scorecard counts the same spans; this keeps the card's name and the `seq` of
+ * every entry involved, which is what a finding has to be able to point at.
+ */
+interface HazardSpan {
+  hazardId: string;
+  seatId: string;
+  card: string;
+  spawnedTurn: number;
+  /** Turn it left the table, or null while it is still standing. */
+  endTurn: number | null;
+  /** How it left. `null` while it stands; 'retired' is a seat dying with it. */
+  fate: 'removed' | 'swept' | 'retired' | null;
+  /** The card the player named removing it, when they named one. */
+  removedWith: string | null;
+  seqs: number[];
 }
 
 interface Replay {
@@ -166,6 +191,8 @@ interface Replay {
   respondSeqs: Map<number, number[]>;
   /** Turn a resolved (not negated) wipe landed on, to its event entry `seq`. */
   wipeSeqs: Map<number, number>;
+  /** Every hate piece that stood, in the order the pieces landed. */
+  hazards: HazardSpan[];
   /** `seq` of the first entry that put a commander on the battlefield. */
   firstCommanderSeq: number | null;
   /** Printed mana value of the cheapest commander in the roster. */
@@ -255,6 +282,7 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
   let armedWindowTurn: number | null = null;
   const respondSeqs = new Map<number, number[]>();
   const wipeSeqs = new Map<number, number>();
+  const hazardById = new Map<string, HazardSpan>();
   let firstCommanderSeq: number | null = null;
   let lastTurn = 1;
   let lastSeq = 0;
@@ -420,10 +448,46 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
         if (type === 'wipe' && isTrue(p, 'resolved') && !wipeSeqs.has(entry.turn)) {
           wipeSeqs.set(entry.turn, entry.seq);
         }
+        // A hate piece the player let through is now standing. Only a resolution
+        // that says `standing` makes a piece: the same event answered on the
+        // stack resolves nothing onto the table.
+        const outcome = readObject(p, 'outcome');
+        if (type === 'hate' && isTrue(p, 'resolved') && outcome && isTrue(outcome, 'standing')) {
+          const hazardId = readString(outcome, 'hazardId') ?? `hz-${eventId ?? entry.seq}`;
+          if (!hazardById.has(hazardId)) {
+            hazardById.set(hazardId, {
+              hazardId,
+              seatId: readString(p, 'seatId') ?? '?',
+              card: readString(p, 'card') ?? 'the piece',
+              spawnedTurn: entry.turn,
+              endTurn: null,
+              fate: null,
+              removedWith: null,
+              seqs: [entry.seq],
+            });
+          }
+        }
         break;
       }
 
       case 'threat': {
+        // A standing piece leaving without the player: swept by a wrath, or
+        // retired with the seat that cast it. This entry shares its `canceled` /
+        // `seat-eliminated` wording with the dropped-counter entry below, and a
+        // hazard id is the only thing that tells them apart — without the guard,
+        // a seat dying with a hate piece on the table would hand back a tax the
+        // window really did charge.
+        const hazardId = readString(p, 'hazardId');
+        if (hazardId !== undefined && isTrue(p, 'canceled')) {
+          const span = hazardById.get(hazardId);
+          if (span && span.endTurn === null) {
+            span.endTurn = entry.turn;
+            span.fate = readString(p, 'reason') === 'wiped' ? 'swept' : 'retired';
+            span.seqs.push(entry.seq);
+          }
+          break;
+        }
+
         // The seat holding up interaction is out, and the store logs the counter
         // it dropped here rather than in another window entry. The window that
         // armed it taxed a turn nothing was ever held over, so take that back.
@@ -446,6 +510,21 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
       }
 
       case 'respond': {
+        // Removing a standing piece is not an answer given on the table: the
+        // event it belongs to ended turns ago, and `answered-under-pressure`
+        // reads `respondSeqs` as "interaction spent while a question was live".
+        // It closes the piece's span instead.
+        const hazardId = readString(p, 'hazardId');
+        if (readString(p, 'reason') === 'removed-hazard' && hazardId !== undefined) {
+          const span = hazardById.get(hazardId);
+          if (span && span.endTurn === null) {
+            span.endTurn = entry.turn;
+            span.fate = 'removed';
+            span.removedWith = isTrue(p, 'bound') ? (readString(p, 'answerName') ?? null) : null;
+            span.seqs.push(entry.seq);
+          }
+          break;
+        }
         push(respondSeqs, entry.turn, entry.seq);
         break;
       }
@@ -471,6 +550,7 @@ function replayForReview(run: RunRecord, options?: ReviewOptions): Replay {
     taxedTurns: new Set([...taxTurnByEvent.values(), ...windowTaxedTurns]),
     respondSeqs,
     wipeSeqs,
+    hazards: [...hazardById.values()],
     firstCommanderSeq,
     commanderMv,
     factsFor,
@@ -802,6 +882,35 @@ export function reviewRun(run: RunRecord, card: Scorecard, options?: ReviewOptio
     });
   }
 
+  // --- hate pieces left standing --------------------------------------------
+  // A counting finding like every other one here: how long the piece was on the
+  // table, and that nothing was ever named against it. It does not say the piece
+  // *could* have been removed — that is a colour and a legality question — and a
+  // piece a wrath happened to catch still counts, because the player did not
+  // deal with it, the pod did.
+  for (const span of replay.hazards) {
+    const endTurn = span.endTurn ?? lastTurn;
+    const stood = Math.max(0, endTurn - span.spawnedTurn);
+    if (span.fate === 'removed') continue;
+    if (stood < REVIEW.hazard.minTurnsStanding) continue;
+    const ending =
+      span.fate === 'swept'
+        ? `a wrath took it on T${endTurn}`
+        : span.fate === 'retired'
+          ? `it left with Seat ${span.seatId} on T${endTurn}`
+          : `it was still there on T${endTurn}`;
+    drafts.push({
+      code: 'hate-stood',
+      kind: 'miss',
+      turns: [span.spawnedTurn, endTurn],
+      title: `${span.card} stood ${stood} ${plural(stood, 'turn', 'turns')}`,
+      detail: `Seat ${span.seatId} landed it on T${span.spawnedTurn} and ${ending}. No answer was ever named for it.`,
+      evidence: span.seqs,
+      impact: stood,
+      suffix: span.hazardId,
+    });
+  }
+
   // --- the goods ------------------------------------------------------------
   const through = Math.min(REVIEW.landDrop.goodThroughTurn, gradedThrough);
   let allHit = through >= 1;
@@ -864,6 +973,28 @@ export function reviewRun(run: RunRecord, card: Scorecard, options?: ReviewOptio
       suffix: String(turn),
     });
     break;
+  }
+
+  // The other half of the piece: one that did not get to sit there. Removing it
+  // inside a turn of it landing is the interaction spent where it mattered, and
+  // it is the only hate reading worth crediting — a piece removed on turn nine
+  // was still a piece the table played around for eight turns.
+  for (const span of replay.hazards) {
+    if (span.fate !== 'removed' || span.endTurn === null) continue;
+    const stood = Math.max(0, span.endTurn - span.spawnedTurn);
+    if (stood > REVIEW.hazard.quickRemovalTurns) continue;
+    drafts.push({
+      code: 'hate-removed-fast',
+      kind: 'good',
+      turns: [span.spawnedTurn, span.endTurn],
+      title: `Removed ${span.card} ${stood === 0 ? 'the turn it landed' : 'the turn after it landed'}`,
+      detail:
+        `Seat ${span.seatId} landed it on T${span.spawnedTurn} and it was gone by T${span.endTurn}` +
+        `${span.removedWith === null ? '' : `, to ${span.removedWith}`}.`,
+      evidence: span.seqs,
+      impact: 4,
+      suffix: span.hazardId,
+    });
   }
 
   if (clock.faced && clock.beatClock) {

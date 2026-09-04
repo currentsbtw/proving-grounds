@@ -50,6 +50,7 @@ const FALLBACK = {
   manaB: '#bba9c9',
   manaR: '#e58a76',
   manaG: '#8fc49e',
+  manaC: '#b8b5ae',
 };
 
 type Palette = typeof FALLBACK;
@@ -70,6 +71,7 @@ const TOKEN_OF: Record<keyof Palette, string> = {
   manaB: '--mana-b',
   manaR: '--mana-r',
   manaG: '--mana-g',
+  manaC: '--mana-c',
 };
 
 function readPalette(): Palette {
@@ -101,6 +103,11 @@ function eventColor(C: Palette, type: string): string {
       return C.manaR;
     case 'clock':
       return C.manaG;
+    case 'hate':
+      // Colourless grey, matching the ledger chip. The letter is what actually
+      // says which class it is — this image is read on Discord, where hue is not
+      // a channel every reader has.
+      return C.manaC;
     default:
       return C.muted;
   }
@@ -615,6 +622,22 @@ function drawTiles(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   });
 }
 
+/** Gaps between key entries, widest first — the first one that fits is used. */
+const KEY_GAPS = [18, 12, 8];
+
+/** What the whole marker key measures at a given gap, mark + word + gap each. */
+function keyRowWidth(ctx: Ctx2D, gap: number): number {
+  let width = 0;
+  for (const { type, word } of EVENT_MARK_KEY) {
+    ctx.font = `600 12px ${BODY_FONT}`;
+    width += measure(ctx, EVENT_MARK[type] ?? '?') + 4;
+    ctx.font = `400 11px ${BODY_FONT}`;
+    width += measure(ctx, word) + gap;
+  }
+  // The trailing gap is not part of the row: the last word ends the key.
+  return Math.max(0, width - gap);
+}
+
 function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const rows: TurnRow[] = card.timeline ?? [];
 
@@ -705,16 +728,25 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   });
 
   // The key, printed once under the axis so the letters are never a code the
-  // reader has to already know.
+  // reader has to already know. It is one row and every class is on it, so the
+  // gap between entries is measured rather than assumed: a class added to
+  // `eventMarks.ts` must not push the last word off the card.
+  let keyGap = KEY_GAPS[KEY_GAPS.length - 1];
+  for (const candidate of KEY_GAPS) {
+    if (keyRowWidth(ctx, candidate) <= CONTENT_W) {
+      keyGap = candidate;
+      break;
+    }
+  }
   let keyX = L;
   for (const { type, word } of EVENT_MARK_KEY) {
-    const markW = text(ctx, EVENT_MARK[type], keyX, KEY_Y, {
+    const markW = text(ctx, EVENT_MARK[type] ?? '?', keyX, KEY_Y, {
       size: 12,
       weight: 600,
       color: eventColor(C, type),
     });
     const wordW = text(ctx, word, keyX + markW + 4, KEY_Y, { size: 11, color: C.muted });
-    keyX += markW + wordW + 18;
+    keyX += markW + wordW + keyGap;
   }
 
   // Turn numbers, thinned out so a 30-turn game does not become a smear.

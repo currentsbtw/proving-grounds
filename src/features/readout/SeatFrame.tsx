@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PROFILES, colorLetters } from '../../data/profiles';
 import type { Seat, SeatId } from '../../domain/types';
 import { highestThreatSeat, livingSeats } from '../../engine/pressure';
 import { LETHAL_COMMANDER_DAMAGE, useGameStore } from '../../state/gameStore';
 import type { LifeTarget } from '../../state/gameStore';
+import AnswerPicker, { answerPayload } from '../pressure/AnswerPicker';
 import { seatLabel } from '../pressure/pressureUi';
 
 /** Segments in a threat meter — the engine's threat scale is 0–10. */
@@ -100,13 +101,28 @@ export default function SeatFrame({
   onDetailChange,
 }: FrameProps) {
   const dealCommanderDamage = useGameStore((s) => s.dealCommanderDamage);
+  const removeHazard = useGameStore((s) => s.removeHazard);
+  const allHazards = useGameStore((s) => s.hazards);
+  // The last time the pod swung at this seat. Not an event — the player was not
+  // asked anything — so it is only ever a reading in the detail.
+  const podHit = useGameStore((s) => s.lastPodHit[seat.id]);
   // Hover and keyboard focus both open the detail to be read. Only the pin keeps
   // it open, which is what makes the buttons inside it reachable: a pane that
   // shut on mouse-out could never be clicked into.
   const [near, setNear] = useState(false);
+  // Which standing piece has the Remove picker hanging under it, if any. One at
+  // a time, and only while the seat is pinned.
+  const [removing, setRemoving] = useState<string | null>(null);
   const detailRef = useRef<HTMLDivElement | null>(null);
 
   const dead = seat.eliminated;
+  // The pieces this seat is holding. A dead seat holds none — the store retires
+  // them as it dies, and this is the floor under that: a piece printed under a
+  // seat that is out would be a tell the player would go on honouring.
+  const hazards = useMemo(
+    () => (dead ? [] : allHazards.filter((hazard) => hazard.seatId === seat.id)),
+    [allHazards, dead, seat.id],
+  );
   const { creatures, power, artifacts, openMana } = seat.silhouette;
   const filled = Math.max(0, Math.min(THREAT_SEGMENTS, Math.round(dead ? 0 : seat.threat)));
   const trend: Trend = dead ? 'steady' : trendOf(seat.threat, previous);
@@ -128,6 +144,17 @@ export default function SeatFrame({
     return () => observer.disconnect();
   }, [open, pinned, dead, seat.id, onDetailChange]);
 
+  // The picker belongs to the pin, so dropping the pin closes it — during render
+  // rather than in an effect, because nothing outside React is being
+  // synchronised and a hover reopening a picker the player had put away would be
+  // the pane acting on its own. A piece that leaves by any other route (a wipe,
+  // the seat's death) drops out of `hazards` and takes its picker with it.
+  const [pinnedWas, setPinnedWas] = useState(pinned);
+  if (pinnedWas !== pinned) {
+    setPinnedWas(pinned);
+    if (removing) setRemoving(null);
+  }
+
   // The frame carries the whole reading, so nothing inside it is announced
   // twice: the meter, the chips and the caption are all hidden from the tree.
   // The archetype the seat is piloting. Absent on a run started before profiles
@@ -141,6 +168,11 @@ export default function SeatFrame({
     dead ? 'out' : null,
     !dead && hasClock ? 'clock' : null,
     !dead && armedThreshold !== null ? `armed, counters ${armedThreshold} or more mana` : null,
+    // The pieces are named rather than counted: "holding Blood Moon" is the
+    // whole of what the player has to remember, and a chip reading HATE is only
+    // the pointer to it.
+    hazards.length > 0 ? `holding ${hazards.map((h) => h.card.name).join(', ')}` : null,
+    podHit ? `last hit by ${seatLabel(podHit.attackerId)} for ${podHit.damage}` : null,
     !dead && hit ? 'the seat to hit' : null,
   ].filter(Boolean);
   // The colours go in the label, not only in the chip's `title`: the chip is
@@ -201,6 +233,14 @@ export default function SeatFrame({
             {!dead && armedThreshold !== null && (
               <span className="rd-chip is-armed">ARMED {armedThreshold}+</span>
             )}
+            {/* The word is the whole signal; the colourless grey only agrees
+                with it. The count rides along once a seat holds more than one,
+                because the pane below is then the only place saying so. */}
+            {hazards.length > 0 && (
+              <span className="rd-chip is-hate" title={hazards.map((h) => h.card.name).join(', ')}>
+                HATE{hazards.length > 1 ? ` ${hazards.length}` : ''}
+              </span>
+            )}
             {!dead && hit && showHit && <span className="rd-chip is-hit">HIT</span>}
           </span>
         </span>
@@ -240,6 +280,63 @@ export default function SeatFrame({
               </>
             )}
           </div>
+
+          {/* What this seat has left standing, and the way off it. The name is
+              the fact; the tell under it is the thing the player is honouring by
+              hand, so it is printed in full rather than clipped. */}
+          {hazards.length > 0 && (
+            <div className="hud-hazards">
+              {hazards.map((hazard) => (
+                <div key={hazard.id} className="hud-hazard">
+                  <div className="hud-hazard-head">
+                    <strong className="hud-hazard-name">{hazard.card.name}</strong>
+                    {/* Read on hover, act on the pin — the same rule the
+                        commander-damage row keeps, for the same reason. */}
+                    {pinned && (
+                      <button
+                        type="button"
+                        className="hud-hazard-remove"
+                        aria-expanded={removing === hazard.id}
+                        aria-label={`Remove ${hazard.card.name} with a card`}
+                        onClick={() =>
+                          setRemoving((open) => (open === hazard.id ? null : hazard.id))
+                        }
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="hud-hazard-tell">{hazard.card.tell ?? hazard.card.effect}</p>
+                  {/* The same picker the dock answers events with, so removing a
+                      piece names the card that did it exactly as answering an
+                      event does — including the way out for an answer the app
+                      has no instance for. */}
+                  {pinned && removing === hazard.id && (
+                    <AnswerPicker
+                      title={`Remove ${hazard.card.name} with: pick the card`}
+                      onAnswer={(iid) => {
+                        setRemoving(null);
+                        removeHazard(hazard.id, answerPayload(iid));
+                      }}
+                      onClose={() => setRemoving(null)}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* The pod swinging at itself. A reading only: nothing was asked of
+              the player, and the life it cost is already on the frame. */}
+          {podHit && (
+            <div className="hud-detail-row">
+              <span className="rd-label">pod</span>
+              <span>
+                hit by {podHit.attackerId} for <span className="num">{podHit.damage}</span> on T
+                <span className="num">{podHit.turn}</span>
+              </span>
+            </div>
+          )}
 
           <div className="hud-detail-row">
             <span className="rd-label">cmdr dmg</span>

@@ -31,7 +31,7 @@ import {
   type PermanentSummary,
   type PlayerSummary,
 } from '../engine/pressure';
-import type { CitationSweep, CitationZone } from '../data/citations';
+import type { CitationPermanent, CitationSweep, CitationZone } from '../data/citations';
 import type {
   CardData,
   CardInstance,
@@ -43,6 +43,7 @@ import type {
   LogEntry,
   LogKind,
   Phase,
+  PodHit,
   PressureEvent,
   RosterEntry,
   RunRecord,
@@ -51,6 +52,7 @@ import type {
   SeatId,
   Silhouette,
   StackItem,
+  StandingHazard,
   TokenSpec,
   ZoneId,
 } from '../domain/types';
@@ -377,6 +379,20 @@ export interface GameState {
   clock: ClockState | null;
   /** A seat holding up interaction for the current turn, or null. */
   counterArmed: CounterArmed | null;
+  /**
+   * Hate pieces the player let resolve, still on the table. Nothing here is
+   * enforced: a standing piece is a tell the player honours by hand, and it
+   * leaves when they remove it, a wrath wide enough sweeps it, or the seat that
+   * cast it dies. The engine never writes one — it only ever offers the event,
+   * because up to the moment the player says it resolved the piece is still a
+   * question.
+   */
+  hazards: StandingHazard[];
+  /**
+   * The last swing each seat took from another seat, for the readout's "hit by
+   * B for 7 on T6". Only the most recent one is kept; the log holds the rest.
+   */
+  lastPodHit: Partial<Record<SeatId, { attackerId: SeatId; damage: number; turn: number }>>;
   /** Derived 0–10 rating of how scary the player looked at the last window. */
   playerThreat: number;
   /** How many opponent windows have resolved this run. */
@@ -468,6 +484,12 @@ export interface GameState {
   resolveActiveEvent: (payload?: ResolveEventPayload) => void;
   /** Cancel the race clock by claiming held interaction, with or without a card. */
   declareInteraction: (answer?: AnswerPayload) => void;
+  /**
+   * "I dealt with it." Take a standing hate piece off the table, optionally
+   * naming the card that did it — the same binding an answered event gets, so
+   * the piece and the answer sit on one entry the scorers can pair up.
+   */
+  removeHazard: (id: string, answer?: AnswerPayload) => void;
 }
 
 /** Display name for a card instance (token name, cached Scryfall name, or a fallback). */
@@ -723,6 +745,40 @@ export const useGameStore = create<GameState>((set, get) => {
     shuffleWith(rngOrFallback());
   }
 
+  /**
+   * Take standing hate pieces off the table, one entry each.
+   *
+   * The three ways a piece can leave — its seat dies, a wrath wide enough
+   * sweeps it, the player removes it — differ only in what they say about it,
+   * so they share this: the matching pieces come off state in a single `set`,
+   * then each gets the entry `describe` asks for, in the order they were
+   * standing. `describe` runs after the removal and before that piece's entry,
+   * which is where a caller that binds an answer wants to be (the card's move
+   * entry lands ahead of the retirement it paid for).
+   *
+   * Returns what it removed, so a caller can tell "nothing was standing" from
+   * "one left" without re-reading state.
+   */
+  function retireHazards(
+    matching: (hazard: StandingHazard) => boolean,
+    describe: (hazard: StandingHazard) => {
+      kind: 'threat' | 'respond';
+      message: string;
+      payload: Record<string, unknown>;
+    },
+  ): StandingHazard[] {
+    const retired = get().hazards.filter(matching);
+    if (retired.length === 0) return retired;
+
+    const gone = new Set(retired.map((h) => h.id));
+    set((s) => ({ hazards: s.hazards.filter((h) => !gone.has(h.id)) }));
+    for (const hazard of retired) {
+      const entry = describe(hazard);
+      appendLog(entry.kind, entry.message, entry.payload);
+    }
+    return retired;
+  }
+
   function checkSeatElimination(seatId: SeatId): void {
     const seat = get().seats.find((s) => s.id === seatId);
     if (!seat || seat.eliminated) return;
@@ -773,6 +829,25 @@ export const useGameStore = create<GameState>((set, get) => {
         threshold: armed.threshold,
       });
     }
+
+    // A hate piece is one seat's card sitting on one seat's side of the table.
+    // The seat is gone, so the piece is gone with it, and the player stops
+    // playing around a tell nobody is left to hold them to.
+    retireHazards(
+      (h) => h.seatId === seatId,
+      (hazard) => ({
+        kind: 'threat',
+        message: `Seat ${seatId} is out. ${hazard.card.name} leaves with it.`,
+        payload: {
+          hazardId: hazard.id,
+          eventId: hazard.eventId,
+          seatId,
+          cardName: hazard.card.name,
+          canceled: true,
+          reason: 'seat-eliminated',
+        },
+      }),
+    );
 
     // Pressure does not drop when a seat dies; it concentrates. Event frequency
     // is already seat-independent, so only threat and board move here.
@@ -889,6 +964,56 @@ export const useGameStore = create<GameState>((set, get) => {
           : seat,
       ),
     }));
+  }
+
+  /**
+   * One seat's swing at another, applied to the table's books.
+   *
+   * The engine has already folded what the hit cost the defender's threat and
+   * board into this window's seat updates; what it hands back is the life,
+   * which it does not own. Applying `applyDamageToSeat` a second time here
+   * would shed the threat twice and walk the store off the curves the probe
+   * fitted, so this only moves life — and the two threat readings on the entry
+   * bracket the window the hit landed in rather than the hit alone.
+   *
+   * Two things it deliberately does not touch. `previousThreat` is the trend
+   * baseline for damage the *player* deals, and this is the pod hurting itself:
+   * the meters are supposed to show it. And `damageDealtByTurn` is the player's
+   * own damage tally, which is what the scorecard scores them on — a seat the
+   * pod softened up is not a seat the player burned down.
+   *
+   * `checkSeatElimination` at the tail is a belt on braces: the engine caps a
+   * hit at `life - 1`, so this can never be the blow that kills, and if that
+   * ever changes the seat still leaves the table properly.
+   */
+  function applyPodHit(hit: PodHit, turn: number): void {
+    const seat = get().seats.find((s) => s.id === hit.defenderId);
+    if (!seat || seat.eliminated || hit.damage <= 0) return;
+    const before = seat.life;
+    const after = before - hit.damage;
+    const threatBefore = get().previousThreat[hit.defenderId] ?? seat.threat;
+
+    set((s) => ({
+      seats: s.seats.map((x) => (x.id === hit.defenderId ? { ...x, life: after } : x)),
+      lastPodHit: {
+        ...s.lastPodHit,
+        [hit.defenderId]: { attackerId: hit.attackerId, damage: hit.damage, turn },
+      },
+    }));
+
+    appendLog('damage', `Seat ${hit.attackerId} attacks Seat ${hit.defenderId} for ${hit.damage}`, {
+      seatId: hit.defenderId,
+      attackerId: hit.attackerId,
+      amount: hit.damage,
+      /** The flag every scorer reads: damage the player did not deal. */
+      podCombat: true,
+      before,
+      after,
+      threatBefore,
+      threatAfter: seat.threat,
+    });
+
+    checkSeatElimination(hit.defenderId);
   }
 
   /**
@@ -1080,6 +1205,17 @@ export const useGameStore = create<GameState>((set, get) => {
       })
       .sort(byArrival)
       .map((c) => c.iid);
+  }
+
+  /**
+   * Does a wipe of this scope take a standing piece with it? A creatures-only
+   * wrath only reaches the creature pieces — Thalia goes, Blood Moon does not —
+   * and the wider sweeps (`nonland`, `ace`) reach every kind a piece can be. A
+   * citation with no printed kind is read as "not a creature", which is the only
+   * safe reading of an untagged permanent.
+   */
+  function sweepClearsHazard(sweep: CitationSweep, permanent?: CitationPermanent): boolean {
+    return sweep === 'creatures' ? permanent === 'creature' : true;
   }
 
   /**
@@ -1335,6 +1471,33 @@ export const useGameStore = create<GameState>((set, get) => {
     if (!state.run) return true;
 
     const windowIndex = state.windowCount + 1;
+
+    // A piece in front of the player counts as standing for the purpose of
+    // dealing another. `state.hazards` holds only the pieces that resolved, so
+    // a hate event still waiting in the queue — or sitting active, unanswered —
+    // would be invisible to the engine's per-seat cap and the seat could be
+    // dealt a second piece while the player has not answered the first. The
+    // provisional entries below exist only in this call's `WindowInput`:
+    // `state.hazards` and the window entry's `hazards` field keep listing the
+    // real standing pieces. An event with no card can never stand, so it is not
+    // counted.
+    const unanswered = state.activeEvent
+      ? [state.activeEvent, ...state.pendingEvents]
+      : state.pendingEvents;
+    const provisional: StandingHazard[] = unanswered.flatMap((event) =>
+      event.type === 'hate' && event.card
+        ? [
+            {
+              id: `hz-${event.id}`,
+              eventId: event.id,
+              seatId: event.seatId,
+              card: event.card,
+              spawnedTurn: event.turn,
+            },
+          ]
+        : [],
+    );
+
     const result = resolveWindow({
       turn: upcomingTurn,
       windowIndex,
@@ -1345,6 +1508,9 @@ export const useGameStore = create<GameState>((set, get) => {
       permanents: playerPermanentsOf(state),
       clock: state.clock,
       counterArmed: state.counterArmed,
+      // Read-only to the engine: a seat already holding a piece — resolved, or
+      // still a question in front of the player — is not dealt another one.
+      hazards: [...state.hazards, ...provisional],
       firedCounts: state.firedCounts,
       lastFiredWindow: state.lastFiredWindow,
     });
@@ -1398,6 +1564,12 @@ export const useGameStore = create<GameState>((set, get) => {
       eventTypes: result.events.map((e) => e.type),
       counterArmed: result.counterArmed,
       clock: result.clock,
+      // What was standing as the window opened, and what the seats did to each
+      // other inside it.
+      hazards: state.hazards.map((h) => h.id),
+      /** Hate events still unanswered as the window opened; they held a seat's slot too. */
+      queuedHate: provisional.map((h) => h.eventId),
+      podHits: result.podHits,
       notes: result.notes,
     });
 
@@ -1405,6 +1577,11 @@ export const useGameStore = create<GameState>((set, get) => {
     for (const event of stamped) {
       appendLog('event', event.prompt, { ...eventPayload(event), queued: true });
     }
+
+    // After the queue, so the log reads in the order the table saw it: the
+    // window, then what it is asking the player, then what the pod did to
+    // itself while the player was being asked.
+    for (const hit of result.podHits) applyPodHit(hit, upcomingTurn);
     return true;
   }
 
@@ -1521,6 +1698,8 @@ export const useGameStore = create<GameState>((set, get) => {
     activeEvent: null,
     clock: null,
     counterArmed: null,
+    hazards: [],
+    lastPodHit: {},
     playerThreat: 0,
     windowCount: 0,
     firedCounts: zeroFiredCounts(),
@@ -1604,6 +1783,8 @@ export const useGameStore = create<GameState>((set, get) => {
         activeEvent: null,
         clock: null,
         counterArmed: null,
+        hazards: [],
+        lastPodHit: {},
         playerThreat: 0,
         windowCount: 0,
         firedCounts: zeroFiredCounts(),
@@ -2294,6 +2475,8 @@ export const useGameStore = create<GameState>((set, get) => {
         activeEvent: null,
         clock: null,
         counterArmed: null,
+        hazards: [],
+        lastPodHit: {},
         playerThreat: 0,
         windowCount: 0,
         firedCounts: zeroFiredCounts(),
@@ -2533,6 +2716,27 @@ export const useGameStore = create<GameState>((set, get) => {
             outcome.zone = zone;
             outcome.swept = victims.length;
             outcome.iids = victims;
+
+            // A wrath does not stop at the player's side of the table. Anything
+            // standing that this sweep reaches goes with the board, which is the
+            // one way a piece leaves without the player spending an answer.
+            const cleared = retireHazards(
+              (h) => sweepClearsHazard(sweep, h.card.permanent),
+              (hazard) => ({
+                kind: 'threat',
+                message: `${hazard.card.name} (Seat ${hazard.seatId}) swept by ${event.card?.name ?? 'the wipe'}`,
+                payload: {
+                  hazardId: hazard.id,
+                  eventId: hazard.eventId,
+                  seatId: hazard.seatId,
+                  cardName: hazard.card.name,
+                  canceled: true,
+                  reason: 'wiped',
+                  byEventId: event.id,
+                },
+              }),
+            );
+            if (cleared.length > 0) outcome.hazardsSwept = cleared.map((h) => h.id);
             break;
           }
 
@@ -2689,6 +2893,32 @@ export const useGameStore = create<GameState>((set, get) => {
             outcome.deadlineTurn = event.severity.deadlineTurn;
             break;
           }
+
+          case 'hate': {
+            // The piece resolving is what turns it from a question into a fact,
+            // which is why the engine never made one: had the player answered
+            // it, nothing would be standing. From here it is a tell printed
+            // under the seat until it is removed, swept, or its seat dies.
+            const card = event.card;
+            if (card) {
+              const hazard: StandingHazard = {
+                id: `hz-${event.id}`,
+                eventId: event.id,
+                seatId: event.seatId,
+                card,
+                spawnedTurn: state.turn,
+              };
+              set((s) => ({ hazards: [...s.hazards, hazard] }));
+              outcome.standing = true;
+              outcome.hazardId = hazard.id;
+              detail = ` (${card.name} stands)`;
+            } else {
+              // No citation, nothing to stand: an event with no card is not a
+              // piece the player could name, let alone play around.
+              outcome.standing = false;
+            }
+            break;
+          }
         }
 
         const resolved: PressureEvent = { ...event, state: 'resolved' };
@@ -2750,6 +2980,43 @@ export const useGameStore = create<GameState>((set, get) => {
         });
         advanceQueue();
       }
+    },
+
+    removeHazard(id, answer) {
+      // Removing a piece applies nothing to the player, so it cannot end a run
+      // on its own. It settles anyway, for the same reason answering an event
+      // does: every exit a question has sits on the same footing.
+      action(() => {
+        const state = get();
+        if (!state.run || !state.hazards.some((h) => h.id === id)) return;
+
+        retireHazards(
+          (h) => h.id === id,
+          (hazard) => {
+            // Bound to the event that put it there, not to the hazard: the
+            // ledger files answers under event ids, and the piece and the event
+            // the player let through are the same thing at two different ages.
+            const bound = bindAnswer(answer?.iid, hazard.eventId);
+            const withCard = bound.name ? ` with ${bound.name}` : '';
+            return {
+              kind: 'respond',
+              message: `Removed ${hazard.card.name} (Seat ${hazard.seatId})${withCard}`,
+              payload: {
+                reason: 'removed-hazard',
+                hazardId: hazard.id,
+                eventId: hazard.eventId,
+                seatId: hazard.seatId,
+                cardName: hazard.card.name,
+                spawnedTurn: hazard.spawnedTurn,
+                /** How long the player played around it. 0 means the turn it landed. */
+                turnsStanding: state.turn - hazard.spawnedTurn,
+                ...bound.fields,
+                note: answer?.note?.trim(),
+              },
+            };
+          },
+        );
+      });
     },
   };
 });

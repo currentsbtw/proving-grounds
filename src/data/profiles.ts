@@ -52,7 +52,7 @@ export interface SeatProfile {
    */
   colors: ManaColor[];
   /** Multiplies the per-window hazard probability for each event type. */
-  hazardMult: Record<'wipe' | 'removal' | 'combat' | 'resource' | 'clock', number>;
+  hazardMult: Record<'wipe' | 'removal' | 'combat' | 'resource' | 'clock' | 'hate', number>;
   /** Multiplies the chance this seat is the one holding up a counterspell. */
   counterArmMult: number;
   /** Multiplies the threat this seat gains per opponent window. */
@@ -109,7 +109,9 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     blurb: 'Hits face early, light on answers.',
     // Mardu: the beatdown colours, and every burn-shaped wrath it does run.
     colors: ['R', 'W', 'B'],
-    hazardMult: { wipe: 0.5, removal: 0.85, combat: 1.6, resource: 0.5, clock: 0.8 },
+    // Hate at 0.3: the beatdown seat would rather spend two mana on a body than
+    // on a piece that only slows the table down, itself included.
+    hazardMult: { wipe: 0.5, removal: 0.85, combat: 1.6, resource: 0.5, clock: 0.8, hate: 0.3 },
     counterArmMult: 0.2,
     threatGrowthMult: 1.1,
     silhouette: { creaturesMult: 1.0, powerMult: 1.5 },
@@ -126,7 +128,7 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     // control seat was still turning creatures sideways more than half as often
     // as the aggro seat at bracket 4, where both curves sit near their ceiling.
     // A seat that would rather hold up its mana attacks less than that.
-    hazardMult: { wipe: 2.0, removal: 1.6, combat: 0.4, resource: 0.8, clock: 0.8 },
+    hazardMult: { wipe: 2.0, removal: 1.6, combat: 0.4, resource: 0.8, clock: 0.8, hate: 0.9 },
     counterArmMult: 1.5,
     threatGrowthMult: 0.9,
     silhouette: { creaturesMult: 1.0, powerMult: 1.0 },
@@ -139,7 +141,7 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     // Sultai: the baseline seat. Its multipliers are the closest to flat of the
     // six, but they are not flat — that is what `neutral` is for.
     colors: ['B', 'G', 'U'],
-    hazardMult: { wipe: 1.15, removal: 1.05, combat: 1.05, resource: 1.0, clock: 0.9 },
+    hazardMult: { wipe: 1.15, removal: 1.05, combat: 1.05, resource: 1.0, clock: 0.9, hate: 0.7 },
     counterArmMult: 0.85,
     threatGrowthMult: 1.0,
     silhouette: { creaturesMult: 1.0, powerMult: 1.0 },
@@ -151,7 +153,7 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     blurb: 'Ignores the board, wins out of nowhere.',
     // Grixis: tutors, rituals and the two-card kill.
     colors: ['U', 'B', 'R'],
-    hazardMult: { wipe: 0.7, removal: 0.9, combat: 0.45, resource: 0.8, clock: 1.5 },
+    hazardMult: { wipe: 0.7, removal: 0.9, combat: 0.45, resource: 0.8, clock: 1.5, hate: 0.8 },
     counterArmMult: 1.15,
     threatGrowthMult: 1.0,
     silhouette: { creaturesMult: 1.0, powerMult: 1.0 },
@@ -163,7 +165,10 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     blurb: 'Taxes everything, wins slowly and on purpose.',
     // Esper again, pointed the other way: the pieces, not the wraths.
     colors: ['W', 'B', 'U'],
-    hazardMult: { wipe: 1.05, removal: 1.1, combat: 0.6, resource: 2.0, clock: 0.7 },
+    // Hate at 2.5, the largest multiplier in the table and deliberately so: the
+    // standing piece *is* the stax deck, the same way the tax is. A pod with the
+    // stax seat still in it plays a different game from one without.
+    hazardMult: { wipe: 1.05, removal: 1.1, combat: 0.6, resource: 2.0, clock: 0.7, hate: 2.5 },
     counterArmMult: 0.7,
     threatGrowthMult: 1.0,
     silhouette: { creaturesMult: 1.0, powerMult: 1.0 },
@@ -177,7 +182,7 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     blurb: 'Wide board, small bodies, one bad wrath away from nothing.',
     // Selesnya: the widest board at the table and the least behind it.
     colors: ['G', 'W'],
-    hazardMult: { wipe: 0.85, removal: 0.8, combat: 1.4, resource: 1.0, clock: 0.9 },
+    hazardMult: { wipe: 0.85, removal: 0.8, combat: 1.4, resource: 1.0, clock: 0.9, hate: 0.5 },
     counterArmMult: 0.3,
     threatGrowthMult: 1.0,
     silhouette: { creaturesMult: 1.6, powerMult: 0.8 },
@@ -199,7 +204,7 @@ export const PROFILES: Record<SeatProfileId, SeatProfile> = {
     label: 'Pod',
     blurb: 'No archetype read on this seat.',
     colors: [...ALL_COLORS],
-    hazardMult: { wipe: 1.0, removal: 1.0, combat: 1.0, resource: 1.0, clock: 1.0 },
+    hazardMult: { wipe: 1.0, removal: 1.0, combat: 1.0, resource: 1.0, clock: 1.0, hate: 1.0 },
     counterArmMult: 1.0,
     threatGrowthMult: 1.0,
     silhouette: { creaturesMult: 1.0, powerMult: 1.0 },

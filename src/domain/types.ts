@@ -122,7 +122,15 @@ export interface Seat {
   profile?: SeatProfileId;
 }
 
-export type EventType = 'wipe' | 'removal' | 'counter' | 'combat' | 'clock' | 'resource';
+export type EventType =
+  | 'wipe'
+  | 'removal'
+  | 'counter'
+  | 'combat'
+  | 'clock'
+  | 'resource'
+  /** A seat casts a persistent hate piece — Blood Moon, Thalia, Rest in Peace. */
+  | 'hate';
 
 /**
  * The real card a seat cast to produce an event, frozen onto the event itself.
@@ -188,6 +196,38 @@ export interface ClockState {
 export interface CounterArmed {
   seatId: SeatId;
   threshold: number;
+}
+
+/**
+ * A hate piece the player let resolve, still on a seat's side of the table.
+ *
+ * Nothing is enforced (PRODUCT.md, no rules engine): this is a standing tell the
+ * player honours by hand, printed under the seat until they remove it, a wipe
+ * sweeps it, or the seat dies. The engine only ever creates the `hate` event —
+ * the store makes one of these once the player has said it resolved, because up
+ * to that point the piece is still a question rather than a fact.
+ */
+export interface StandingHazard {
+  /** Deterministic: `hz-${eventId}`. */
+  id: string;
+  /** The `PressureEvent` the player let through. */
+  eventId: string;
+  seatId: SeatId;
+  card: EventCitation;
+  /** The player turn the piece landed on. */
+  spawnedTurn: number;
+}
+
+/**
+ * One seat swinging at another. Not an event: the player is not being asked
+ * anything, they are being told what the pod did to itself while they untapped.
+ * `damage` never reaches the defender's life total — the pod softens a seat up,
+ * the player is the one who kills it.
+ */
+export interface PodHit {
+  attackerId: SeatId;
+  defenderId: SeatId;
+  damage: number;
 }
 
 export type StackItemKind = 'spell' | 'ability' | 'counter';

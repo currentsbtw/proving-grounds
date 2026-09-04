@@ -108,6 +108,10 @@ export default function LiveHud() {
   const clock = useGameStore((s) => s.clock);
   const activeEvent = useGameStore((s) => s.activeEvent);
   const pendingEvents = useGameStore((s) => s.pendingEvents);
+  // The pieces still on the table. They are the one tell that outlives the
+  // window that produced it, so they hang under their seat until something takes
+  // them off — a removal, a wipe, or the seat dying (the store retires those).
+  const hazards = useGameStore((s) => s.hazards);
   // The sentence and the ARMED chip on the frame are one tell in two places, so
   // a seat that has been knocked out drops both rather than only the chip.
   const armed = useGameStore((s) =>
@@ -241,6 +245,21 @@ export default function LiveHud() {
                     </button>
                   </p>
                 )}
+
+                {/* One line per piece this seat has standing, for as long as it
+                    stands. Quiet, because it is a rule the player is living
+                    under rather than news — and glossed, because the tells name
+                    keywords ("nonbasic lands", "enters the battlefield") that
+                    are the whole of what has to be honoured. */}
+                {!seat.eliminated &&
+                  hazards
+                    .filter((hazard) => hazard.seatId === seat.id)
+                    .map((hazard) => (
+                      <p key={hazard.id} className="hud-tell pg-pane is-quiet">
+                        <strong>{hazard.card.name}</strong>:{' '}
+                        <Glossed text={hazard.card.tell ?? hazard.card.effect} />
+                      </p>
+                    ))}
 
                 {/* Everything still waiting behind the active event, each under
                     the seat that will throw it. */}

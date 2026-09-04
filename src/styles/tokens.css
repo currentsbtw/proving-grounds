@@ -26,6 +26,10 @@
   --mana-b: #bba9c9;
   --mana-r: #e58a76;
   --mana-g: #8fc49e;
+  /* Colourless, for the classes that wear no colour at all. Held a clear step
+     brighter than --muted: a hate piece is a live state, and a chip in the muted
+     grey would read as a caption rather than as something standing. */
+  --mana-c: #ccd0d8;
 
   /* Depth. Translucent black is not theme-neutral: a near-opaque near-black
      scrim over a paper ground is a dark design with a light patch in it, so
@@ -90,4 +94,7 @@
   --mana-b: #57406d;
   --mana-r: #9d3b1f;
   --mana-g: #2f6b45;
+  /* The same colourless, on paper: a cool slate, darker and cooler than the warm
+     grey --muted so the two never read as one ink. */
+  --mana-c: #454c56;
 }

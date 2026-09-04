@@ -14,7 +14,7 @@
  * distinguishable.
  */
 export const REVIEW = {
-  version: 1,
+  version: 2,
 
   /** Hard cap on findings shown. A debrief nobody reads changes no decklist. */
   maxFindings: 8,
@@ -60,6 +60,19 @@ export const REVIEW = {
      * so the comparison is against the printed mana value alone.
      */
     lateByTurns: 2,
+  },
+
+  hazard: {
+    /**
+     * Turns a hate piece stood before the run is worth telling about it. Three
+     * is a full cycle of the table plus one: a piece nobody has answered by then
+     * was not going to be answered by accident. Nothing here says the piece
+     * *could* have been removed — the log knows what was in hand, never what it
+     * could legally have done — so the finding stops at how long it stood.
+     */
+    minTurnsStanding: 3,
+    /** Removed within this many turns of landing earns the good. */
+    quickRemovalTurns: 1,
   },
 
   overextend: {

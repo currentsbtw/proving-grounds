@@ -29,17 +29,20 @@ import {
   SHARE_IMAGE_HEIGHT,
   SHARE_IMAGE_WIDTH,
 } from '../src/features/scorecard/shareImage.ts';
+import { EVENT_MARK, EVENT_MARK_KEY } from '../src/features/scorecard/eventMarks.ts';
 import { verdictOf } from '../src/features/scorecard/verdict.ts';
-import type { CardData, Deck, RunRecord } from '../src/domain/types.ts';
+import type { CardData, Deck, EventType, RunRecord } from '../src/domain/types.ts';
 
 /**
  * The same default `scripts/verify-scorecard.ts` runs on. The two harnesses
  * script their own games and share nothing but this string; keeping it in step
  * means a seed judged good enough for the scorer is the one the receipt is drawn
- * from too. On the current pressure tuning it puts two wipes and a terminal
- * verdict on the card, which is the shape the colour and layout checks want.
+ * from too. On the current pressure tuning it puts two wipes, a hate piece and a
+ * terminal verdict on the card, which is the shape the colour and layout checks
+ * want — the hate piece in particular, because colourless grey is the one
+ * marker colour that is not a mana colour.
  */
-const SEED = process.argv[2] ?? 'scorecard-verify-12';
+const SEED = process.argv[2] ?? 'scorecard-verify-v7-2';
 const TURNS = 10;
 const BRACKET = 4;
 const DECK_NAME = 'Scorecard Verification';
@@ -480,15 +483,17 @@ function emptyScorecard(): Scorecard {
         combat: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
         clock: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
         resource: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
+        hate: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
       },
       total: { offered: 0, responded: 0, resolved: 0, unresolved: 0, named: 0, nameable: 0 },
       rate: null,
       namedRate: null,
     },
+    hazards: { faced: 0, stood: 0, removed: 0, swept: 0, turnsStanding: [] },
     seats: [
-      { seatId: 'A', damageDealt: 0, commanderDamageDealt: 0, eliminatedTurn: null, eliminationReason: null },
-      { seatId: 'B', damageDealt: 0, commanderDamageDealt: 0, eliminatedTurn: null, eliminationReason: null },
-      { seatId: 'C', damageDealt: 0, commanderDamageDealt: 0, eliminatedTurn: null, eliminationReason: null },
+      { seatId: 'A', damageDealt: 0, commanderDamageDealt: 0, podDamageTaken: 0, eliminatedTurn: null, eliminationReason: null },
+      { seatId: 'B', damageDealt: 0, commanderDamageDealt: 0, podDamageTaken: 0, eliminatedTurn: null, eliminationReason: null },
+      { seatId: 'C', damageDealt: 0, commanderDamageDealt: 0, podDamageTaken: 0, eliminatedTurn: null, eliminationReason: null },
     ],
     clock: { faced: false, spawnedTurn: null, deadlineTurn: null, outcome: null, beatClock: false },
     keep: { mulligans: 0, keptHandSize: 0, landsInKeptHand: 0, landsInOpeningSeven: 0 },
@@ -551,6 +556,9 @@ async function main(): Promise<void> {
       namedAnswerRate: 0.5,
       clocksFaced: 2,
       clocksBeaten: 1,
+      hateFaced: 3,
+      hateStood: 2,
+      hateRemovedRate: 0.5,
       mulliganRate: 0.25,
       avgLandsInKeep: 3,
       tags: ['fast', 'interactive', 'brittle to wraths'],
@@ -675,7 +683,35 @@ async function main(): Promise<void> {
   );
   // Events are marked with the class letter, not a coloured dot: the receipt
   // goes to Discord, where hue is not a channel every reader has.
-  const MARKS = new Set(['W', 'R', 'S', 'C', 'A', 'K']);
+  // The marks and the key are read off `eventMarks.ts` rather than listed here:
+  // a class added there has to appear on the receipt without this harness being
+  // edited, which is the whole point of checking the key at all.
+  // ...but the letters themselves are pinned here by hand, because a check
+  // that reads its expectation off the constant it is testing can never see
+  // that constant go wrong: a transposed pair would draw wrong and pass.
+  const EXPECTED_MARKS: Record<EventType, string> = {
+    wipe: 'W',
+    removal: 'R',
+    resource: 'S',
+    hate: 'H',
+    counter: 'C',
+    combat: 'A',
+    clock: 'K',
+  };
+  const EXPECTED_KEY = ['wrath', 'removal', 'resource', 'hate piece', 'counter', 'attack', 'clock'];
+  const markTypes = Object.keys(EXPECTED_MARKS) as EventType[];
+  check(
+    'the class letters are the ones the product pins',
+    markTypes.length === Object.keys(EVENT_MARK).length &&
+      markTypes.every((type) => EVENT_MARK[type] === EXPECTED_MARKS[type]),
+    markTypes.map((type) => `${type}=${EVENT_MARK[type]}`).join(' '),
+  );
+  check(
+    'the key reads in the pinned order with the pinned words',
+    JSON.stringify(EVENT_MARK_KEY.map((entry) => entry.word)) === JSON.stringify(EXPECTED_KEY),
+    EVENT_MARK_KEY.map((entry) => entry.word).join(', '),
+  );
+  const MARKS = new Set(Object.values(EVENT_MARK));
   const eventMarks = recording.texts.filter(
     (t) => MARKS.has(t.text) && t.y > 285 && t.y < 330 && t.align === 'center',
   );
@@ -684,10 +720,43 @@ async function main(): Promise<void> {
     scorecard.events.length === 0 || eventMarks.length > 0,
     `${eventMarks.length} marks for ${scorecard.events.length} events`,
   );
+  // A hate piece is the one class whose colour is not a mana colour, so the
+  // seed is chosen to put one on the card: it is the only way the colourless
+  // branch of `eventColor` is ever drawn.
+  const hateRows = scorecard.events.filter((e) => e.type === 'hate');
   check(
-    'the marker key names every class',
-    ['wrath', 'removal', 'resource', 'counter', 'attack', 'clock'].every((w) => drawn.includes(w)),
-    drawn.filter((t) => ['wrath', 'removal', 'clock'].includes(t)).join(', ') || '(no key drawn)',
+    'the seed puts a hate piece on the card',
+    hateRows.length > 0,
+    'no hate event this run — pick another seed',
+  );
+  const hateMarks = eventMarks.filter((t) => t.text === EVENT_MARK.hate);
+  check(
+    'a hate piece is marked in colourless grey, not a mana colour',
+    hateRows.length === 0 || hateMarks.some((t) => t.color === '#b8b5ae'),
+    hateMarks.map((t) => t.color).join(', ') || '(no hate mark drawn)',
+  );
+
+  const keyWords = EVENT_MARK_KEY.map((entry) => entry.word);
+  check(
+    `the marker key names every class (${EVENT_MARK_KEY.length})`,
+    keyWords.every((w) => drawn.includes(w)),
+    keyWords.filter((w) => !drawn.includes(w)).join(', ') || '(no key drawn)',
+  );
+  // Every entry on one row, and the row inside the content width. The key grows
+  // by a class every time the pod learns a new trick, so the thing worth
+  // asserting is that the last word still ends before the card's right edge.
+  const KEY_Y = 522;
+  const keyRuns = recording.texts.filter((t) => t.y === KEY_Y);
+  check(
+    'every key entry is drawn on the key row',
+    keyRuns.length === EVENT_MARK_KEY.length * 2,
+    `${keyRuns.length} runs for ${EVENT_MARK_KEY.length} entries`,
+  );
+  const keyRight = keyRuns.length === 0 ? 0 : Math.max(...keyRuns.map((t) => extentOf(t).right));
+  check(
+    'the whole marker key fits on one row inside the content width',
+    keyRight <= 1144,
+    `key ends at ${keyRight.toFixed(0)}px, edge 1144`,
   );
   check(
     'the turn axis is labelled',
@@ -787,7 +856,8 @@ async function main(): Promise<void> {
     `image               ${SHARE_IMAGE_WIDTH}×${SHARE_IMAGE_HEIGHT} logical, ${DEVICE_SCALE}× backing`,
     `canvas calls        ${recording.calls.length}`,
     `text runs           ${recording.texts.length}`,
-    `bars                ${bars.length}, event marks ${eventMarks.length}`,
+    `bars                ${bars.length}, event marks ${eventMarks.length} (${hateMarks.length} hate)`,
+    `marker key          ${EVENT_MARK_KEY.length} entries, ends at ${keyRight.toFixed(0)}px (edge 1144)`,
     `verdict             "${verdictRun?.text ?? '(none drawn)'}" at y ${verdictRun?.y ?? '-'} in ${verdictRun?.color ?? '-'}`,
     `events / wipes      ${scorecard.events.length} / ${scorecard.wipes.length}`,
     `widest text run     ${Math.max(...recording.texts.map((t) => extentOf(t).right)).toFixed(0)}px (edge 1144)`,

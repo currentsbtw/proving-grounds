@@ -336,6 +336,86 @@
   margin-left: auto;
 }
 
+/* ── Standing pieces in the detail ──────────────────────────────────────── */
+
+/* The pieces this seat has left on the table, listed rather than counted. The
+   pane is measured, so it is free to grow: a seat holding something is worth a
+   taller pane, and nothing under it moves except the event pane, which is
+   already pushed clear by its own rule. */
+.hud-hazards {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hud-hazard {
+  /* The picker hangs off this row, so the row is what it is measured against —
+     and wears the piece's own colourless rather than the readout's one accent,
+     which the seat to hit is still spending. */
+  --pgp-accent: var(--mana-c);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 7px;
+  border-left: 2px solid var(--mana-c);
+}
+
+.hud-hazard-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The card's own name, in ink: it is the fact, the tell under it is the price. */
+.hud-hazard-name {
+  min-width: 0;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+
+/* What the player keeps honouring while it stands. Printed whole — a tell with
+   its tail cut off is a rule nobody can follow. */
+.hud-hazard-tell {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.hud-hazard-remove {
+  margin-left: auto;
+  min-height: 24px;
+  padding: 0 7px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hud-hazard-remove:hover {
+  color: var(--ink);
+  border-color: var(--rule);
+}
+
+/* In the dock the picker hangs over the battlefield, out of flow. In here it is
+   part of the pane: the pane is what the ResizeObserver measures and what the
+   pointer has to stay inside, so a picker floating out of it would be a picker
+   the pin no longer holds open. */
+.hud-detail .pgp-picker {
+  position: static;
+  margin-top: 6px;
+  box-shadow: none;
+}
+
 /* ── Tells and the queue ────────────────────────────────────────────────── */
 
 .hud-tell-slot {
@@ -546,6 +626,14 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Colourless, because that is what most hate pieces print as — and the word HATE
+   is what actually carries it, so the chip survives greyscale like every other
+   state on the row. It is not the accent: the seat to hit still owns that. */
+.rd-chip.is-hate {
+  border-color: var(--mana-c);
+  color: var(--mana-c);
 }
 
 /* The accent is spent on one chip only: the seat to hit is the answer to "who

@@ -10,7 +10,7 @@
  *
  *   npm run verify:engine
  *
- * Seventeen checks, each labelled:
+ * Twenty checks, each labelled:
  *
  *   (a) a seat with a queued event is eliminated — the event leaves the queue,
  *       the log says it was canceled, and the scorecard never lists it
@@ -70,8 +70,22 @@
  *       control seat arms more often than an unmodified one and an aggro seat
  *       less, nothing exceeds `profileCeiling`, and the unmodified seat lands
  *       exactly where the pre-clamp formula put it
+ *   (r) a hate piece is a standing tell, not an event that finished: letting one
+ *       resolve stands it on the seat that cast it and the next window knows it
+ *       is there, a card takes it off the table with the turns it stood counted
+ *       on the entry, a wrath wide enough sweeps it (and a creatures-only one
+ *       leaves the artifacts and enchantments alone), and the seat's death takes
+ *       its piece with it
+ *   (s) the seats hit each other: the hit is logged as pod combat, the defender
+ *       loses exactly what the entry claims, the readout can say who hit it, and
+ *       none of it reaches the tally the player is scored on — and the pod never
+ *       finishes a seat, even with the whole table sitting on 2 life
+ *   (t) a hate event the player has not answered yet holds its seat's slot just
+ *       as a resolved piece does: the seat is dealt no second piece while the
+ *       first waits, the windows that open meanwhile say they counted it, and a
+ *       seat that owes nothing can still be dealt one
  *
- * (a) to (c), (h), (i), (k), (l) and (o) need a run where the pod actually did the thing
+ * (a) to (c), (h), (i), (k), (l), (o) and (r) to (t) need a run where the pod actually did the thing
  * being tested, so each one searches seeds until it finds one and prints which
  * it used. Failures are collected rather than thrown, so one execution reports
  * everything.
@@ -124,6 +138,7 @@ import type {
   SeatId,
   Silhouette,
   StackItem,
+  StandingHazard,
 } from '../src/domain/types.ts';
 
 const BRACKET = 4;
@@ -1635,6 +1650,9 @@ function checkEveryEventCitesACard(): void {
           permanents: sweepPermanents(turn),
           clock,
           counterArmed: null,
+          // Nothing ever stands in this sweep: resolving a hate event is the
+          // store's job, and the store is not in this loop.
+          hazards: [],
           firedCounts,
           lastFiredWindow,
         });
@@ -1679,7 +1697,7 @@ function checkEveryEventCitesACard(): void {
   );
   check(
     '(m) the sweep exercised every hazard',
-    ['wipe', 'removal', 'combat', 'resource', 'clock'].every((t) => seen.has(t)),
+    ['wipe', 'removal', 'combat', 'resource', 'clock', 'hate'].every((t) => seen.has(t)),
     [...seen].join(', '),
   );
   summary.push(
@@ -1873,8 +1891,14 @@ function findTuckEvent(seed: string, castCommander = false): PressureEvent | nul
       if (event.type === 'removal' && event.card?.zone === 'library') {
         // With the commander on the table it is the only thing the pod points
         // at, so `castCommander` is also what decides which target this finds.
-        const onCommander = store().cards[event.targetIid ?? '']?.isCommander === true;
-        if (onCommander === castCommander) return event;
+        //
+        // The target has to still be on the battlefield: a queued warp can
+        // outlive what it was pointed at — a wrath in front of it in the same
+        // window bins the card first — and one resolving on nothing tucks
+        // nothing, which is not the scenario either caller is asking about.
+        const target = store().cards[event.targetIid ?? ''];
+        const onCommander = target?.isCommander === true;
+        if (target?.zone === 'battlefield' && onCommander === castCommander) return event;
       }
       if (event.type === 'combat') store().respondToActiveEvent({ note: 'blocked it' });
       else store().resolveActiveEvent();
@@ -1883,6 +1907,13 @@ function findTuckEvent(seed: string, castCommander = false): PressureEvent | nul
     store().nextTurn();
     playLand();
     if (castCommander) {
+      // A commander a wrath binned goes home and comes back down, the way a
+      // player would — without that, one wipe ends the scenario and the search
+      // spends its seeds on runs whose warp has nothing left to tuck.
+      const binned = Object.values(store().cards).find(
+        (c) => c.isCommander && (c.zone === 'graveyard' || c.zone === 'exile'),
+      );
+      if (binned) store().moveCard(binned.iid, 'command');
       const commander = cardsInZone(store(), 'command')[0];
       if (commander) store().moveCard(commander.iid, 'battlefield');
     }
@@ -2060,6 +2091,7 @@ function checkExcludesAreHonoured(): void {
           permanents: artifactCreatureBoard(),
           clock: null,
           counterArmed: null,
+          hazards: [],
           firedCounts,
           lastFiredWindow,
         });
@@ -3000,6 +3032,665 @@ function checkCounterArmClamp(): void {
   );
 }
 
+// ---------------------------------------------------------------------------
+// (r) a hate piece stands, and leaves the way it is supposed to
+// ---------------------------------------------------------------------------
+
+/** What a hate-piece search hands back: the piece, and the event that made it. */
+interface StoodPiece {
+  seed: string;
+  hazard: StandingHazard;
+  event: PressureEvent;
+}
+
+/** Answer everything on offer this turn without taking damage or losing the race. */
+function drainTurnWithoutDamage(onResolved?: (event: PressureEvent) => void): void {
+  if (store().clock) store().declareInteraction();
+  for (let guard = 0; guard < 60; guard++) {
+    const event = store().activeEvent;
+    if (!event || !store().run) return;
+    if (event.type === 'combat') {
+      store().respondToActiveEvent({ note: 'blocked it' });
+      continue;
+    }
+    store().resolveActiveEvent();
+    onResolved?.(event);
+  }
+  throw new Error('the event queue never emptied');
+}
+
+/** An instant sitting in hand, which is what a piece gets answered with. */
+function instantInHand(): CardInstance | undefined {
+  return cardsInZone(store(), 'hand').find((c) => isInstantOrSorceryCard(store(), c));
+}
+
+/**
+ * Play until a hate piece is standing.
+ *
+ * The probe resolves the event itself, because the piece only exists once the
+ * player has let it through — up to that point it is a question, and answering
+ * it leaves nothing behind. `holdOneTurn` plays one further turn and rejects the
+ * seed unless the piece survived it, which is what gives `turnsStanding`
+ * something to count; `needsInstant` holds out for a seed that also dealt the
+ * player something to answer it with.
+ */
+function standAHatePiece(
+  label: string,
+  opts: { stackDeck?: boolean; holdOneTurn?: boolean; needsInstant?: boolean } = {},
+): StoodPiece | null {
+  const usable = (piece: StoodPiece): StoodPiece | null => {
+    if (!store().hazards.some((h) => h.id === piece.hazard.id)) return null;
+    if (opts.needsInstant && !instantInHand()) return null;
+    return piece;
+  };
+
+  return search(label, (seed) => {
+    if (opts.stackDeck) freshStackRun(seed);
+    else freshRun(seed);
+
+    // Boxed: the drain assigns from inside a closure, which the compiler's flow
+    // analysis cannot see through — the same reason `lastCapturedRun` exists.
+    const box: { stood: StoodPiece | null } = { stood: null };
+    for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+      store().nextTurn();
+      if (!store().run) return null;
+
+      drainTurnWithoutDamage((event) => {
+        if (event.type !== 'hate' || box.stood) return;
+        const hazard = store().hazards.find((h) => h.eventId === event.id);
+        if (hazard) box.stood = { seed, hazard, event };
+      });
+      if (!store().run) return null;
+
+      const stood = box.stood;
+      if (stood && !opts.holdOneTurn) return usable(stood);
+      // The piece has to survive a turn before it has stood for one.
+      if (stood && store().turn > stood.hazard.spawnedTurn) return usable(stood);
+    }
+    return null;
+  });
+}
+
+/**
+ * The whole life of a standing piece, on one run: it lands, the player lets it
+ * resolve, the window that follows knows it is there, and a card takes it off
+ * the table with the turns it stood counted on the entry.
+ */
+function checkHatePieceStandsAndIsRemoved(): void {
+  const found = standAHatePiece('engine-hate', {
+    stackDeck: true,
+    holdOneTurn: true,
+    needsInstant: true,
+  });
+  if (!found) {
+    failures.push('(r) no seed stood a hate piece with an answer in hand');
+    return;
+  }
+  const { hazard, event } = found;
+
+  check('(r) the piece is standing', store().hazards.some((h) => h.id === hazard.id));
+  check('(r) its id comes off the event', hazard.id === `hz-${event.id}`, hazard.id);
+  check('(r) it stands on the seat that cast it', hazard.seatId === event.seatId);
+  check(
+    '(r) it carries the card the seat cast',
+    hazard.card.name === event.card?.name,
+    `${hazard.card.name} vs ${event.card?.name}`,
+  );
+  check(
+    '(r) the card says what kind of permanent it is',
+    hazard.card.permanent !== undefined,
+    hazard.card.name,
+  );
+  check(
+    '(r) and what the player now has to play around',
+    typeof hazard.card.tell === 'string' && hazard.card.tell.length > 0,
+    `${hazard.card.tell}`,
+  );
+
+  const log = () => store().run?.log ?? [];
+  const stoodEntry = log().find(
+    (entry) => entry.kind === 'event' && entry.payload.eventId === event.id && entry.payload.resolved === true,
+  );
+  const outcome = (stoodEntry?.payload.outcome ?? {}) as Record<string, unknown>;
+  check(
+    '(r) the resolution says the piece stood',
+    outcome.standing === true && outcome.hazardId === hazard.id,
+    JSON.stringify(outcome),
+  );
+  check(
+    '(r) and the message names it',
+    stoodEntry?.message.includes(`(${hazard.card.name} stands)`) === true,
+    stoodEntry?.message ?? '(no entry)',
+  );
+
+  // The engine reads the standing list back, so the window entry has to carry it.
+  const lastWindow = log().filter((entry) => entry.kind === 'window').pop();
+  const listed = (lastWindow?.payload.hazards ?? []) as string[];
+  check(
+    '(r) the next window entry lists what was standing',
+    listed.includes(hazard.id),
+    listed.join(', ') || '(none)',
+  );
+
+  // --- and a card takes it off the table -----------------------------------
+  const answer = instantInHand();
+  if (!answer) {
+    failures.push('(r) the search returned a run with no instant in hand');
+    return;
+  }
+  const answerName = cardName(store(), answer.iid);
+  const expectedTurns = store().turn - hazard.spawnedTurn;
+  store().removeHazard(hazard.id, { iid: answer.iid, note: 'blew it up' });
+
+  check('(r) the piece is off the table', !store().hazards.some((h) => h.id === hazard.id));
+  const removed = lastRespondEntry();
+  const payload = removed?.payload ?? {};
+  check(
+    '(r) the removal names the piece and the card',
+    removed?.message === `Removed ${hazard.card.name} (Seat ${hazard.seatId}) with ${answerName}`,
+    removed?.message ?? '(no entry)',
+  );
+  check('(r) it is filed as a removed hazard', payload.reason === 'removed-hazard', `${payload.reason}`);
+  check(
+    '(r) it points back at the piece and its event',
+    payload.hazardId === hazard.id && payload.eventId === hazard.eventId,
+    `${payload.hazardId} / ${payload.eventId}`,
+  );
+  check(
+    '(r) it counts the turns the player played around it',
+    payload.turnsStanding === expectedTurns && expectedTurns >= 1,
+    `${payload.turnsStanding} (expected ${expectedTurns})`,
+  );
+  check(
+    '(r) the answer is bound to the card that made it',
+    payload.bound === true && payload.answerName === answerName && payload.answerTo === 'graveyard',
+    `${payload.answerName} → ${payload.answerTo}`,
+  );
+  check(
+    '(r) and the card was spent',
+    store().cards[answer.iid].zone === 'graveyard',
+    store().cards[answer.iid].zone,
+  );
+
+  summary.push(
+    `(r) seed ${found.seed}: ${hazard.card.name} stood on seat ${hazard.seatId} from T${hazard.spawnedTurn}, ` +
+      `removed with ${answerName} after ${expectedTurns} turn(s)`,
+  );
+}
+
+/**
+ * A wrath does not stop at the player's side of the table. Whether it reaches a
+ * standing piece is the card's own scope: a creatures-only sweep takes Thalia
+ * and leaves Blood Moon, a wider one takes both.
+ */
+function checkWipeSweepsStandingPieces(): void {
+  const found = search('engine-hate-wipe', (seed) => {
+    freshRun(seed);
+    for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+      store().nextTurn();
+      if (!store().run) return null;
+      if (store().clock) store().declareInteraction();
+
+      for (let guard = 0; guard < 60; guard++) {
+        const event = store().activeEvent;
+        if (!event || !store().run) break;
+        if (event.type === 'combat') {
+          store().respondToActiveEvent({ note: 'blocked it' });
+          continue;
+        }
+        const sweep = event.type === 'wipe' ? event.card?.sweep : undefined;
+        if (sweep) {
+          const reaches = (h: StandingHazard): boolean =>
+            sweep !== 'creatures' || h.card.permanent === 'creature';
+          const swept = store().hazards.filter(reaches);
+          const kept = store().hazards.filter((h) => !reaches(h));
+          if (swept.length > 0) {
+            store().resolveActiveEvent();
+            return { seed, swept, kept, wipe: event };
+          }
+        }
+        store().resolveActiveEvent();
+      }
+    }
+    return null;
+  });
+
+  if (!found) {
+    failures.push('(r) no seed wrathed a table with a piece standing on it');
+    return;
+  }
+
+  const standing = store().hazards.map((h) => h.id);
+  check(
+    '(r) the sweep took every piece it reaches',
+    found.swept.every((h) => !standing.includes(h.id)),
+    standing.join(', '),
+  );
+  check(
+    '(r) and left the ones it does not',
+    found.kept.every((h) => standing.includes(h.id)),
+    `kept ${found.kept.map((h) => h.card.name).join(', ')}`,
+  );
+
+  const log = store().run?.log ?? [];
+  for (const hazard of found.swept) {
+    const entry = log.find(
+      (e) => e.kind === 'threat' && e.payload.hazardId === hazard.id && e.payload.reason === 'wiped',
+    );
+    check(
+      `(r) ${hazard.card.name} was logged as swept`,
+      entry !== undefined && entry.payload.byEventId === found.wipe.id && entry.payload.canceled === true,
+      `${entry?.message ?? '(no entry)'}`,
+    );
+    check(
+      `(r) and the entry says what swept it`,
+      entry?.message ===
+        `${hazard.card.name} (Seat ${hazard.seatId}) swept by ${found.wipe.card?.name}`,
+      entry?.message ?? '(no entry)',
+    );
+  }
+
+  const wipeEntry = log.find(
+    (e) => e.kind === 'event' && e.payload.eventId === found.wipe.id && e.payload.resolved === true,
+  );
+  const outcome = (wipeEntry?.payload.outcome ?? {}) as Record<string, unknown>;
+  check(
+    "(r) the wipe's own entry lists what it swept",
+    JSON.stringify(outcome.hazardsSwept) === JSON.stringify(found.swept.map((h) => h.id)),
+    JSON.stringify(outcome.hazardsSwept),
+  );
+
+  summary.push(
+    `(r) seed ${found.seed}: ${found.wipe.card?.name} (${found.wipe.card?.sweep}) swept ` +
+      `${found.swept.map((h) => h.card.name).join(', ')}, ${found.kept.length} left standing`,
+  );
+}
+
+/** A piece is one seat's card. The seat dies, the piece goes with it. */
+function checkSeatDeathRetiresItsPieces(): void {
+  const found = standAHatePiece('engine-hate-death');
+  if (!found) {
+    failures.push('(r) no seed stood a hate piece to kill a seat under');
+    return;
+  }
+  const { hazard } = found;
+  const seat = store().seats.find((s) => s.id === hazard.seatId);
+  if (!seat) {
+    failures.push('(r) the piece stood on a seat that is not at the table');
+    return;
+  }
+
+  store().adjustLife(hazard.seatId, -seat.life);
+  check('(r) the seat is out', store().seats.find((s) => s.id === hazard.seatId)?.eliminated === true);
+  check('(r) its piece left with it', !store().hazards.some((h) => h.id === hazard.id));
+
+  const entry = (store().run?.log ?? []).find(
+    (e) => e.kind === 'threat' && e.payload.hazardId === hazard.id,
+  );
+  check(
+    '(r) the piece was retired, not left standing on a corpse',
+    entry?.payload.reason === 'seat-eliminated' && entry.payload.canceled === true,
+    `${entry?.payload.reason}`,
+  );
+  check(
+    '(r) the retirement names the card and the seat',
+    entry?.payload.cardName === hazard.card.name && entry.payload.seatId === hazard.seatId,
+    entry?.message ?? '(no entry)',
+  );
+
+  summary.push(
+    `(r) seed ${found.seed}: seat ${hazard.seatId} died holding ${hazard.card.name}; the piece left with it`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (s) the seats hit each other, and it is not the player's damage
+// ---------------------------------------------------------------------------
+
+/** Every seat-on-seat hit this run has logged, in order. */
+function podEntriesSoFar(): LogEntry[] {
+  return (store().run?.log ?? []).filter(
+    (entry) => entry.kind === 'damage' && entry.payload.podCombat === true,
+  );
+}
+
+/**
+ * A pod hit is damage the player did not deal, applied to a seat's life the
+ * engine does not own. So: the entry has to say who hit whom, the life on the
+ * seat has to move by exactly what the entry claims, and none of it may reach
+ * the tally the player is scored on.
+ */
+function checkPodCombatHits(): void {
+  const found = search('engine-pod', (seed) => {
+    freshRun(seed);
+    for (let turn = 1; turn <= SEARCH_TURNS; turn++) {
+      const lifeBefore: Partial<Record<SeatId, number>> = {};
+      for (const seat of store().seats) lifeBefore[seat.id] = seat.life;
+      const tallyBefore = { ...store().damageDealtByTurn };
+      const seen = podEntriesSoFar().length;
+
+      store().nextTurn();
+      if (!store().run) return null;
+      const entries = podEntriesSoFar();
+      if (entries.length > seen) return { seed, entry: entries[seen], lifeBefore, tallyBefore };
+
+      drainTurnWithoutDamage();
+      if (!store().run) return null;
+    }
+    return null;
+  });
+
+  if (!found) {
+    failures.push('(s) no seed had the seats swing at each other');
+    return;
+  }
+
+  const payload = found.entry.payload;
+  const defender = payload.seatId as SeatId;
+  const attacker = payload.attackerId as SeatId;
+  const amount = payload.amount as number;
+  const before = payload.before as number;
+  const after = payload.after as number;
+
+  check('(s) the hit is a damage entry', found.entry.kind === 'damage', found.entry.kind);
+  check('(s) it is flagged as pod combat', payload.podCombat === true);
+  check('(s) the attacker is not the defender', attacker !== defender, `${attacker} → ${defender}`);
+  check(
+    '(s) the message reads as one seat hitting another',
+    found.entry.message === `Seat ${attacker} attacks Seat ${defender} for ${amount}`,
+    found.entry.message,
+  );
+  check(
+    '(s) the life it reports is the life the seat had',
+    before === found.lifeBefore[defender],
+    `${before} vs ${found.lifeBefore[defender]}`,
+  );
+  check('(s) the seat lost exactly what was dealt', before - after === amount, `${before}→${after} for ${amount}`);
+  const seat = store().seats.find((s) => s.id === defender);
+  check('(s) and the table agrees', seat?.life === after, `${seat?.life} vs ${after}`);
+  check(
+    '(s) the pod softens a seat up, it never finishes one',
+    after >= 1 && amount <= before - 1 && seat?.eliminated === false,
+    `${before}→${after} for ${amount}`,
+  );
+  const log = store().run?.log ?? [];
+  const windowEntry = log.filter((e) => e.kind === 'window' && e.seq < found.entry.seq).pop();
+  // The window before turn N is where the hit happened, so that is the turn the
+  // readout prints — the same turn the events out of that window carry, and one
+  // ahead of the turn the entry was written on.
+  check(
+    '(s) the readout can say who hit it, for how much, when',
+    JSON.stringify(store().lastPodHit[defender]) ===
+      JSON.stringify({
+        attackerId: attacker,
+        damage: amount,
+        turn: windowEntry?.payload.windowBeforeTurn,
+      }),
+    JSON.stringify(store().lastPodHit[defender]),
+  );
+
+  const hits = (windowEntry?.payload.podHits ?? []) as {
+    attackerId: SeatId;
+    defenderId: SeatId;
+    damage: number;
+  }[];
+  check(
+    '(s) the window entry carries the hit too',
+    hits.some((h) => h.attackerId === attacker && h.defenderId === defender && h.damage === amount),
+    JSON.stringify(hits),
+  );
+  check(
+    '(s) the window entry lists what was standing',
+    Array.isArray(windowEntry?.payload.hazards),
+    JSON.stringify(windowEntry?.payload.hazards),
+  );
+
+  // The whole point of the flag: the player is not credited with damage the pod
+  // dealt itself. The second half proves the tally still works — it is the same
+  // seat, the same store, one point later.
+  check(
+    "(s) the hit stays out of the player's damage tally",
+    JSON.stringify(store().damageDealtByTurn) === JSON.stringify(found.tallyBefore),
+    `${JSON.stringify(store().damageDealtByTurn)} vs ${JSON.stringify(found.tallyBefore)}`,
+  );
+  const victim = store().seats.find((s) => !s.eliminated && s.life > 5);
+  if (victim) {
+    const tallyTurn = store().turn;
+    const dealtBefore = store().damageDealtByTurn[tallyTurn] ?? 0;
+    store().adjustLife(victim.id, -1);
+    check(
+      "(s) but the player's own point of damage does tally",
+      (store().damageDealtByTurn[tallyTurn] ?? 0) === dealtBefore + 1,
+      `${store().damageDealtByTurn[tallyTurn]} vs ${dealtBefore}`,
+    );
+  }
+
+  summary.push(
+    `(s) seed ${found.seed}: seat ${attacker} hit seat ${defender} for ${amount} (life ${before}→${after}) ` +
+      `on T${found.entry.turn}, none of it the player's`,
+  );
+}
+
+/**
+ * The cap that keeps the pod from playing the game for the player: a hit is
+ * capped at `life - 1` and a seat on 1 life is not swung at. Putting every seat
+ * one point above dead is the only way to press on it hard — a table like that
+ * would be a pod that eliminates itself, and the run must end with all three
+ * seats alive and nothing eliminated.
+ */
+function checkPodCombatNeverKills(): void {
+  const LOW_LIFE_TURNS = 18;
+  const found = search('engine-pod-cap', (seed) => {
+    freshRun(seed);
+    let lowered = false;
+    for (let turn = 1; turn <= LOW_LIFE_TURNS; turn++) {
+      const seen = podEntriesSoFar().length;
+      store().nextTurn();
+      if (!store().run) return null;
+      const fresh = podEntriesSoFar().slice(seen);
+      const onTwo = fresh.find((entry) => (entry.payload.before as number) <= 2);
+      if (onTwo) return { seed, entry: onTwo, loweredAt: turn };
+
+      drainTurnWithoutDamage();
+      if (!store().run) return null;
+
+      if (!lowered && store().turn >= 5) {
+        for (const seat of store().seats) {
+          if (!seat.eliminated && seat.life > 2) store().adjustLife(seat.id, 2 - seat.life);
+        }
+        lowered = true;
+      }
+    }
+    return null;
+  });
+
+  if (!found) {
+    failures.push('(s) no seed swung at a seat sitting on 2 life');
+    return;
+  }
+
+  const payload = found.entry.payload;
+  const defender = payload.seatId as SeatId;
+  check(
+    '(s) a seat on 2 life is hit for exactly the point it can spare',
+    payload.before === 2 && payload.amount === 1 && payload.after === 1,
+    `${payload.before} → ${payload.after} for ${payload.amount}`,
+  );
+  check(
+    '(s) the defender is still at the table',
+    store().seats.find((s) => s.id === defender)?.eliminated === false,
+  );
+
+  const log = store().run?.log ?? [];
+  const belowOne = podEntriesSoFar().filter((entry) => (entry.payload.after as number) < 1);
+  check(
+    '(s) no pod hit anywhere in the run took a seat below 1',
+    belowOne.length === 0,
+    `${belowOne.length}`,
+  );
+  const eliminated = log.filter((entry) => entry.kind === 'damage' && entry.payload.threatAtDeath !== undefined);
+  check(
+    '(s) a table on 2 life apiece still lost nobody',
+    eliminated.length === 0,
+    eliminated.map((e) => e.message).join(', '),
+  );
+
+  summary.push(
+    `(s) seed ${found.seed}: every seat on 2 life, ${podEntriesSoFar().length} pod hit(s), ` +
+      `none of them fatal (seat ${defender} left on ${payload.after})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (t) an unanswered hate event holds the seat's slot
+// ---------------------------------------------------------------------------
+
+/** What holding a hate event unanswered hands back. */
+interface HeldHate {
+  seed: string;
+  /** The event left in the queue, never resolved. */
+  first: PressureEvent;
+  /** Every other hate event dealt while it waited — none of them may be its seat's. */
+  others: PressureEvent[];
+  /** Windows that opened while it sat there. */
+  windowsWaited: number;
+}
+
+/** Turns a hold search will play. Longer than the others: the wait needs windows. */
+const HOLD_TURNS = 16;
+/** Windows the first hate event has to survive unanswered before the seed counts. */
+const HOLD_WINDOWS = 5;
+
+/**
+ * Answer everything on offer except a hate event, which is left standing in the
+ * queue as the question it is. A hate event at the head blocks what is behind
+ * it, which is the point: nothing after it is resolved either, so the only
+ * thing moving between turns is the pod.
+ *
+ * The race clock is still claimed every turn — it is cancelled off `state.clock`
+ * rather than off the queue, so holding the queue must not lose the run instead.
+ */
+function drainTurnLeavingHate(): void {
+  if (store().clock) store().declareInteraction();
+  for (let guard = 0; guard < 60; guard++) {
+    const event = store().activeEvent;
+    if (!event || !store().run) return;
+    // Left unanswered on purpose: the store has to count it as standing anyway.
+    if (event.type === 'hate') return;
+    if (event.type === 'combat') {
+      store().respondToActiveEvent({ note: 'blocked it' });
+      continue;
+    }
+    store().resolveActiveEvent();
+  }
+  throw new Error('the event queue never emptied');
+}
+
+/**
+ * Play until a hate event has been sitting unanswered for `HOLD_WINDOWS`
+ * windows. Nothing hate is ever resolved, so every hate event the run dealt is
+ * still in the queue at the end and can be read straight off it.
+ *
+ * `needsSecond` holds out for a seed where the pod dealt a second piece while
+ * the first waited, whoever it went to. That is the only seed shape that can
+ * tell the fix from the bug: it is where a store that does not lend the engine
+ * the unanswered event puts the second piece on the same seat, and where a
+ * store that does puts it on another one.
+ */
+function holdAHateEvent(label: string, opts: { needsSecond?: boolean } = {}): HeldHate | null {
+  return search(label, (seed) => {
+    freshRun(seed);
+    let firstWindow = 0;
+    for (let turn = 1; turn <= HOLD_TURNS; turn++) {
+      store().nextTurn();
+      if (!store().run) return null;
+      drainTurnLeavingHate();
+      if (!store().run) return null;
+
+      const hate = queuedEvents().filter((e) => e.type === 'hate');
+      if (hate.length > 0 && firstWindow === 0) firstWindow = store().windowCount;
+      if (firstWindow === 0 || store().windowCount - firstWindow < HOLD_WINDOWS) continue;
+
+      const [first, ...others] = hate;
+      if (opts.needsSecond && others.length === 0) return null;
+      return { seed, first, others, windowsWaited: store().windowCount - firstWindow };
+    }
+    return null;
+  });
+}
+
+/**
+ * The cap the engine enforces is per seat, and it reads `input.hazards` — which
+ * holds only the pieces that resolved. A hate event the player has not answered
+ * yet is not in there, so without the store lending the engine a provisional
+ * entry for it a seat could be dealt a second piece while the first is still a
+ * question, and answering neither would stand two.
+ *
+ * `PRESSURE.hazards.hate.cap` is 2 at this bracket, so the run has exactly one
+ * more piece to give: it must not go to the seat already waiting, and it must
+ * still be allowed to go to a seat that is not.
+ */
+function checkQueuedHateHoldsTheSeatsSlot(): void {
+  const found =
+    holdAHateEvent('engine-hate-queued-second', { needsSecond: true }) ??
+    holdAHateEvent('engine-hate-queued');
+  if (!found) {
+    failures.push('(t) no seed left a hate event unanswered for long enough to test');
+    return;
+  }
+  const { first, others } = found;
+
+  check(
+    '(t) the held event is still a question in front of the player',
+    queuedEvents().some((e) => e.id === first.id),
+    first.id,
+  );
+  check(
+    '(t) and nothing is standing, because nothing was let through',
+    !store().hazards.some((h) => h.eventId === first.id),
+    store().hazards.map((h) => h.id).join(', ') || '(none)',
+  );
+
+  const sameSeat = others.filter((e) => e.seatId === first.seatId);
+  check(
+    '(t) the seat that is owed an answer was not dealt a second piece',
+    sameSeat.length === 0,
+    sameSeat.map((e) => `${e.id} (${e.card?.name})`).join(', '),
+  );
+
+  // The provisional entry is engine-input only: the window entry still lists
+  // what actually stood, and names the unanswered event separately.
+  const windows = (store().run?.log ?? []).filter((e) => e.kind === 'window');
+  const afterHold = windows.filter((e) => (e.payload.queuedHate as string[] | undefined)?.includes(first.id));
+  check(
+    '(t) every window that opened while it waited counted it',
+    afterHold.length === found.windowsWaited,
+    `${afterHold.length} of ${found.windowsWaited} window(s)`,
+  );
+  check(
+    '(t) and none of them called it standing',
+    afterHold.every((e) => ((e.payload.hazards as string[] | undefined) ?? []).length === 0),
+    JSON.stringify(afterHold.map((e) => e.payload.hazards)),
+  );
+
+  const otherSeat = others.find((e) => e.seatId !== first.seatId);
+  if (otherSeat) {
+    check(
+      '(t) a seat that owes nothing can still be dealt one',
+      otherSeat.seatId !== first.seatId,
+      `${otherSeat.seatId} vs ${first.seatId}`,
+    );
+  }
+
+  summary.push(
+    `(t) seed ${found.seed}: seat ${first.seatId} held ${first.card?.name ?? 'a hate event'} unanswered for ` +
+      `${found.windowsWaited} window(s), dealt no second piece; ` +
+      (otherSeat
+        ? `seat ${otherSeat.seatId} was still dealt ${otherSeat.card?.name}`
+        : `no other seat was dealt one while it waited, in ${SEARCH_ATTEMPTS} seeds (note, not a failure)`),
+  );
+}
+
 function checkDeterminism(): void {
   const seed = 'engine-determinism';
   const first = normalizeLog(scriptedRun(seed));
@@ -3048,6 +3739,12 @@ async function main(): Promise<void> {
   await checkCounterCitationColors();
   checkSeatsCarryDistinctProfiles();
   checkCounterArmClamp();
+  checkHatePieceStandsAndIsRemoved();
+  checkWipeSweepsStandingPieces();
+  checkSeatDeathRetiresItsPieces();
+  checkPodCombatHits();
+  checkPodCombatNeverKills();
+  checkQueuedHateHoldsTheSeatsSlot();
   checkDeterminism();
 
   console.log('\nverify:engine');

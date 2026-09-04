@@ -99,6 +99,27 @@ export const PRESSURE = {
    * unmodified one. Seeds where the arming roll sat near that cap do not replay
    * identically; the hazard rolls are untouched.
    *
+   * Version 7 adds two draw sites, so no earlier seed replays at all. The hate
+   * roll sits after the resource attack and before the clock: a seat casts a
+   * standing piece, and unlike every other hazard it does not finish when the
+   * window does. The pod-combat roll sits immediately after the player-combat
+   * roll: the seats now swing at each other, which is damage the player did not
+   * have to deal and threat that moves without them. Both are gated on a real
+   * card or a real board the same way everything else here is — hate needs a
+   * citation the seat could be holding, pod combat needs `podCombat.minPower`
+   * on the attacking silhouette.
+   *
+   * A pod hit never kills. The engine caps its damage at the defender's
+   * `life - 1`, and withholds the hit outright against a seat already at 1 —
+   * after the roll, so the draw order above keeps its shape either way. The
+   * reason is a product one rather than a tuning one: the pod softens a seat up
+   * and the player takes it down. A pod that eliminated seats would be handing
+   * the player wins they did not play for, and the run would be decided by how
+   * the table happened to point at itself rather than by what the player did
+   * about it. With the kill ruled out in the engine, `podCombat.powerShare` and
+   * `podCombat.chance` are sized for how much a hit should read as at the table
+   * instead of being held down to keep seats alive.
+   *
    * Two files share this version rather than carrying their own. Changing a
    * multiplier in `src/data/profiles.ts` bumps it, because those numbers are
    * read straight off these curves. Editing `src/data/citations.ts` bumps it
@@ -107,7 +128,7 @@ export const PRESSURE = {
    * seed's stream from that window on. `CITATIONS_VERSION` in that file tracks
    * the table's own revision and must move with this number.
    */
-  version: 6,
+  version: 7,
 
   /**
    * Hard ceiling on a hazard's per-window probability after its seat's profile
@@ -211,6 +232,29 @@ export const PRESSURE = {
       cap: [4, 4, 4, 4, 4] as BracketTable,
       cooldown: [0, 0, 0, 0, 0] as BracketTable,
     },
+    /**
+     * The standing piece. The one hazard whose bracket schedule is mostly not
+     * these numbers at all: the citation table is, because the pieces are what
+     * the Commander bracket guidelines are most explicit about. Nothing in
+     * `CITATIONS.hate` is a bracket-1 card, so a bracket-1 pod produces none of
+     * these however early `startTurn` lets it roll — "no card, no event" is the
+     * gate, and a `startTurn` of 7 there only says what would happen if one
+     * were ever added. Bracket 2 gets graveyard hate and nothing else; the
+     * taxes and the one-spell-a-turn pieces arrive at 3, the deck-off pieces
+     * (Blood Moon, Null Rod, Winter Orb, the Spheres) at 4.
+     *
+     * `cap` is low on purpose. Two standing pieces at bracket 3 is a table the
+     * player has to play around; five would be a different game, and the player
+     * only ever gets one answer at a time.
+     */
+    hate: {
+      startTurn: [7, 6, 4, 3, 3] as BracketTable,
+      base: [0.045, 0.06, 0.115, 0.135, 0.175] as BracketTable,
+      perTurn: [0.008, 0.012, 0.018, 0.02, 0.026] as BracketTable,
+      max: [0.15, 0.22, 0.28, 0.36, 0.44] as BracketTable,
+      cap: [1, 1, 2, 2, 3] as BracketTable,
+      cooldown: [4, 4, 3, 2, 2] as BracketTable,
+    },
   } satisfies Record<Exclude<EventType, 'counter'>, Hazard>,
 
   wipe: {
@@ -256,6 +300,62 @@ export const PRESSURE = {
     minPower: 2,
   },
 
+  hate: {
+    /**
+     * How many standing pieces one seat may hold. A seat already holding one is
+     * not a candidate, so the pieces spread across the table rather than piling
+     * onto whichever seat happens to be scariest — three taxes on one seat reads
+     * as a bug, one each reads as a pod.
+     */
+    maxStandingPerSeat: 1,
+  },
+
+  /**
+   * The seats attacking each other. Not an event: the player is not being asked
+   * anything, so there is nothing to answer and nothing to resolve — it is the
+   * pod doing to itself what it has been doing to the player, and the reason the
+   * threat meters move without the player having spent a card.
+   *
+   * `chance` peaks at bracket 3-4 and drops at 5 for the same reason the combat
+   * hazard does: a cEDH seat is holding up interaction and assembling a combo,
+   * not racing the seat next to it. It is scaled by the attacker's
+   * `hazardMult.combat`, because a seat that would rather not attack the player
+   * would rather not attack anyone.
+   *
+   * A pod hit never kills — `resolveWindow` caps its damage at the defender's
+   * `life - 1` and withholds it entirely against a seat already on 1. The kill
+   * is the player's: a pod that emptied the table would be handing them wins
+   * they did not play for. That cap is what lets both numbers below be sized
+   * for how a hit should read rather than for how many seats survive it.
+   */
+  podCombat: {
+    /** First turn the seats start swinging at each other. */
+    startTurn: [5, 4, 4, 3, 4] as BracketTable,
+    /**
+     * Per-window chance, before the attacker's profile multiplier. Fitted to
+     * roughly 1.5 / 2.5 / 3.5 / 4 / 2 hits a run, which is the schedule the row
+     * would have had all along if it had not been held down to keep seats alive.
+     */
+    chance: [0.248, 0.406, 0.562, 0.66, 0.253] as BracketTable,
+    /**
+     * Fraction of the attacker's silhouette power that lands on the defender.
+     * Below the 1.0 that swings at the player, because the seats are blocking
+     * each other and neither is the other's real target.
+     *
+     * It is not held down any further than that. "The pod must not empty the
+     * table" used to be this number's job — the defender is the highest-threat
+     * seat, which is the same seat the player is burning down, so pod damage
+     * lands on top of the player's, and at 0.6 the probe killed a seat in a
+     * third of bracket-5 runs. Shrinking the hits to fix that made them too
+     * small to feel at the table. The engine now caps a hit at the defender's
+     * `life - 1` instead, so the kill cannot happen at any share, and this
+     * number is free to be sized for how much a hit should *read* as.
+     */
+    powerShare: 0.6,
+    /** Below this much power the seat has nothing worth sending sideways. */
+    minPower: 3,
+  },
+
   clock: {
     /** Deadline = spawn turn + this. */
     deadlineOffset: [5, 4, 3, 2, 2] as BracketTable,
@@ -289,7 +389,19 @@ export const PRESSURE = {
       combat: 0.5,
       clock: 1.2,
       resource: 0.6,
+      /**
+       * Between a wrath and a clock: a hate piece does not answer the board, but
+       * it is a permanent that stays, and the seat that resolved it is playing a
+       * game the rest of the table now has to play too.
+       */
+      hate: 0.7,
     } satisfies Record<EventType, number>,
+    /**
+     * Threat the attacker gains for landing a hit on another seat. Small: it
+     * took damage off a seat that was scarier, so the table's total pressure
+     * barely moves — this is who is holding it, not how much there is.
+     */
+    podHitJump: 0.3,
     /**
      * Threat a seat gains when a pay-or-punish tax goes unpaid, on top of the
      * `eventJump.resource` it already took for casting the thing. This is off

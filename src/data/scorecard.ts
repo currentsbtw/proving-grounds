@@ -10,7 +10,7 @@
  * different tunings stay distinguishable.
  */
 export const SCORING = {
-  version: 1,
+  version: 2,
 
   /** Player life at the start of every run — mirrors `STARTING_LIFE` in the store. */
   startingLife: 40,
@@ -57,6 +57,16 @@ export const SCORING = {
 
     /** `mulligans often`: this share of runs opened with at least one mulligan. */
     mulliganRate: 0.4,
+
+    /**
+     * `lets hate pieces stand`: enough pieces actually resolved for the share to
+     * mean anything, and most of them were still standing when the run ended.
+     * Read against pieces that *stood*, not pieces faced — a hate piece the
+     * player countered was answered, and answering is already what the answer
+     * rate measures.
+     */
+    hateMinStood: 2,
+    hateRemovedRate: 0.34,
   },
 
   /** The tag strings themselves, so the UI and the engine cannot drift apart. */
@@ -69,6 +79,7 @@ export const SCORING = {
     losesToClock: 'loses to the clock',
     interactive: 'interactive',
     mulligansOften: 'mulligans often',
+    letsHateStand: 'lets hate pieces stand',
   },
 } as const;
 

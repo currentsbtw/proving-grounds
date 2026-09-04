@@ -38,6 +38,9 @@ export type CounterTarget =
 
 export type Punish = 'draw' | 'treasure';
 
+/** What kind of permanent a hate piece is — i.e. which wipe sweeps clear it. */
+export type CitationPermanent = 'creature' | 'artifact' | 'enchantment';
+
 export interface Citation {
   name: string;
   /**
@@ -74,6 +77,19 @@ export interface Citation {
   pay?: number;
   /** Pay-or-punish taxes: what the seat gets if the player does not pay. */
   punish?: Punish;
+  /**
+   * Hate pieces: what the card is on the battlefield, and therefore which wipe
+   * sweeps it away. Required on every entry in `hate` — a piece nothing can
+   * sweep would stand until the seat died.
+   */
+  permanent?: CitationPermanent;
+  /**
+   * Hate pieces: the standing reminder, in second person, printed under the seat
+   * for as long as the piece is out ("Your nonbasic lands are Mountains."). It
+   * is what the player has to remember to honour, so it is the consequence
+   * rather than the wording — `effect` still carries the card's full effect.
+   */
+  tell?: string;
 }
 
 /**
@@ -88,8 +104,13 @@ export interface Citation {
  * same as a curve edit does — see the note there.
  *
  * Revision 2: Deadly Rollick's colour identity corrected from R to B.
+ *
+ * Revision 3: the `hate` table — the persistent pieces a seat leaves standing.
+ * Every entry carries `permanent` (what sweeps it) and `tell` (what the player
+ * has to keep honouring), because a hate piece is the one citation that does not
+ * finish resolving the turn it is cast.
  */
-export const CITATIONS_VERSION = 2;
+export const CITATIONS_VERSION = 3;
 
 export interface CitationTable {
   wipe: Citation[];
@@ -99,6 +120,8 @@ export interface CitationTable {
   sacrifice: Citation[];
   tax: Citation[];
   clock: Citation[];
+  /** Standing pieces. Every entry has `permanent` and `tell`. */
+  hate: Citation[];
 }
 
 export const CITATIONS: CitationTable = {
@@ -796,6 +819,245 @@ export const CITATIONS: CitationTable = {
       cost: 3,
       effect: 'With a creature that casts from exile: infinite mana into their commander.',
       brackets: [4, 5],
+    },
+  ],
+
+  /**
+   * Standing pieces. Unlike every other table here, these do not finish when the
+   * window does: what the seat cast stays on the table and the player keeps
+   * paying for it, which is why each one carries a `tell` short enough to sit
+   * under the seat all game.
+   *
+   * The brackets follow the Commander bracket guidelines rather than raw power:
+   * graveyard hate is a normal maindeck card from bracket 2, the taxes and the
+   * "one spell a turn" pieces are an upgraded-table sight (3), and the ones that
+   * turn a deck off outright — Blood Moon, Null Rod, Winter Orb, the Spheres —
+   * are bracket 4 and up. Trinisphere is cEDH alone.
+   */
+  hate: [
+    {
+      name: 'Rest in Peace',
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: 'Exile all graveyards. Cards go to exile instead of a graveyard.',
+      brackets: [2, 5],
+      permanent: 'enchantment',
+      tell: 'Your graveyard is exiled as it fills.',
+    },
+    {
+      name: "Grafdigger's Cage",
+      colors: [],
+      mv: 1,
+      cost: 1,
+      effect:
+        "Creatures can't enter the battlefield from graveyards or libraries, and nobody casts spells from either.",
+      brackets: [3, 5],
+      permanent: 'artifact',
+      tell: 'You cast nothing out of your graveyard or library.',
+    },
+    {
+      name: 'Torpor Orb',
+      colors: [],
+      mv: 2,
+      cost: 2,
+      effect: "Creatures entering the battlefield don't cause abilities to trigger.",
+      brackets: [3, 5],
+      permanent: 'artifact',
+      tell: "Your creatures' enters-the-battlefield triggers do not happen.",
+    },
+    {
+      name: 'Hushbringer',
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: "Creatures entering or dying don't cause abilities to trigger.",
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'Your creatures trigger nothing when they enter and nothing when they die.',
+    },
+    {
+      name: 'Thalia, Guardian of Thraben',
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: 'Noncreature spells cost 1 more to cast.',
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'Your noncreature spells cost 1 more.',
+    },
+    {
+      name: 'Rule of Law',
+      colors: ['W'],
+      mv: 3,
+      cost: 3,
+      effect: "Each player can't cast more than one spell each turn.",
+      brackets: [3, 5],
+      permanent: 'enchantment',
+      tell: 'You cast one spell a turn.',
+    },
+    {
+      name: 'Ethersworn Canonist',
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: "Each player can't cast more than one nonartifact spell each turn.",
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'You cast one nonartifact spell a turn.',
+    },
+    {
+      name: 'Archon of Emeria',
+      colors: ['W'],
+      mv: 3,
+      cost: 3,
+      effect:
+        "Each player can't cast more than one spell each turn, and their nonbasic lands enter tapped.",
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'You cast one spell a turn and your nonbasic lands enter tapped.',
+    },
+    {
+      name: 'Stony Silence',
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: "Activated abilities of artifacts can't be activated.",
+      brackets: [3, 5],
+      permanent: 'enchantment',
+      tell: 'Your mana rocks and every other artifact ability are switched off.',
+    },
+    {
+      name: 'Collector Ouphe',
+      colors: ['G'],
+      mv: 2,
+      cost: 2,
+      effect: "Activated abilities of artifacts can't be activated.",
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: "Your artifacts' activated abilities do not work.",
+    },
+    {
+      name: 'Cursed Totem',
+      colors: [],
+      mv: 2,
+      cost: 2,
+      effect: "Activated abilities of creatures can't be activated.",
+      brackets: [3, 5],
+      permanent: 'artifact',
+      tell: "Your creatures' activated abilities do not work.",
+    },
+    {
+      name: 'Linvala, Keeper of Silence',
+      colors: ['W'],
+      mv: 4,
+      cost: 4,
+      effect: "Activated abilities of creatures your opponents control can't be activated.",
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'Your creatures have no activated abilities while they hold this.',
+    },
+    {
+      name: "Kataki, War's Wage",
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: 'Each artifact has "At the beginning of your upkeep, sacrifice this unless you pay 1."',
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'You pay 1 each upkeep for every artifact you control or sacrifice it.',
+    },
+    {
+      name: 'Aven Mindcensor',
+      colors: ['W'],
+      mv: 3,
+      cost: 3,
+      effect: 'Opponents who search a library look at only the top four cards of it.',
+      brackets: [3, 5],
+      permanent: 'creature',
+      tell: 'When you search a library, you see only its top four cards.',
+    },
+    {
+      name: 'Blood Moon',
+      colors: ['R'],
+      mv: 3,
+      cost: 3,
+      minTurn: 3,
+      effect: 'All nonbasic lands are Mountains and lose every other type and ability.',
+      brackets: [4, 5],
+      permanent: 'enchantment',
+      tell: 'Your nonbasic lands are Mountains.',
+    },
+    {
+      name: 'Sphere of Resistance',
+      colors: [],
+      mv: 2,
+      cost: 2,
+      effect: 'Spells cost 1 more to cast.',
+      brackets: [4, 5],
+      permanent: 'artifact',
+      tell: 'Every spell you cast costs 1 more.',
+    },
+    {
+      name: 'Null Rod',
+      colors: [],
+      mv: 2,
+      cost: 2,
+      effect: "Activated abilities of artifacts can't be activated.",
+      brackets: [4, 5],
+      permanent: 'artifact',
+      tell: 'Your mana rocks make no mana and your artifacts do nothing.',
+    },
+    {
+      name: 'Winter Orb',
+      colors: [],
+      mv: 2,
+      cost: 2,
+      effect: 'Players untap only one land during their untap step.',
+      brackets: [4, 5],
+      permanent: 'artifact',
+      tell: 'You untap one land a turn.',
+    },
+    {
+      name: 'Deafening Silence',
+      colors: ['W'],
+      mv: 1,
+      cost: 1,
+      effect: "Each player can't cast more than one noncreature spell each turn.",
+      brackets: [4, 5],
+      permanent: 'enchantment',
+      tell: 'You cast one noncreature spell a turn.',
+    },
+    {
+      name: 'Drannith Magistrate',
+      colors: ['W'],
+      mv: 2,
+      cost: 2,
+      effect: "Opponents can't cast spells from anywhere other than their hands.",
+      brackets: [4, 5],
+      permanent: 'creature',
+      tell: 'You cast only out of your hand — your commander stays in the command zone.',
+    },
+    {
+      name: 'Opposition Agent',
+      colors: ['B'],
+      mv: 3,
+      cost: 3,
+      effect:
+        'While an opponent searches their library, its controller does the searching and may play what they find.',
+      brackets: [4, 5],
+      permanent: 'creature',
+      tell: 'They run your tutors and fetches, and keep whatever they find.',
+    },
+    {
+      name: 'Trinisphere',
+      colors: [],
+      mv: 3,
+      cost: 3,
+      effect: 'Spells that would cost less than 3 cost 3 instead.',
+      brackets: [5, 5],
+      permanent: 'artifact',
+      tell: 'Nothing you cast costs less than 3.',
     },
   ],
 };
