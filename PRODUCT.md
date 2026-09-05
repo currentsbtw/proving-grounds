@@ -31,6 +31,7 @@ Pressure-testing without simulated opponents: "flight simulator, not dogfight AI
 - The player resolves everything honestly (honor system). The app never verifies legality; it records what was claimed.
 - Card data and imagery come from Scryfall (cache-first via IndexedDB). Decks are built elsewhere and imported.
 - Scorecard PNGs are shared to Discord/Reddit as "receipts."
+- A static build is published from main by GitHub Actions at https://currentsbtw.github.io/proving-grounds/ (since Sep 4, 2026; the repo went public the same day for Pages). It runs without the judge proxy, so the Judge drawer reports offline there. docs/TESTING.md is the brief handed to outside testers.
 - Fan Content Policy context: the app is free, unofficial, Scryfall-attributed, not endorsed by Wizards of the Coast.
 
 ## Capabilities and Constraints

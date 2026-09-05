@@ -1,5 +1,7 @@
 # Proving Grounds
 
+Live build for testers: https://currentsbtw.github.io/proving-grounds/ (static; the judge drawer needs the local proxy and reports offline there). Tester brief: [docs/TESTING.md](docs/TESTING.md).
+
 Proving Grounds is a solo Commander (EDH) playtest trainer. You pilot your real decklist at a virtual table against three opponent seats (A, B, C) that exist only as life totals — there is no AI, no rules engine, and no legality checking. The app does the bookkeeping and keeps a complete, machine-readable log of everything that happens; you resolve the game honestly. Each game is a **run**: seeded so shuffles are reproducible, and instrumented so every mutation appends a log entry. That log is the source of all future scoring.
 
 ## M0 scope
