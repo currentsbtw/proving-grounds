@@ -1,0 +1,20 @@
+# The deck-link fetcher for the published (static) build.
+#
+#   cd workers/deck-fetch && npx wrangler deploy
+#
+# No bindings beyond one var and one optional secret: this Worker holds no
+# state, no database and no credentials of its own. See README.md.
+
+name = "proving-grounds-deck-fetch"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Origins allowed to call this Worker. The Pages build, plus the two local Vite
+# ports so a locally served build can be pointed at the deployed Worker.
+ALLOWED_ORIGINS = "https://currentsbtw.github.io,http://localhost:5173,http://localhost:4173"
+
+# MOXFIELD_USER_AGENT is a secret, not a var:
+#   npx wrangler secret put MOXFIELD_USER_AGENT
+# Unset is a supported state — Moxfield links then answer 501 and the app tells
+# the player to paste the list instead.

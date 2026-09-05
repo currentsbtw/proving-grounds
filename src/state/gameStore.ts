@@ -484,7 +484,18 @@ export interface GameState {
   toggleTapped: (iid: string) => void;
   untapAll: () => void;
   addCounter: (iid: string, kind: string, delta: number) => void;
-  createToken: (spec: TokenSpec, n: number) => void;
+  /** Create `n` tokens from `spec` on the battlefield. Returns the new instance iids. */
+  createToken: (spec: TokenSpec, n: number) => string[];
+  /**
+   * Attach a found printing's face to tokens that already exist. Cosmetic only:
+   * it patches `tokenSpec` on the named instances (and only those that are still
+   * present and still tokens), appends NO log entry, and touches neither the RNG
+   * nor any counted state — no move counter, no threat, no settle. The log is the
+   * product: a same-seed replay compares logs entry for entry, so an image that
+   * arrives from the network some milliseconds after the click must be invisible
+   * to it. Deliberately not wrapped in `action`, which would settle the run.
+   */
+  setTokenFace: (iids: string[], face: { scryfallId: string; imageNormal: string }) => void;
   adjustLife: (target: LifeTarget, delta: number) => void;
   dealCommanderDamage: (seatId: SeatId, amount: number) => void;
   nextPhase: () => void;
@@ -2303,8 +2314,8 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     createToken(spec, n) {
-      action(() => {
-        if (!get().run || n <= 0) return;
+      return action(() => {
+        if (!get().run || n <= 0) return [];
         const created: string[] = [];
         set((s) => {
           const cards = { ...s.cards };
@@ -2323,6 +2334,35 @@ export const useGameStore = create<GameState>((set, get) => {
           iids: created,
           spec,
         });
+        return created;
+      });
+    },
+
+    setTokenFace(iids, face) {
+      if (iids.length === 0 || !face.scryfallId || !face.imageNormal) return;
+      set((s) => {
+        const cards = { ...s.cards };
+        let touched = false;
+        for (const iid of iids) {
+          const card = cards[iid];
+          // Gone (a token that left the battlefield is removed) or no longer a
+          // token: nothing to dress. The face is late by definition, so a miss
+          // here is the normal case, not an error.
+          if (!card || !card.isToken || !card.tokenSpec) continue;
+          cards[iid] = {
+            ...card,
+            tokenSpec: {
+              ...card.tokenSpec,
+              scryfallId: face.scryfallId,
+              imageNormal: face.imageNormal,
+            },
+          };
+          touched = true;
+        }
+        // `movedAt` and `moveCounter` are left alone on purpose: the face does not
+        // move the card, and the battlefield's ordering must not shuffle when an
+        // image lands.
+        return touched ? { cards } : s;
       });
     },
 

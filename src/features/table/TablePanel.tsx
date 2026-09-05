@@ -20,7 +20,7 @@ import {
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { Battlefield } from './Battlefield';
 import { BrowseOverlay } from './BrowseOverlay';
-import { STRIP_CARD_WIDTH } from './cardGeometry';
+import { useCardUnit } from './cardGeometry';
 import { CardMenuProvider } from './CardMenu';
 import { CardView } from './CardView';
 import { Hand } from './Hand';
@@ -87,8 +87,13 @@ function TableSurface() {
   const takeMulligan = useGameStore((s) => s.takeMulligan);
   const resolveMulligan = useGameStore((s) => s.resolveMulligan);
   const keymap = useHotkeyStore((s) => s.keymap);
+  const unit = useCardUnit();
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  // The width the card was picked up at. A card in the strip is the card unit,
+  // but a board card is whatever width the battlefield's fit chose for its half,
+  // which is knowable only from the card itself.
+  const [activeWidth, setActiveWidth] = useState<number | null>(null);
   // Whether the card in the air is one the stack would take. Read at drag start
   // so the tray's offer and the drop's outcome are the same rule.
   const [canCast, setCanCast] = useState(false);
@@ -144,6 +149,12 @@ function TableSurface() {
   function onDragStart(e: DragStartEvent): void {
     const iid = String(e.active.id);
     setActiveId(iid);
+    // Read off the card that was grabbed rather than from its rectangle: a
+    // tapped card is rotated, and its bounding box would hand the overlay the
+    // card's height. Layout width is what the rotation leaves alone.
+    const target = e.activatorEvent.target;
+    const node = target instanceof Element ? target.closest<HTMLElement>('.tbl-card') : null;
+    setActiveWidth(node && node.offsetWidth > 0 ? node.offsetWidth : null);
     // Asked once, of the store that owns the answer, before the tray decides
     // whether to open at all. Nothing about the card changes mid-drag.
     setCanCast(canCastToStack(useGameStore.getState(), iid));
@@ -151,6 +162,7 @@ function TableSurface() {
 
   function onDragEnd(e: DragEndEvent): void {
     setActiveId(null);
+    setActiveWidth(null);
     setCanCast(false);
     if (!e.over) return;
     // The stack is not a zone you move a card to, it is a cast: the store owns
@@ -400,7 +412,11 @@ function TableSurface() {
         {activeCard ? (
           <CardView
             card={activeCard}
-            width={activeCard.zone === 'battlefield' ? 140 : STRIP_CARD_WIDTH}
+            width={
+              activeCard.zone === 'battlefield'
+                ? (activeWidth ?? Math.round(unit * 0.9))
+                : unit
+            }
             lifted
             menu={false}
           />

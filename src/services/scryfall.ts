@@ -1,7 +1,8 @@
 import { cacheCards, getCachedCardsByIds, getCachedCardsByName } from '../db/db';
-import type { CardData } from '../domain/types';
+import type { CardData, TokenSpec } from '../domain/types';
 
 const COLLECTION_URL = 'https://api.scryfall.com/cards/collection';
+const SEARCH_URL = 'https://api.scryfall.com/cards/search';
 const BATCH_SIZE = 75;
 const BATCH_DELAY_MS = 120;
 const MAX_RETRIES = 2;
@@ -44,9 +45,37 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Lookup key: case-insensitive, whitespace-collapsed. */
+/**
+ * How a `//` name is written when it is split or joined: Scryfall prints the
+ * spaces, a decklist export may not, and both have to key the same.
+ */
+const FACE_SPLIT = /\s*\/\/\s*/g;
+
+/**
+ * Lookup key: case-insensitive, whitespace-collapsed, and with the `//` of a
+ * two-faced name normalised to one spaced form. Without that last step a paste
+ * of "Brazen Borrower//Petty Theft" was fetched and cached under the spaced name
+ * Scryfall returns and then reported missing, because the key it was looked up
+ * by was the unspaced one nothing had filed.
+ */
 export function nameKey(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+  return name
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(FACE_SPLIT, ' // ')
+    .toLowerCase();
+}
+
+/**
+ * The name Scryfall's collection endpoint will answer to. It resolves a
+ * double-faced or split card by its front face ("Westvale Abbey", "Fire") and
+ * reports the full printed form ("Westvale Abbey // Ormendahl, Profane Prince")
+ * as not found, which is exactly the form Archidekt exports and a player pastes.
+ * The card that comes back carries the full name, and `indexByName` files it
+ * under both, so the request is the only place the split matters.
+ */
+export function frontFaceName(name: string): string {
+  return name.split(FACE_SPLIT)[0]?.trim() || name.trim();
 }
 
 /** Maps a Scryfall card object onto the cached CardData subset. */
@@ -108,18 +137,19 @@ function needsLoyaltyTopUp(card: CardData): boolean {
 
 /**
  * Index resolved cards by every name a decklist might use: the full Scryfall name
- * plus each face of a `//` name (DFC, split, adventure).
+ * plus each face of a `//` name (DFC, split, adventure). The split is the same
+ * regex `frontFaceName` requests by, and `nameKey` normalises the spacing around
+ * a `//`, so a paste of either "Brazen Borrower // Petty Theft" or
+ * "Brazen Borrower//Petty Theft" or just "Brazen Borrower" finds the same card.
  */
 export function indexByName(cards: CardData[]): Map<string, CardData> {
   const map = new Map<string, CardData>();
   for (const card of cards) {
     const full = nameKey(card.name);
     if (!map.has(full)) map.set(full, card);
-    if (card.name.includes('//')) {
-      for (const part of card.name.split('//')) {
-        const key = nameKey(part);
-        if (key && !map.has(key)) map.set(key, card);
-      }
+    for (const part of card.name.split(FACE_SPLIT)) {
+      const key = nameKey(part);
+      if (key && key !== full && !map.has(key)) map.set(key, card);
     }
   }
   return map;
@@ -224,7 +254,7 @@ export async function resolveCards(names: string[]): Promise<ResolveResult> {
   let cards: ScryfallCard[] = [];
   let missing: { name?: string; id?: string }[] = [];
   try {
-    ({ cards, missing } = await fetchInBatches(toFetch.map((name) => ({ name }))));
+    ({ cards, missing } = await fetchInBatches(toFetch.map((name) => ({ name: frontFaceName(name) }))));
   } catch (err) {
     // A batch of nothing but top-ups is allowed to fail quietly: every card in it
     // is already in hand, and an offline moment should cost the added field, not
@@ -252,7 +282,7 @@ export async function resolveCards(names: string[]): Promise<ResolveResult> {
   // Names Scryfall explicitly rejected that we never asked about (defensive).
   for (const entry of missing) {
     const name = entry.name?.trim();
-    if (name && !notFound.some((n) => nameKey(n) === nameKey(name))) notFound.push(name);
+    if (name && !notFound.some((n) => nameKey(frontFaceName(n)) === nameKey(name))) notFound.push(name);
   }
 
   return { found, notFound };
@@ -319,4 +349,139 @@ export async function resolveCardsByIds(
   }
 
   return { found, notFound };
+}
+
+// ---------------------------------------------------------------------------
+// Token faces
+// ---------------------------------------------------------------------------
+
+/** The two fields a found printing contributes back to a `TokenSpec`. */
+export interface TokenFace {
+  scryfallId: string;
+  imageNormal: string;
+}
+
+/**
+ * Per-query results for the life of the session. Creating the same token twice
+ * costs one call, and a name Scryfall has no token for is remembered as a miss
+ * rather than asked about again on every click. Only settled answers are stored
+ * — a hit, or the 404 Scryfall returns for a search that matched nothing. A
+ * network failure or an abort is left out, so an offline moment does not pin a
+ * token to the text frame for the rest of the run.
+ */
+const tokenFaceCache = new Map<string, TokenFace | null>();
+
+/** Wall-clock stamp of the last search, for the same courtesy delay the collection batches keep. */
+let lastSearchAt = 0;
+
+/**
+ * Splits a preset's display name into the name Scryfall knows and the ability
+ * the parenthetical was standing in for: "Spirit (flying)" is a Spirit token
+ * with flying, and Scryfall has no card named "Spirit (flying)".
+ */
+function splitTokenName(raw: string): { name: string; hint: string } {
+  const match = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(raw.trim());
+  if (!match) return { name: raw.trim(), hint: '' };
+  return { name: (match[1] ?? '').trim(), hint: (match[2] ?? '').trim() };
+}
+
+/** Quotes are the one character that would end the `name:` term early. */
+function quotable(value: string): string {
+  return value.replace(/["\\]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The Scryfall search that finds a token's printing. `t:token` keeps the result
+ * to the token set; the name, the body and the colours narrow it to the token
+ * the player asked for; a parenthetical ability becomes an oracle term. Pure,
+ * so the verification script can read every preset's query without a network.
+ */
+export function tokenSearchQuery(spec: TokenSpec): string {
+  const { name, hint } = splitTokenName(spec.name);
+  const terms = ['t:token'];
+
+  const cleanName = quotable(name);
+  if (cleanName) terms.push(`name:"${cleanName}"`);
+  if (spec.power) terms.push(`pow=${quotable(spec.power)}`);
+  if (spec.toughness) terms.push(`tou=${quotable(spec.toughness)}`);
+
+  // `colors: []` is a real answer — the artifact presets are colourless and want
+  // no colour term at all — so an empty list adds nothing. A spec that names
+  // colours gets them as one term: ['W'] → c:w, ['C'] → c:c, ['W','U'] → c:wu.
+  const colors = (spec.colors ?? [])
+    .map((c) => c.trim().toLowerCase())
+    .filter((c) => /^[wubrgc]$/.test(c))
+    .join('');
+  if (colors) terms.push(`c:${colors}`);
+
+  const cleanHint = quotable(hint).toLowerCase();
+  if (cleanHint) terms.push(`o:${cleanHint.replace(/\s+/g, '')}`);
+
+  return terms.join(' ');
+}
+
+/**
+ * The first entry in a search response that actually has a face to show. A
+ * printing with no `image_uris` of its own is read through its front face, the
+ * same fallback `toCardData` uses; one with neither is skipped rather than
+ * returned as a token with a blank image.
+ */
+export function pickTokenFace(body: unknown): TokenFace | null {
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return null;
+
+  for (const entry of data) {
+    const card = entry as ScryfallCard | null;
+    if (!card || typeof card.id !== 'string') continue;
+    const faces = Array.isArray(card.card_faces) ? card.card_faces : [];
+    const image = card.image_uris?.normal ?? faces[0]?.image_uris?.normal;
+    if (image) return { scryfallId: card.id, imageNormal: image };
+  }
+  return null;
+}
+
+/**
+ * Finds the newest printing of a token and returns its id and normal image, or
+ * null when there is none to be had. Never throws and never retries: the caller
+ * is a button the player just pressed, and the text frame it would otherwise
+ * draw is a complete token on its own. Scryfall answers 404 to a search that
+ * matched nothing, so that status is a miss rather than an error.
+ */
+export async function findTokenFace(
+  spec: TokenSpec,
+  signal?: AbortSignal,
+): Promise<TokenFace | null> {
+  const query = tokenSearchQuery(spec);
+  const cached = tokenFaceCache.get(query);
+  if (cached !== undefined) return cached;
+
+  const url = `${SEARCH_URL}?q=${encodeURIComponent(query)}&order=released&dir=desc&unique=cards`;
+
+  try {
+    const wait = lastSearchAt + BATCH_DELAY_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastSearchAt = Date.now();
+
+    const res = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        // Best effort — browsers override User-Agent. Node does not, and
+        // Scryfall rejects a default runtime agent, so the scripts need it.
+        'User-Agent': 'ProvingGrounds/0.1',
+      },
+      signal,
+    });
+
+    if (res.status === 404) {
+      tokenFaceCache.set(query, null);
+      return null;
+    }
+    if (!res.ok) return null;
+
+    const face = pickTokenFace(await res.json());
+    tokenFaceCache.set(query, face);
+    return face;
+  } catch {
+    return null;
+  }
 }

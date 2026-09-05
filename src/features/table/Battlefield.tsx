@@ -3,12 +3,17 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CardData, CardInstance } from '../../domain/types';
 import { isLandTypeLine } from '../../domain/typeLine';
 import { useGameStore } from '../../state/gameStore';
+import { useCardUnit } from './cardGeometry';
 import { cardHeight, DraggableCardView } from './CardView';
 
-/** Comfortable width; the board never renders a card wider than this. */
-const BF_CARD_MAX = 150;
-/** Readability floor. Past this a full half scrolls instead of shrinking. */
-const BF_CARD_MIN = 96;
+/**
+ * The floor a board card is allowed to shrink to, as a fraction of the ceiling,
+ * and the absolute floor under that. Past the floor a full half scrolls instead
+ * of shrinking. The ceiling is the card unit itself, so a board card at its
+ * largest is exactly a strip card.
+ */
+const BF_MIN_RATIO = 0.6;
+const BF_MIN_FLOOR = 84;
 
 /**
  * Which half of the board a permanent stands in. The shared front-face reading
@@ -23,7 +28,7 @@ function isLand(card: CardInstance, cardData: Record<string, CardData>): boolean
 }
 
 /**
- * As large as fits: the widest card, up to `BF_CARD_MAX`, at which every card in
+ * As large as fits: the widest card, up to the card unit, at which every card in
  * this half still stands inside the half without scrolling — wrapping into as
  * many rows as the half's width allows. Five permanents get the full size in one
  * row; a dozen step down until two rows fit; a crowded half bottoms out at the
@@ -34,8 +39,8 @@ function isLand(card: CardInstance, cardData: Record<string, CardData>): boolean
  * counting down, is the largest one that fits. Gaps and padding are read off the
  * element, so the stylesheet stays the one place either is decided.
  */
-function widthForHalf(row: HTMLElement, count: number): number {
-  if (count === 0) return BF_CARD_MAX;
+function widthForHalf(row: HTMLElement, count: number, max: number, min: number): number {
+  if (count === 0) return max;
 
   const style = getComputedStyle(row);
   const height =
@@ -49,7 +54,7 @@ function widthForHalf(row: HTMLElement, count: number): number {
   const rowGap = Number.parseFloat(style.rowGap) || 0;
   const columnGap = Number.parseFloat(style.columnGap) || 0;
 
-  for (let w = BF_CARD_MAX; w > BF_CARD_MIN; w--) {
+  for (let w = max; w > min; w--) {
     const perRow = Math.max(1, Math.floor((width + columnGap) / (w + columnGap)));
     const rows = Math.ceil(count / perRow);
     // CardView rounds the derived height, so measure the rendered height rather
@@ -57,13 +62,18 @@ function widthForHalf(row: HTMLElement, count: number): number {
     // pixel taller.
     if (rows * cardHeight(w) + (rows - 1) * rowGap <= height) return w;
   }
-  return BF_CARD_MIN;
+  return min;
 }
 
 export function Battlefield({ cards }: { cards: CardInstance[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'battlefield' });
   const cardData = useGameStore((s) => s.cardData);
   const toggleTapped = useGameStore((s) => s.toggleTapped);
+  // The board's ceiling is the strip's card, so the largest card the board ever
+  // prints matches the hand it was played from; the floor holds its distance
+  // under it, and never goes below the width at which a face stops reading.
+  const max = useCardUnit();
+  const min = Math.max(BF_MIN_FLOOR, Math.round(max * BF_MIN_RATIO));
 
   const rowsRef = useRef<HTMLDivElement | null>(null);
 
@@ -78,7 +88,7 @@ export function Battlefield({ cards }: { cards: CardInstance[] }) {
 
   // Each half is sized on its own contents, so a spare land row never shrinks a
   // crowded creature row and neither half is held back by the other.
-  const [widths, setWidths] = useState<[number, number]>([BF_CARD_MAX, BF_CARD_MAX]);
+  const [widths, setWidths] = useState<[number, number]>(() => [max, max]);
 
   const measure = useCallback(() => {
     const box = rowsRef.current;
@@ -88,16 +98,17 @@ export function Battlefield({ cards }: { cards: CardInstance[] }) {
     const next: number[] = [];
     for (const [i, row] of rows.entries()) {
       if (row.clientHeight <= 0) return;
-      next.push(widthForHalf(row, counts[i] ?? 0));
+      next.push(widthForHalf(row, counts[i] ?? 0, max, min));
     }
     setWidths((prev) =>
       prev[0] === next[0] && prev[1] === next[1] ? prev : [next[0], next[1]],
     );
-  }, [nonlands.length, lands.length]);
+  }, [nonlands.length, lands.length, max, min]);
 
-  // Re-measured on resize by the observer, and on every change of either half's
+  // Re-measured on resize by the observer, on every change of either half's
   // count — the halves keep their size when cards arrive, so a new permanent
-  // resizes nothing the observer would otherwise see.
+  // resizes nothing the observer would otherwise see — and whenever the card
+  // unit moves, which changes the ceiling the fit counts down from.
   useLayoutEffect(() => {
     const box = rowsRef.current;
     if (!box) return;

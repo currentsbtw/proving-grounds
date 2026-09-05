@@ -11,10 +11,16 @@ import { createPortal } from 'react-dom';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { CardData, CardInstance } from '../../domain/types';
 import { Glossed } from '../glossary/Glossed';
-import { CARD_ASPECT } from './cardGeometry';
+import { CARD_ASPECT, readCardUnit } from './cardGeometry';
 
-/** Widest the panel gets. The image fills it, so this is the printed card size. */
-const PREVIEW_WIDTH = 312;
+/**
+ * Widest the panel gets: twice the card unit, so it tracks the same fluid scale
+ * as the cards on the table, held between 240px and 340px. Read at placement
+ * time rather than once, because the unit moves with the window.
+ */
+function previewWidth(): number {
+  return Math.max(240, Math.min(340, Math.round(readCardUnit() * 2)));
+}
 /** Narrowest the panel is allowed to shrink to before it starts overlapping. */
 const MIN_WIDTH = 180;
 /** Gap between the card and the panel, and between the panel and the viewport. */
@@ -388,7 +394,7 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
       const roomLeft = rect.left - GAP - EDGE;
       // Width is decided before measuring: the panel takes what the wider side
       // of the card can give it, up to a printed card's worth.
-      const width = Math.max(MIN_WIDTH, Math.min(PREVIEW_WIDTH, Math.max(roomRight, roomLeft)));
+      const width = Math.max(MIN_WIDTH, Math.min(previewWidth(), Math.max(roomRight, roomLeft)));
       el.style.width = `${width}px`;
 
       const height = el.offsetHeight;
@@ -462,9 +468,18 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
   const typeLine = card.isToken ? spec?.typeLine : data?.typeLine;
   const cost = card.isToken ? undefined : data?.manaCost;
   const oracle = card.isToken ? undefined : data?.oracleText;
-  const image = card.isToken ? undefined : data?.imageNormal;
+  // A token has no `CardData` behind it, so its face — when the token bar found
+  // one — rides on the spec itself.
+  const image = card.isToken ? spec?.imageNormal : data?.imageNormal;
   const pt =
     card.isToken && spec?.power && spec?.toughness ? `${spec.power}/${spec.toughness}` : null;
+  // The face is the preview. The printed text under it is only drawn where there
+  // is no face to read — a token, a card the cache has no image for, or an image
+  // that failed to load — because a card's own frame already says everything the
+  // block repeated, and the block made the panel taller than the card it showed.
+  // Behind a face it is still in the tree, visually hidden: see below.
+  const [imageFailed, setImageFailed] = useState(false);
+  const showText = !image || imageFailed;
 
   return createPortal(
     <div
@@ -475,7 +490,7 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
       style={{
         left: pos?.left ?? 0,
         top: pos?.top ?? 0,
-        width: pos?.width ?? PREVIEW_WIDTH,
+        width: pos?.width ?? previewWidth(),
         visibility: pos ? 'visible' : 'hidden',
       }}
       // The panel itself never takes the pointer — the board under it has to
@@ -490,20 +505,23 @@ export function CardPreview({ id, card, data, anchor, onDismiss }: CardPreviewPr
         closeAfterGrace(id);
       }}
     >
-      {image && (
+      {image && !imageFailed && (
         <img
           className="tbl-preview-img"
           src={image}
+          // The block below carries the name for the reader that cannot see the
+          // face, so an alt here would read it twice.
           alt=""
           style={{ aspectRatio: `1 / ${CARD_ASPECT}` }}
           decoding="async"
           draggable={false}
-          onError={(e) => {
-            e.currentTarget.hidden = true;
-          }}
+          onError={() => setImageFailed(true)}
         />
       )}
-      <div className="tbl-preview-text">
+      {/* Behind a face the block is not drawn, but it stays in the tree: this
+          panel is what the card's `aria-describedby` points at, and with only an
+          image in it the description would be an empty alt. */}
+      <div className={showText ? 'tbl-preview-text' : 'pg-sr-only'}>
         <div className="tbl-preview-head">
           <span className="tbl-preview-name">{name}</span>
           {cost && <span className="tbl-preview-cost">{cost}</span>}

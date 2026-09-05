@@ -139,8 +139,11 @@
      plus that gap, and the battlefield spends it as padding below, so no card is
      ever dealt onto the board already hidden behind a frame. */
   --hud-inset: 10px;
-  --hud-frame-w: 272px;
-  --hud-event-w: 320px;
+  /* Both panes scale with the window between the width at which their readings
+     still fit and the width past which they would only be carrying air. The
+     frame is the narrower of the two because three of them share the row. */
+  --hud-frame-w: clamp(212px, 19vw, 272px);
+  --hud-event-w: clamp(300px, 22vw, 320px);
   --hud-top: 82px;
 }
 
@@ -176,22 +179,6 @@
 .pg-rail > h2,
 .pg-table > h2 {
   margin-bottom: 10px;
-}
-
-/* Responsive floor: the frames give up width before the board does. Three of
-   them plus the two 10px insets is the only thing competing with the board for
-   width now, and below 1100px they stop trying to hold 272px each. */
-@media (max-width: 1280px) {
-  .pg-body.is-live {
-    --hud-frame-w: 244px;
-  }
-}
-
-@media (max-width: 1100px) {
-  .pg-body.is-live {
-    --hud-frame-w: 212px;
-    --hud-event-w: 300px;
-  }
 }
 
 /* Short window: the shell's own chrome gives up its slack before the readout

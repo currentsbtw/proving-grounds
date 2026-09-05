@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { randomSeed } from '../../domain/rng';
 import { getDeck } from '../../db/db';
 import { dealHands, handStats } from '../../engine/drill';
 import { resolveDeckCards } from '../decks/startDeckRun';
 import { CardView } from '../table/CardView';
-import { STRIP_CARD_WIDTH } from '../table/cardGeometry';
+import { useCardUnit } from '../table/cardGeometry';
 import { useUiStore } from '../../state/uiStore';
 import type { CardData, CardInstance, Deck } from '../../domain/types';
 import './drill.css';
@@ -27,6 +27,22 @@ import './drill.css';
  */
 
 const HAND_SIZE = 7;
+
+/** The gap between the drill's cards, as `.dr-hand` sets it in drill.css. */
+const HAND_GAP = 8;
+
+/** No card in the drill is drawn narrower than this, however tight the panel. */
+const MIN_CARD_W = 84;
+
+/**
+ * How much wider a reading of the hand's row has to be than the last one before
+ * it is believed. Fitting the cards to the row changes the panel's height by a
+ * pixel or two, which can take the panel's own scrollbar away — which widens the
+ * row by that scrollbar, which asks for a wider card, which brings the scrollbar
+ * back. Wide enough to cover a scrollbar of either kind and far narrower than
+ * any real change in the window.
+ */
+const GROW_SLACK = 20;
 
 /** Land counts the tally reports on. Every hand has one; most have two or three. */
 const LAND_COUNTS = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -100,6 +116,7 @@ export default function HandDrill() {
   const drill = useUiStore((s) => s.drill);
   const closeDrill = useUiStore((s) => s.closeDrill);
   const deckId = drill?.deckId ?? null;
+  const unit = useCardUnit();
 
   const [deck, setDeck] = useState<Deck | null>(null);
   const [cardData, setCardData] = useState<Record<string, CardData>>({});
@@ -109,6 +126,46 @@ export default function HandDrill() {
   const [seed, setSeed] = useState(() => drill?.seed.trim() || randomSeed());
   const [handNo, setHandNo] = useState(1);
   const [tally, setTally] = useState<Tally>(EMPTY_TALLY);
+
+  /**
+   * The width of the row the hand is dealt into. The card unit is derived from
+   * the window, and this drill sits inside the centre panel: at the unit's cap
+   * seven cards are wider than that panel, and `.dr-hand` wrapped them onto a
+   * second row — which is the one thing the drill's own contract forbids. So the
+   * cards are fitted to the row rather than to the window. Measured with an
+   * observer, like the hand on the table, because the panel moves with the rail
+   * and the window both.
+   */
+  const [rowWidth, setRowWidth] = useState(0);
+  const handObserver = useRef<ResizeObserver | null>(null);
+  const setHandRow = useCallback((node: HTMLDivElement | null) => {
+    handObserver.current?.disconnect();
+    handObserver.current = null;
+    if (!node) return;
+    const measure = (): void => {
+      const inner = node.clientWidth;
+      // A zero reading is a collapsed or unrendered panel; keep the last good
+      // width rather than snapping the hand to its floor.
+      if (inner <= 0) return;
+      setRowWidth((prev) => {
+        if (Math.abs(prev - inner) < 0.5) return prev;
+        // A little more room than last time is the panel's scrollbar leaving,
+        // not the window opening: taking it would put the scrollbar back.
+        if (inner > prev && inner - prev < GROW_SLACK) return prev;
+        return inner;
+      });
+    };
+    measure();
+    handObserver.current = new ResizeObserver(measure);
+    handObserver.current.observe(node);
+  }, []);
+  const cardWidth =
+    rowWidth > 0
+      ? Math.max(
+          MIN_CARD_W,
+          Math.min(unit, Math.floor((rowWidth - (HAND_SIZE - 1) * HAND_GAP) / HAND_SIZE)),
+        )
+      : unit;
 
   // The rail already resolved this deck before opening the drill, so this is a
   // cache read rather than a fetch; it is done again here because the resolved
@@ -253,13 +310,13 @@ export default function HandDrill() {
         <p className="dk-empty">{loadError ? 'Nothing to deal.' : 'Dealing…'}</p>
       ) : (
         <>
-          <div className="dr-hand">
+          <div className="dr-hand" ref={setHandRow}>
             {instances.map((card) => (
               <CardView
                 key={card.iid}
                 card={card}
                 data={cardData[card.scryfallId ?? '']}
-                width={STRIP_CARD_WIDTH}
+                width={cardWidth}
                 menu={false}
               />
             ))}

@@ -98,12 +98,31 @@ function CardArt({
   if (card.isToken) {
     const spec = card.tokenSpec;
     const pt = spec?.power && spec?.toughness ? `${spec.power}/${spec.toughness}` : null;
-    return (
+    // Same two layers as a real card below: the printed frame is the token, and
+    // the face — when the token bar found one — is laid over it.
+    const tokenFrame = (
       <div className="tbl-frame is-token">
         <div className="tbl-frame-name">{spec?.name ?? 'Token'}</div>
         {pt && <div className="tbl-frame-pt">{pt}</div>}
         {spec?.typeLine && <div className="tbl-frame-type">{spec.typeLine}</div>}
       </div>
+    );
+    if (!spec?.imageNormal) return tokenFrame;
+    return (
+      <>
+        {tokenFrame}
+        <img
+          className="tbl-card-img"
+          src={spec.imageNormal}
+          alt={spec.name}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onError={(e) => {
+            e.currentTarget.hidden = true;
+          }}
+        />
+      </>
     );
   }
 

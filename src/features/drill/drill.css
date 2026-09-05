@@ -57,9 +57,12 @@
   white-space: nowrap;
 }
 
-/* Seven cards, side by side and never overlapping: there is room for the whole
-   hand in the centre panel, and a drill about reading a hand must not hide any
-   of it. */
+/* Seven cards, side by side and never overlapping: a drill about reading a hand
+   must not hide any of it. The card unit is derived from the window and this row
+   is only as wide as the centre panel, so HandDrill.tsx measures this box and
+   deals the hand at whatever width fits seven of them plus six of the gap below
+   — never above the unit, never under 84px. The wrap is the last resort under
+   that floor, at a width the panel itself has already started scrolling at. */
 .dr-hand {
   display: flex;
   flex-wrap: wrap;

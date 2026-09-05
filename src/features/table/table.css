@@ -90,14 +90,14 @@
 /* The hand column carries a real floor: with `auto` outer tracks and no minimum
    of its own it was the only track that could give, so a narrow window squeezed
    the hand to nothing while the zone stacks kept their full width. The floor is
-   a few strip cards wide — it moves with `--strip-card` — so the hand still fans
-   rather than stacking to a single overlapped edge before the strip scrolls. */
+   a few cards wide — it moves with `--card-w` — so the hand still fans rather
+   than stacking to a single overlapped edge before the strip scrolls.
+
+   The ground and the rule above it run the whole window; the five zones inside
+   them do not. Past `--table-max` the side padding takes the surplus, so the
+   graveyard and the command zone stay one glance apart on an ultrawide instead
+   of standing at opposite ends of the desk. */
 .tbl-strip {
-  /* The strip's one card size, matching STRIP_CARD_WIDTH in cardGeometry.ts:
-     the cards themselves are sized in TS, and the frames and empty slots that
-     hold them are sized here. */
-  --strip-card: 105px;
-  --strip-card-h: 147px;
   /* One frame recipe for all five zones — graveyard, exile, hand, library,
      command. The head row is lifted out of the flow and the frame reserves its
      band as padding, so no zone's head can push its frame wider or taller than
@@ -106,10 +106,10 @@
   --zone-head-h: 14px;
   --zone-head-gap: 4px;
   display: grid;
-  grid-template-columns: auto minmax(300px, 1fr) auto;
+  grid-template-columns: auto minmax(calc(var(--card-w) * 2.86), 1fr) auto;
   gap: 12px;
   align-items: start;
-  padding: 8px 12px 9px;
+  padding: 8px max(12px, calc((100% - var(--table-max)) / 2)) 9px;
   background: var(--ground);
   border-top: 1px solid var(--line);
 }
@@ -146,12 +146,15 @@
 }
 
 /* Exactly one card tall in every zone, whether it is holding a card, a row of
-   commanders, a fanned hand, or nothing at all. */
+   commanders, a fanned hand, or nothing at all. This is the one place the card's
+   height is written rather than derived from its own width: the body is a row of
+   cards, not a card, so it has no aspect of its own. The multiplier is
+   CARD_ASPECT in cardGeometry.ts. */
 .tbl-zone-body {
   position: relative;
   display: flex;
   gap: 6px;
-  height: var(--strip-card-h);
+  height: calc(var(--card-w) * 1.396);
 }
 
 /* The head row sits in the band the frame reserved for it: an 11px label on the
@@ -207,8 +210,8 @@
 
 .tbl-zone-slot {
   position: relative;
-  width: var(--strip-card);
-  height: var(--strip-card-h);
+  width: var(--card-w);
+  aspect-ratio: 1 / 1.396;
   border-radius: 0;
   background: var(--raised);
   border: 1px dashed var(--rule);
@@ -252,8 +255,8 @@
    rendered prop in this world, and no image to fetch. */
 .tbl-lib-back {
   position: relative;
-  width: var(--strip-card);
-  height: var(--strip-card-h);
+  width: var(--card-w);
+  aspect-ratio: 1 / 1.396;
   border-radius: 5px;
   /* Mixed towards the accent rather than towards the ink, so the back is the
      same warm slab a shade off the frame in both themes — mixing towards the
@@ -354,17 +357,18 @@
 
 /* Narrow strip ----------------------------------------------------------- */
 
-/* Below the layout's comfortable width the strip gives up its spacing, not its
-   card size: every card in the strip is one size at every width now, and a pile
-   that shrank while the hand beside it did not was the thing this row was
-   reorganised to stop. What is left over goes to the hand; past that the strip
-   scrolls, in the block below. The comfortable width moves with the card size:
-   the five frames and the hand's floor are ~840px wide now, and this keeps the
-   same ~400px of slack over that figure the strip had at the smaller size. */
-@media (max-width: 1240px) {
+/* The card now shrinks with the window, so the strip fits by construction at
+   almost every width: five cards, the hand's floor and this row's own spacing
+   come to about 87% of the window while the width term of `--card-w` is the one
+   binding, and to far less than that once the cap takes over. The one band where
+   the sums do not close is the last stretch above the product's declared floor,
+   where the fixed spacing is a larger share of a smaller window. There the strip
+   gives up its spacing, not its card size: a pile that shrank while the hand
+   beside it did not was the thing this row was reorganised to stop. */
+@media (max-width: 1024px) {
   .tbl-strip {
     gap: 8px;
-    padding: 8px 8px 10px;
+    padding: 8px max(8px, calc((100% - var(--table-max)) / 2)) 10px;
   }
 
   .tbl-zone-group {
@@ -376,14 +380,12 @@
   }
 }
 
-/* A browser at 200% zoom on a 1440px screen reports 720px of width, well under
-   the layout's declared floor. Four stacks and a 300px hand cannot share that
-   line, and the strip was clipping the graveyard and exile off the right edge.
-   Below the floor the surface scrolls instead: nothing is lost, the hand keeps
-   its width, and the board above is untouched. The breakpoint sits above the
-   strip's true minimum (about 930px with a partner pair at the 105px card) so
-   a second commander never clips in the band just above it. */
-@media (max-width: 1000px) {
+/* Under the declared floor — a 1440px screen at 200% zoom reports 720px — the
+   card has bottomed out at its own floor and cannot pay for the window any
+   more, so the surface scrolls rather than clipping the outer stacks off the
+   right edge: nothing is lost, the hand keeps its width, and the board above is
+   untouched. */
+@media (max-width: 820px) {
   .pg-table.tbl-root {
     overflow-x: auto;
     overflow-y: hidden;
@@ -581,6 +583,14 @@
   overflow: hidden;
   background: var(--raised);
   border: 1px solid var(--line);
+}
+
+/* An image that failed to load hides itself with the `hidden` attribute, and the
+   `display: block` below would otherwise beat the user agent's `[hidden]` rule
+   and leave a broken-image box laid over the printed frame. */
+.tbl-card-img[hidden],
+.tbl-preview-img[hidden] {
+  display: none;
 }
 
 .tbl-card-img {
@@ -1043,7 +1053,7 @@
   overflow: auto;
   padding: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-w) * 0.9), 1fr));
   gap: 14px;
   align-content: start;
 }
@@ -1082,7 +1092,7 @@
 /* Short windows (200% zoom on a laptop). The board keeps room for two rows of
    floor-width cards; if the tray and the strip cannot fit under that, the table
    scrolls vertically rather than closing the battlefield to a few pixels. This
-   block sits after the 1000px rules so its overflow-y wins there too. */
+   block sits after the narrow-window rules so its overflow-y wins there too. */
 @media (max-height: 560px) {
   .pg-table.tbl-root {
     grid-template-rows: minmax(136px, 1fr) auto auto;

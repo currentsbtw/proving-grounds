@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import type { CardInstance } from '../../domain/types';
+import { useCardUnit } from './cardGeometry';
 import { CardView } from './CardView';
 
 export interface BrowseOverlayProps {
@@ -25,6 +26,10 @@ export function BrowseOverlay({
   actions,
   onClose,
 }: BrowseOverlayProps) {
+  // A grid cell is a shade under a table card: the browser prints many at once
+  // and the cell carries its action row under it.
+  const width = Math.round(useCardUnit() * 0.9);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key === 'Escape') {
@@ -58,7 +63,7 @@ export function BrowseOverlay({
           {cards.length === 0 && <p className="tbl-overlay-empty">{emptyText}</p>}
           {cards.map((card) => (
             <div className="tbl-overlay-cell" key={card.iid}>
-              <CardView card={card} width={140} />
+              <CardView card={card} width={width} />
               {actions && <div className="tbl-cell-actions">{actions(card)}</div>}
             </div>
           ))}

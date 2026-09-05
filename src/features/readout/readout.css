@@ -177,11 +177,17 @@
    comparison between seats, and leaves the whole set one layer under the
    drawer whatever any seat is doing.
 */
+/* The row is bounded and centred over the board rather than pinned to the
+   window's own two edges: three seat readings held at the far ends of an
+   ultrawide are not a row you can take in at a glance, and the seats are read
+   against each other. The board underneath keeps the full width. */
 .hud-frames {
   position: absolute;
   top: var(--hud-inset);
   left: var(--hud-inset);
   right: var(--hud-inset);
+  max-width: var(--table-max);
+  margin-inline: auto;
   isolation: isolate;
   display: grid;
   grid-template-columns: repeat(3, var(--hud-frame-w));
@@ -835,7 +841,10 @@
   align-items: center;
   flex-wrap: nowrap;
   gap: 4px 14px;
-  padding: 5px 14px 6px;
+  /* The rule and the ground run the full width; the readings inside sit within
+     the same `--table-max` span as the seat frames and the strip, so on an
+     ultrawide TURN and the tab group are not a screen apart. */
+  padding: 5px max(14px, calc((100% - var(--table-max)) / 2)) 6px;
   background: var(--ground);
   border-top: 1px solid var(--line);
   min-width: 0;

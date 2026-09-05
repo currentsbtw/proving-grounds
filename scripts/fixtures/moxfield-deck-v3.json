@@ -1,0 +1,83 @@
+{
+  "_note": "HAND-MADE. Moxfield's API is bot-gated (403 without a whitelisted user agent), so this was written from the documented v3 shape and has never been checked against a live response. Boards live under `boards` and their `cards` maps are keyed by an opaque id, not by card name.",
+  "id": "hand-made-v3",
+  "publicId": "AbCd_12EfGh",
+  "name": "Thelon Spore Engine",
+  "format": "commander",
+  "boards": {
+    "commanders": {
+      "count": 1,
+      "cards": {
+        "5f0b0d5a9a1c4d7e8f2a3b4c": {
+          "quantity": 1,
+          "card": { "id": "c673b7b0", "name": "Thelon of Havenwood", "set": "tsp" }
+        }
+      }
+    },
+    "companions": {
+      "count": 1,
+      "cards": {
+        "60a1c2d3e4f5061728394a5b": {
+          "quantity": 1,
+          "card": { "id": "9a2b1c04", "name": "Lurrus of the Dream-Den", "set": "iko" }
+        }
+      }
+    },
+    "mainboard": {
+      "count": 17,
+      "cards": {
+        "70b2d3e4f50617283949a6bc": {
+          "quantity": 1,
+          "card": { "id": "11111111", "name": "Sol Ring", "set": "c21" }
+        },
+        "81c3e4f5061728394a5b6cd7": {
+          "quantity": 1,
+          "card": { "id": "22222222", "name": "Deathspore Thallid", "set": "tsp" }
+        },
+        "92d4f50617283949a5b6c7de": {
+          "quantity": 2,
+          "card": { "id": "33333333", "name": "Sporesower Thallid", "set": "tsp" }
+        },
+        "a3e50617283949a5b6c7d8ef": {
+          "quantity": 12,
+          "card": { "id": "44444444", "name": "Forest", "set": "unf" }
+        },
+        "b4f617283949a5b6c7d8e9f0": {
+          "quantity": 1,
+          "card": {
+            "id": "55555555",
+            "name": "Westvale Abbey // Ormendahl, Profane Prince",
+            "set": "soi"
+          }
+        }
+      }
+    },
+    "sideboard": {
+      "count": 1,
+      "cards": {
+        "c5071829394a5b6c7d8e9f01": {
+          "quantity": 1,
+          "card": { "id": "66666666", "name": "Pithing Needle", "set": "m21" }
+        }
+      }
+    },
+    "maybeboard": {
+      "count": 2,
+      "cards": {
+        "d61829394a5b6c7d8e9f0112": {
+          "quantity": 2,
+          "card": { "id": "77777777", "name": "Doubling Season", "set": "rav" }
+        }
+      }
+    },
+    "tokens": {
+      "count": 1,
+      "cards": {
+        "e729394a5b6c7d8e9f011223": {
+          "quantity": 1,
+          "card": { "id": "88888888", "name": "Saproling", "set": "tspt" }
+        }
+      }
+    }
+  }
+}

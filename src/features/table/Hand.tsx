@@ -3,30 +3,31 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { CardInstance } from '../../domain/types';
 import { useGameStore } from '../../state/gameStore';
-import { STRIP_CARD_WIDTH } from './cardGeometry';
+import { useCardUnit } from './cardGeometry';
 import { DraggableCardView } from './CardView';
 
 /** Breathing room between cards while they still fit side by side. */
-const GAP = 10;
+const GAP_RATIO = 0.095;
 /**
  * Smallest distance between two card left edges when overlapping — the sliver
- * of a covered card that stays readable. Both figures are a fraction of
- * STRIP_CARD_WIDTH rather than absolute room, so a change to the strip's card
- * size fans the hand the same way it did at the old one.
+ * of a covered card that stays readable. Both figures are a fraction of the
+ * card unit rather than absolute room, so the hand fans the same way at every
+ * window size the unit takes.
  */
-const STEP_MIN = 15;
+const STEP_MIN_RATIO = 0.143;
 
 /**
  * Distance between the left edges of two neighbouring cards. The card width is
  * the strip's one size and never gives — a hand that shrank to fit printed its
  * cards smaller than the graveyard beside it — so a hand too wide for its
- * column overlaps instead, down to the STEP_MIN floor. A step below the card
- * width means the cards overlap by `width - step`; hovering one lifts it clear.
+ * column overlaps instead, down to the step floor. A step below the card width
+ * means the cards overlap by `width - step`; hovering one lifts it clear.
  */
-function handStep(avail: number, count: number): number {
-  const spread = STRIP_CARD_WIDTH + GAP;
+function handStep(avail: number, count: number, unit: number): number {
+  const spread = unit + Math.round(unit * GAP_RATIO);
   if (count <= 1 || avail <= 0) return spread;
-  return Math.max(STEP_MIN, Math.min(spread, (avail - STRIP_CARD_WIDTH) / (count - 1)));
+  const stepMin = Math.round(unit * STEP_MIN_RATIO);
+  return Math.max(stepMin, Math.min(spread, (avail - unit) / (count - 1)));
 }
 
 export interface HandProps {
@@ -40,6 +41,7 @@ export interface HandProps {
 export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) {
   const { setNodeRef, isOver } = useDroppable({ id: 'hand' });
   const moveCard = useGameStore((s) => s.moveCard);
+  const unit = useCardUnit();
 
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [avail, setAvail] = useState(0);
@@ -93,8 +95,8 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
     stops[Math.min(index, stops.length - 1)].focus();
   }, [cards.length]);
 
-  const step = handStep(avail, cards.length);
-  const overlap = step - STRIP_CARD_WIDTH;
+  const step = handStep(avail, cards.length, unit);
+  const overlap = step - unit;
 
   return (
     <div
@@ -132,7 +134,7 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
             >
               <DraggableCardView
                 card={card}
-                width={STRIP_CARD_WIDTH}
+                width={unit}
                 selected={selecting && selected.includes(card.iid)}
                 onClick={selecting ? () => onToggleSelect(card.iid) : undefined}
                 onDoubleClick={

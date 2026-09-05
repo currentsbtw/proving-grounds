@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { useGameStore } from '../../../state/gameStore';
 import type { TokenSpec } from '../../../domain/types';
+import { findTokenFace } from '../../../services/scryfall';
+
+/**
+ * How long a face lookup is allowed to hang before it is abandoned. It gates
+ * nothing — the token is already on the battlefield by the time the request goes
+ * out — it only stops a dead connection from holding a request open for ever.
+ */
+const FACE_TIMEOUT_MS = 3000;
 
 interface Preset {
   label: string;
@@ -60,6 +68,7 @@ function clampCount(n: number): number {
 /** Preset token buttons with an ×N multiplier, plus an inline custom-token form. */
 export default function TokenBar() {
   const createToken = useGameStore((s) => s.createToken);
+  const setTokenFace = useGameStore((s) => s.setTokenFace);
 
   const [countText, setCountText] = useState('1');
   const [showCustom, setShowCustom] = useState(false);
@@ -68,9 +77,33 @@ export default function TokenBar() {
   const [toughness, setToughness] = useState('');
   const [customCount, setCustomCount] = useState('1');
 
+  /**
+   * Creates the token now and asks Scryfall for its face afterwards. The click is
+   * the player's, so `createToken` runs synchronously with the plain spec — same
+   * state change, same log entry as if there were no lookup at all. The face is a
+   * later, cosmetic patch onto those instances; a miss, an error, an abort or a
+   * timeout simply leaves the text frame the table has always drawn.
+   */
+  function create(spec: TokenSpec, n: number): void {
+    const iids = createToken(spec, n);
+    if (iids.length === 0) return;
+
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), FACE_TIMEOUT_MS);
+    void findTokenFace(spec, abort.signal)
+      .then((face) => {
+        if (face) setTokenFace(iids, face);
+      })
+      .catch(() => {
+        // `findTokenFace` answers null rather than throwing; belt and braces.
+      })
+      .finally(() => clearTimeout(timer));
+  }
+
   function makePreset(spec: TokenSpec): void {
-    createToken(spec, clampCount(Number(countText)));
+    const n = clampCount(Number(countText));
     setCountText('1');
+    create(spec, n);
   }
 
   function submitCustom(): void {
@@ -87,7 +120,8 @@ export default function TokenBar() {
           typeLine: `Token Creature — ${trimmed}`,
         }
       : { name: trimmed, typeLine: 'Token' };
-    createToken(spec, clampCount(Number(customCount)));
+    const n = clampCount(Number(customCount));
+    create(spec, n);
     setName('');
     setPower('');
     setToughness('');
@@ -120,11 +154,7 @@ export default function TokenBar() {
             {preset.label}
           </button>
         ))}
-        <button
-          type="button"
-          aria-expanded={showCustom}
-          onClick={() => setShowCustom((v) => !v)}
-        >
+        <button type="button" aria-expanded={showCustom} onClick={() => setShowCustom((v) => !v)}>
           Custom…
         </button>
       </div>
@@ -179,7 +209,11 @@ export default function TokenBar() {
             <button type="button" onClick={() => setShowCustom(false)}>
               Cancel
             </button>
-            <button type="button" disabled={name.trim() === ''} onClick={submitCustom}>
+            <button
+              type="button"
+              disabled={name.trim() === ''}
+              onClick={submitCustom}
+            >
               Create
             </button>
           </div>

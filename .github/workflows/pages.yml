@@ -33,7 +33,15 @@ jobs:
       - run: npm run verify:engine
       # Vite's base is the repo name, so asset URLs resolve under the Pages
       # sub-path. Locally `npm run preview:pages` serves dist the same way.
+      #
+      # DECK_FETCH_URL is the deployed deck-fetch Worker (workers/deck-fetch/,
+      # set as a repository variable). It is baked in at build time because the
+      # static build has no `/api` to proxy. Unset is a supported state: the app
+      # falls back to `/api/deck`, which 404s here, and a pasted deck link then
+      # shows the "export the list and paste it" instruction instead.
       - run: npx tsc -b && npx vite build --base "/${GITHUB_REPOSITORY#*/}/"
+        env:
+          VITE_DECK_FETCH_URL: ${{ vars.DECK_FETCH_URL }}
       # A SPA fallback: Pages serves 404.html for unknown paths, and the app has
       # no client-side routes, so the fallback only has to load the app itself.
       - run: cp dist/index.html dist/404.html

@@ -3,6 +3,9 @@ import { nanoid } from 'nanoid';
 import { saveDeck } from '../../db/db';
 import { parseDecklist } from '../../services/deckParser';
 import type { ParsedEntry } from '../../services/deckParser';
+import { deckSiteLabel, isDeckUrl, parseDeckUrl, toDecklistText } from '../../domain/deckUrl';
+import type { DeckUrlRef } from '../../domain/deckUrl';
+import { fetchDeckFromUrl } from '../../services/deckFetch';
 import { indexByName, nameKey, resolveCards, resolveCardsByIds } from '../../services/scryfall';
 import type { CardData, Deck, DeckCardRef } from '../../domain/types';
 import { CommanderPicker } from './CommanderPicker';
@@ -91,11 +94,35 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
     return { main, total: main + commanderIds.length };
   }, [review, commanderIds]);
 
-  async function handleResolve() {
+  /**
+   * The three arguments exist for the fetch path, which resolves a deck in the
+   * same tick it received one: the text comes from what just arrived rather
+   * than from state React has not committed yet, whatever the site's list lost
+   * on the way in (a Maybeboard, a row with no name) is shown in the review
+   * beside the parser's own complaints, and `known` is the deck name as it will
+   * be — so the commander fallback below does not overwrite the name the site
+   * gave the deck.
+   */
+  async function handleResolve(
+    source: string = text,
+    extraWarnings: string[] = [],
+    known: string = name,
+  ) {
     setError(null);
-    const parsed = parseDecklist(text);
+    const parsed = parseDecklist(source);
     if (parsed.entries.length === 0) {
-      setError('Nothing to import. Paste a decklist first.');
+      // Nothing to resolve, so nothing below runs — but the fetch path set
+      // `busy` before calling in, and leaving it set locks the form. On that
+      // path the site's own warnings are the only account of why a deck arrived
+      // empty (everything was on a Maybeboard, the deck listed no cards), so
+      // they are shown instead of an instruction to paste a list that is
+      // already pasted.
+      setError(
+        extraWarnings.length > 0
+          ? `${extraWarnings.join('. ')}. Nothing was imported.`
+          : 'Nothing to import. Paste a decklist first.',
+      );
+      setBusy(null);
       return;
     }
 
@@ -119,12 +146,12 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
         }
       }
 
-      setReview({ rows, notFound, parseWarnings: parsed.warnings });
+      setReview({ rows, notFound, parseWarnings: [...extraWarnings, ...parsed.warnings] });
       setCommanderIds((prev) => {
         const valid = prev.filter((id) => rows.some((r) => r.card.scryfallId === id));
         return marked.length > 0 ? marked : valid;
       });
-      if (!name.trim() && marked.length > 0) {
+      if (!known.trim() && marked.length > 0) {
         const lead = rows.find((r) => r.card.scryfallId === marked[0]);
         if (lead) setName(lead.card.name);
       }
@@ -141,6 +168,30 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * A pasted link, fetched and dropped into the box as a list. The player sees
+   * exactly what came back, and everything after this point — the review, the
+   * commander marking, Scryfall — is the paste flow untouched.
+   */
+  async function handleFetch(ref: DeckUrlRef) {
+    setError(null);
+    setBusy(`Reading the deck on ${deckSiteLabel(ref.site)}`);
+    const result = await fetchDeckFromUrl(ref);
+    if (!result.ok) {
+      setError(result.message);
+      setBusy(null);
+      return;
+    }
+
+    const body = toDecklistText(result.deck);
+    setText(body);
+    // The site's own name for the deck, unless the player already typed one.
+    const fetched = result.deck.name.trim();
+    const known = name.trim() || fetched;
+    if (!name.trim() && fetched) setName(fetched);
+    await handleResolve(body, result.deck.warnings, known);
   }
 
   async function handleSave() {
@@ -178,6 +229,8 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
   }
 
   const commanderOptions = review ? review.rows.map((r) => r.card) : [];
+  /** A box holding one deck link fetches it; anything else is a pasted list. */
+  const link = useMemo(() => (isDeckUrl(text) ? parseDeckUrl(text) : null), [text]);
 
   return (
     <div className="dk-stack">
@@ -222,7 +275,10 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
               className="dk-textarea"
               value={text}
               spellCheck={false}
-              placeholder={'Commander\n1 Atraxa, Praetors’ Voice\n\nDeck\n1 Sol Ring\n1 Arcane Signet\n…'}
+              placeholder={
+                'Commander\n1 Atraxa, Praetors’ Voice\n\nDeck\n1 Sol Ring\n1 Arcane Signet\n…\n\n' +
+                'or paste a Moxfield / Archidekt deck link'
+              }
               onChange={(e) => setText(e.target.value)}
             />
           </label>
@@ -231,9 +287,9 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
               type="button"
               className="dk-btn-primary dk-grow"
               disabled={Boolean(busy) || text.trim().length === 0}
-              onClick={() => void handleResolve()}
+              onClick={() => void (link ? handleFetch(link) : handleResolve())}
             >
-              Resolve list
+              {link ? `Fetch from ${deckSiteLabel(link.site)}` : 'Resolve list'}
             </button>
           </div>
         </>

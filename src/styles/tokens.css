@@ -1,5 +1,19 @@
 /* Dark ships by default. Light is the same design with swapped values — a token
    swap, never a redesign — and is selected by data-theme on the root element. */
+
+/* The card unit is registered rather than merely declared, so the browser
+   resolves the clamp below to a single length and hands JavaScript that number
+   back off the root element. Everything that sizes a card — the strip's frames
+   in CSS, the fan in Hand.tsx, the battlefield's ceiling, the browse cell, the
+   drag overlay, the preview panel — reads this one figure instead of carrying a
+   constant of its own. The initial value is the small end of the range, so a
+   card rendered before the cascade has run is a card, not a sliver. */
+@property --card-w {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 105px;
+}
+
 :root {
   /* Surfaces */
   --ground: #17181c;
@@ -59,6 +73,30 @@
   --titlebar-h: 44px;
   --radius: 6px;
   --gap: 12px;
+
+  /* One card width for the whole app, scaled to the window between a floor at
+     which a card face is still readable and a cap at which it stops growing —
+     past the cap a bigger monitor buys more board, not bigger cards. The height
+     is never a second token: it is this width times CARD_ASPECT.
+
+     The height term is what binds on a short or a wide-and-short window: a
+     3440x1440 window has no more height than a 2560x1440 one, and a card sized
+     off width alone would push the strip off the bottom of it. Worked:
+     1024x768 -> 113 (width binds), 1280x800 -> 141 (width binds),
+     1440x900 and every window wider than that -> 158, the cap.
+
+     Rounded to the whole pixel in CSS, because readCardUnit() rounds the figure
+     it reads: without it the stylesheet drew an empty zone slot at 112.64px and
+     the card beside it at 113px, a fraction apart in width and a whole pixel in
+     height. */
+  --card-w: round(clamp(84px, min(11vw, 18.6vh), 158px), 1px);
+
+  /* The widest the eye should have to travel to read one row. The three seat
+     frames and the five zones of the bottom strip are centred inside this,
+     while the battlefield keeps the whole window — more cards per row there is
+     useful, but three seat readings 1500px apart on an ultrawide is not one
+     row of information any more. */
+  --table-max: 2000px;
 }
 
 :root[data-theme='light'] {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-01T00:00:00Z",
+  "generatedAt": "2026-09-04T00:00:00Z",
   "title": "Design System: Proving Grounds",
   "extensions": {
     "colorMeta": {
@@ -53,7 +53,8 @@
     "breakpoints": [
       { "name": "readout-narrow", "value": "1280px", "purpose": "Right rail 320 -> 280px; seat 'life' caption folds; chips tighten; figures step to 20/17px." },
       { "name": "readout-narrower", "value": "1100px", "purpose": "Right rail -> 250px (276px if also under 820px tall); zone stacks shrink to 78px." },
-      { "name": "strip-scroll", "value": "940px", "purpose": "Bottom strip scrolls horizontally instead of clipping; stacks 70px, slots 58x81." },
+      { "name": "strip-tight", "value": "1024px", "purpose": "Bottom strip gives up its own spacing (gaps 12->8, group gap 10->6, head tracking 0.16->0.06em), never its card size." },
+      { "name": "strip-scroll", "value": "820px", "purpose": "Under the declared width floor the card unit has bottomed out at 84px; the bottom strip scrolls horizontally instead of clipping the outer stacks." },
       { "name": "short", "value": "940px height", "purpose": "Readout paddings close up." },
       { "name": "shorter", "value": "820px height", "purpose": "Title bar 38px; readout figures 18/16px; tabs 30px; legal line 11px. 768px is the floor held." }
     ]

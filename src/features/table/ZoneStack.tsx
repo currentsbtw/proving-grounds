@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import type { MouseEvent } from 'react';
 import type { CardInstance, ZoneId } from '../../domain/types';
 import { commanderTax, useGameStore } from '../../state/gameStore';
-import { STRIP_CARD_WIDTH } from './cardGeometry';
+import { useCardUnit } from './cardGeometry';
 import { DraggableCardView } from './CardView';
 
 export interface ZoneStackProps {
@@ -26,6 +26,7 @@ export interface ZoneStackProps {
  */
 export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) {
   const { setNodeRef, isOver } = useDroppable({ id: zone });
+  const unit = useCardUnit();
   const top = cards.length > 0 ? cards[cards.length - 1] : undefined;
 
   return (
@@ -51,7 +52,7 @@ export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) 
         {top ? (
           <DraggableCardView
             card={top}
-            width={STRIP_CARD_WIDTH}
+            width={unit}
             small
             badge={false}
             title="Drag out, or right-click for options"
@@ -75,6 +76,7 @@ export function ZoneStack({ zone, label, name, cards, onOpen }: ZoneStackProps) 
 function CommanderCard({ card }: { card: CardInstance }) {
   const tax = useGameStore((s) => (card.scryfallId ? commanderTax(s, card.scryfallId) : 0));
   const castCommander = useGameStore((s) => s.castCommander);
+  const unit = useCardUnit();
 
   // The card swallows its own clicks: the zone behind it opens the browse
   // overlay on a plain click, and a first click that opened an overlay would
@@ -87,7 +89,7 @@ function CommanderCard({ card }: { card: CardInstance }) {
     <div className="tbl-commander">
       <DraggableCardView
         card={card}
-        width={STRIP_CARD_WIDTH}
+        width={unit}
         small
         badge={false}
         onClick={swallow}

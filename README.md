@@ -21,6 +21,19 @@ The current milestone is the instrumented goldfish table:
 - **No multiplayer.** Single player, local only.
 - **No deck builder.** Import a finished list; build it elsewhere.
 
+## Import by link
+
+Paste a Moxfield or Archidekt deck URL into the import form instead of the list itself and the
+app fetches it, shows you what came back, and imports it as if you had pasted the text. Neither
+site can be read from the page (Archidekt's CORS allows one origin that is not ours, Moxfield's
+API is behind a bot check), so the link is read by a small fetch route. Locally that route is the
+same process as the judge proxy — `npm run play`, or `npm run judge` on its own, which needs no
+API key to serve it. On the published build it is a Cloudflare Worker; until one is deployed
+(`workers/deck-fetch/README.md`), a pasted link there tells you to export the list and paste the
+text. Archidekt works out of the box. Moxfield refuses automated reads unless the user agent has
+been whitelisted by their support; with one in hand, set it as `MOXFIELD_USER_AGENT` in the
+environment the fetch route runs in, and until then Moxfield links say so and ask for a paste.
+
 ## Keyboard map
 
 | Key     | Action                                   |

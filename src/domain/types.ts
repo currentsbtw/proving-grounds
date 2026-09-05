@@ -55,6 +55,24 @@ export interface TokenSpec {
   toughness?: string;
   colors?: string[];
   typeLine?: string;
+  /**
+   * The printing whose face the table shows, found by `findTokenFace` when the
+   * token is created. A spec carrying a face is still a token and nothing more:
+   * there is no oracle text, no `CardData`, and no row written to the Dexie card
+   * cache, so the id is a provenance note rather than a key anything resolves.
+   * The instance's own `scryfallId` stays null, which is what `isToken` code all
+   * over the app already reads.
+   */
+  scryfallId?: string;
+  /**
+   * Normal-size image URL for that printing, stored the way `CardData` stores
+   * its own so the table renders the face without a second lookup. Absent
+   * whenever the search found nothing, failed, or was never run — the text frame
+   * is the fallback, exactly as before. The store's 'token' log entry carries
+   * the whole spec as its `spec` payload, these two fields included; nothing
+   * replays a spec's shape, so an older log with neither field still reads.
+   */
+  imageNormal?: string;
 }
 
 /** One physical card at the table. */

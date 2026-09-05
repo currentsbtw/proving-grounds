@@ -1,0 +1,53 @@
+{
+  "_note": "HAND-MADE. Moxfield's API is bot-gated (403 without a whitelisted user agent), so this was written from the documented v2 shape and has never been checked against a live response. Boards are objects keyed by card name.",
+  "id": "hand-made-v2",
+  "publicId": "AbCd_12EfGh",
+  "name": "Thelon Spore Engine",
+  "format": "commander",
+  "commanders": {
+    "Thelon of Havenwood": {
+      "quantity": 1,
+      "card": { "id": "c673b7b0", "name": "Thelon of Havenwood", "set": "tsp" }
+    }
+  },
+  "companions": {
+    "Lurrus of the Dream-Den": {
+      "quantity": 1,
+      "card": { "id": "9a2b1c04", "name": "Lurrus of the Dream-Den", "set": "iko" }
+    }
+  },
+  "mainboard": {
+    "Sol Ring": {
+      "quantity": 1,
+      "card": { "id": "11111111", "name": "Sol Ring", "set": "c21" }
+    },
+    "Deathspore Thallid": {
+      "quantity": 1,
+      "card": { "id": "22222222", "name": "Deathspore Thallid", "set": "tsp" }
+    },
+    "Sporesower Thallid": {
+      "quantity": 2,
+      "card": { "id": "33333333", "name": "Sporesower Thallid", "set": "tsp" }
+    },
+    "Forest": {
+      "quantity": 12,
+      "card": { "id": "44444444", "name": "Forest", "set": "unf" }
+    },
+    "Westvale Abbey // Ormendahl, Profane Prince": {
+      "quantity": 1,
+      "card": { "id": "55555555", "name": "Westvale Abbey // Ormendahl, Profane Prince", "set": "soi" }
+    }
+  },
+  "sideboard": {
+    "Pithing Needle": {
+      "quantity": 1,
+      "card": { "id": "66666666", "name": "Pithing Needle", "set": "m21" }
+    }
+  },
+  "maybeboard": {
+    "Doubling Season": {
+      "quantity": 2,
+      "card": { "id": "77777777", "name": "Doubling Season", "set": "rav" }
+    }
+  }
+}
