@@ -423,7 +423,7 @@
   border-color: var(--rule);
 }
 
-/* The row never scrolls: the cards are the strip's one size and Hand.tsx
+/* The row never scrolls: Hand.tsx sizes the cards (the unit, or down to 80% of it before they overlap) and
    overlaps them to the measured width, so they are laid out by margin and the
    body's own gap has to go. Vertical overflow stays visible so the hover lift
    can rise out of the frame; horizontal is clipped purely as a backstop for a

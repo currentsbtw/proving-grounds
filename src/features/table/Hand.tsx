@@ -10,24 +10,58 @@ import { DraggableCardView } from './CardView';
 const GAP_RATIO = 0.095;
 /**
  * Smallest distance between two card left edges when overlapping — the sliver
- * of a covered card that stays readable. Both figures are a fraction of the
- * card unit rather than absolute room, so the hand fans the same way at every
- * window size the unit takes.
+ * of a covered card that stays readable, measured against the width the card is
+ * actually drawn at. Every figure here is a fraction of the card unit rather
+ * than absolute room, so the hand fans the same way at every window size the
+ * unit takes.
  */
 const STEP_MIN_RATIO = 0.143;
+/** Hand cards may print this much smaller than the strip's unit, and no more. */
+const SHRINK_FLOOR_RATIO = 0.8;
+/** The gap left between cards that only fit by having shrunk. */
+const GAP_MIN_RATIO = 0.04;
 
 /**
- * Distance between the left edges of two neighbouring cards. The card width is
- * the strip's one size and never gives — a hand that shrank to fit printed its
- * cards smaller than the graveyard beside it — so a hand too wide for its
- * column overlaps instead, down to the step floor. A step below the card width
- * means the cards overlap by `width - step`; hovering one lifts it clear.
+ * The width each hand card prints at and the distance between two neighbouring
+ * left edges. The card width is the strip's one size while the hand fits at
+ * that size, but unlike every other surface it gives — down to 0.8 of the unit
+ * — before it starts overlapping: seven whole cards printed a fifth smaller
+ * read faster than a fan in which most of each card is hidden behind the next.
+ * Past that floor the width holds and the cards overlap instead, down to the
+ * step floor. A step below the card width means the cards overlap by
+ * `width - step`; hovering one lifts it clear.
  */
-function handStep(avail: number, count: number, unit: number): number {
-  const spread = unit + Math.round(unit * GAP_RATIO);
-  if (count <= 1 || avail <= 0) return spread;
-  const stepMin = Math.round(unit * STEP_MIN_RATIO);
-  return Math.max(stepMin, Math.min(spread, (avail - unit) / (count - 1)));
+function handLayout(
+  avail: number,
+  count: number,
+  unit: number,
+): { width: number; step: number } {
+  const gap = Math.round(unit * GAP_RATIO);
+  if (count <= 1 || avail <= 0) return { width: unit, step: unit + gap };
+
+  // Room for the full unit with its full gap: nothing gives.
+  if (count * unit + (count - 1) * gap <= avail) {
+    return { width: unit, step: unit + gap };
+  }
+
+  // Shrink instead of overlapping, as far as the floor allows. The unit is
+  // still the ceiling: when it is the breathing room and not the card that the
+  // row is short of, the cards keep their size and take the tighter gap.
+  const gapMin = Math.round(unit * GAP_MIN_RATIO);
+  const shrunk = Math.min(
+    unit,
+    Math.floor((avail - (count - 1) * gapMin) / count),
+  );
+  const floor = Math.round(unit * SHRINK_FLOOR_RATIO);
+  if (shrunk >= floor) return { width: shrunk, step: shrunk + gapMin };
+
+  // Too many cards even at the floor: hold the width and fan.
+  const stepMin = Math.round(floor * STEP_MIN_RATIO);
+  const step = Math.max(
+    stepMin,
+    Math.min(floor + gapMin, (avail - floor) / (count - 1)),
+  );
+  return { width: floor, step };
 }
 
 export interface HandProps {
@@ -95,8 +129,9 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
     stops[Math.min(index, stops.length - 1)].focus();
   }, [cards.length]);
 
-  const step = handStep(avail, cards.length, unit);
-  const overlap = step - unit;
+  const { width, step } = handLayout(avail, cards.length, unit);
+  // Negative while the cards overlap, a plain gap while they do not.
+  const overlap = step - width;
 
   return (
     <div
@@ -134,7 +169,7 @@ export function Hand({ cards, selecting, selected, onToggleSelect }: HandProps) 
             >
               <DraggableCardView
                 card={card}
-                width={unit}
+                width={width}
                 selected={selecting && selected.includes(card.iid)}
                 onClick={selecting ? () => onToggleSelect(card.iid) : undefined}
                 onDoubleClick={
