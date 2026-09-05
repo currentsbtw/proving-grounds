@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "preview:pages": "vite preview --base /proving-grounds/ --port 4173 --strictPort",
     "verify:scorecard": "tsx scripts/verify-scorecard.ts",
     "verify:cardstats": "tsx scripts/verify-cardstats.ts",
     "verify:review": "tsx scripts/verify-review.ts",
