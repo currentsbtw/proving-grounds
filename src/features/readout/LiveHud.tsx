@@ -9,6 +9,8 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import Glossed from '../glossary/Glossed';
 import JudgePanel from '../judge/JudgePanel';
 import EventDock from '../pressure/EventDock';
+import SpentWeather from '../pressure/SpentWeather';
+import WeatherFront from '../pressure/WeatherFront';
 import { EVENT_LABEL, seatLabel } from '../pressure/pressureUi';
 import EndRunControls from '../hud/components/EndRunControls';
 import RunLog from '../hud/components/RunLog';
@@ -31,7 +33,12 @@ const WIPE_HINT = 'Drag back anything that survived: indestructible, regenerated
  */
 const SEAT_COLUMN: Record<SeatId, number> = { A: 1, B: 2, C: 3 };
 
-/** Below this a frame has no room for a third chip beside CLOCK and ARMED. */
+/**
+ * Below this the front gives up its HIT chip, and only that one: a wrapped
+ * chips row is a taller front and a taller front pushes the event block down
+ * into the strip. TURN is printed at every width — it is the only thing on the
+ * board naming the seat the standing event came out of.
+ */
 const TIGHT_CHIPS = '(max-width: 1280px)';
 
 /** Which seat's detail pane is open, and how tall it measured. */
@@ -81,13 +88,14 @@ function DrawerBody({ id }: { id: DrawerId }) {
 }
 
 /**
- * The live readout, as unit frames floating over a full-width board.
+ * The live readout, as weather over a full-width board.
  *
- * Three opponent frames pinned along the top edge, whatever each seat is telling
- * you hanging under its own frame, the active event under the seat that produced
- * it, and your own numbers as one bar across the foot. The containers take no
- * pointer events, only the panes do, so the board stays droppable everywhere a
- * pane is not.
+ * Three seat fronts along the top edge, whatever each seat is telling you
+ * hanging under its own name, the class word of the event it is casting
+ * gathering in the clearance above the cards, the active event in that seat's
+ * column, and your own numbers as one bar across the foot. The containers take
+ * no pointer events, only the blocks that carry controls do, so the board stays
+ * droppable everywhere one of those is not.
  */
 export default function LiveHud() {
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
@@ -223,18 +231,26 @@ export default function LiveHud() {
                 onDetailChange={onDetailChange}
               />
 
+              {/* The weather this seat is making: the class word of the event it
+                  is casting, gathering in the clearance the board keeps above
+                  its top card row. Inert — it is a reading, and a word over the
+                  board must never be the reason a card cannot be picked up. */}
+              <div className="hud-front-slot">
+                <WeatherFront seatId={seat.id} />
+              </div>
+
               {/* Mounted empty on every seat, so anything arriving under one of
                   them is announced rather than only appearing. The queue lives
                   in here too: a second event landing behind the first is news,
                   and outside a live region it was news nobody was told. */}
               <div className="hud-tell-slot" role="status">
                 {armed?.seatId === seat.id && (
-                  <p className="hud-tell pg-pane">
+                  <p className="hud-tell">
                     {seatLabel(seat.id)} armed: counters {armed.threshold}+ mana
                   </p>
                 )}
                 {wipeHintSeat === seat.id && !seat.eliminated && (
-                  <p className="hud-tell pg-pane is-quiet">
+                  <p className="hud-tell is-quiet">
                     {/* The hint names three keywords and is read by whoever is
                         least sure which of their permanents survived, so it is
                         the one line on the board most worth glossing. */}
@@ -258,7 +274,7 @@ export default function LiveHud() {
                   hazards
                     .filter((hazard) => hazard.seatId === seat.id)
                     .map((hazard) => (
-                      <p key={hazard.id} className="hud-tell pg-pane is-quiet">
+                      <p key={hazard.id} className="hud-tell is-quiet">
                         <strong>{hazard.card.name}</strong>:{' '}
                         <Glossed text={hazard.card.tell ?? hazard.card.effect} />
                       </p>
@@ -306,6 +322,12 @@ export default function LiveHud() {
           >
             <EventDock onWipeResolved={setWipeHintSeat} />
           </div>
+        </div>
+
+        {/* The run's weather once it has passed, down the board's left margin:
+            struck through, in rain grey, never over a card. */}
+        <div className="hud-spent-slot">
+          <SpentWeather />
         </div>
 
         {drawer && (

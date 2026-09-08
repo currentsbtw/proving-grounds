@@ -9,30 +9,32 @@
   overflow: hidden;
 }
 
-/* A ruled line under the title, not a bar sitting on its own surface. */
+/* A hairline under the title, not a bar on a surface of its own: the paper runs
+   from the wordmark to the footer without a break. */
 .pg-titlebar {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 0 16px;
-  background: var(--ground);
   border-bottom: 1px solid var(--line);
 }
 
-/* The one place the display face is allowed. It is the page's h1, so it also
-   has to undo the two things `base.css` gives every heading: the grotesk, and a
-   600 weight the single Marcellus face would have to fake. */
+/* The wordmark is the same grotesk as everything else, set at the display
+   weight. It is the page's h1, so it only has to raise the 700 `base.css`
+   gives every heading to the 900 the name is set in. */
 .pg-wordmark {
   flex: none;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 400;
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 900;
   line-height: 1;
-  letter-spacing: 0.03em;
+  letter-spacing: -0.005em;
   color: var(--ink);
 }
 
-/* Run identity, moved off the deck rail that stands down while a run is live. */
+/* Run identity, moved off the deck rail that stands down while a run is live.
+   It is a line of caption beside the wordmark, not a boxed chip: the only thing
+   drawn here is the seed, which is the one fact worth reading twice. */
 .pg-run-chip {
   flex: 0 1 auto;
   display: inline-flex;
@@ -40,8 +42,6 @@
   gap: 6px;
   min-width: 9ch;
   max-width: 52ch;
-  padding: 2px 7px;
-  border: 1px solid var(--line);
   font-size: 12px;
   line-height: 1.3;
   color: var(--muted);
@@ -49,7 +49,7 @@
   overflow: hidden;
 }
 
-/* The chip truncates at the deck name rather than at its own right edge: a long
+/* The line truncates at the deck name rather than at its own right edge: a long
    name used to push "bracket 3 · seed …" past the ellipsis and take the run's
    identity with it. `isolate` keeps a name carrying a bidi control character
    from reordering the two facts printed after it. */
@@ -66,10 +66,10 @@
 
 .pg-run-sep {
   flex: none;
-  color: var(--line);
 }
 
-/* The seed is player-typed too, so it truncates on the same terms. */
+/* The seed is player-typed too, so it truncates on the same terms. It is the
+   one word of this line set in ink. */
 .pg-run-seed {
   display: inline-block;
   max-width: 18ch;
@@ -77,6 +77,7 @@
   text-overflow: ellipsis;
   vertical-align: bottom;
   unicode-bidi: isolate;
+  font-weight: 700;
   color: var(--ink);
 }
 
@@ -89,27 +90,45 @@
    truncated or abbreviated. */
 .pg-legal {
   padding: 5px 16px 6px;
-  background: var(--ground);
   border-top: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.3;
   color: var(--muted);
 }
 
-/* Keyboard and Theme sit as printed labels with a bordered key square. */
+/* Keyboard and Theme read as printed labels with a key square beside them: the
+   button draws no edge of its own, only the square does. */
 .pg-titlebar .pg-help-btn {
   flex: none;
-  border: 1px solid var(--rule);
-  border-radius: 0;
+  gap: 8px;
+  padding: 4px 0;
+  border: 0;
   font-size: 11px;
   font-weight: 500;
   line-height: 1.2;
-  letter-spacing: 0.12em;
-  padding: 4px 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .pg-titlebar .pg-help-btn:hover:not(:disabled) {
-  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.pg-titlebar .pg-help-btn .pg-help-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--rule);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
 }
 
 /* Between runs there is no rail to the right of the centre panel: the readout
@@ -124,9 +143,9 @@
 }
 
 /* During a run the board takes the whole shell and the readout stops being a
-   rail: the seat frames, the active event and the drawers float over the board
-   as translucent panes, and the only thing still holding a row of its own is the
-   player's own bar at the foot. The body is the HUD's containing block. */
+   rail: the three seat fronts, the forming word and the active event sit over
+   the board on the same paper, and the only thing still holding a row of its own
+   is the player's own bar at the foot. The body is the HUD's containing block. */
 .pg-body.is-live {
   position: relative;
   grid-template-columns: minmax(0, 1fr);
@@ -134,24 +153,34 @@
   gap: 0;
   padding: 0;
 
-  /* The HUD's margin from the board's edges, the two pane widths, and the room
-     the board keeps free under the seat frames. `--hud-top` is the frame height
-     plus that gap, and the battlefield spends it as padding below, so no card is
-     ever dealt onto the board already hidden behind a frame. */
-  --hud-inset: 10px;
-  /* Both panes scale with the window between the width at which their readings
-     still fit and the width past which they would only be carrying air. The
-     frame is the narrower of the two because three of them share the row. */
-  --hud-frame-w: clamp(212px, 19vw, 272px);
-  --hud-event-w: clamp(300px, 22vw, 320px);
-  --hud-top: 82px;
+  /* The HUD's margin from the board's edges, the two block widths, and the room
+     the board keeps free above the top card row. `--hud-top` is the fronts plus
+     the forming word plus their gap, and the battlefield spends it as padding
+     below, so no card is ever dealt onto the board under a monumental name or
+     under the weather forming over it. */
+  --hud-inset: 12px;
+  /* Both blocks scale with the window between the width at which their readings
+     still fit and the width past which they would only be carrying air. A front
+     is wide because its name is set at 64px and its readings sit inside that
+     measure. */
+  --hud-frame-w: clamp(300px, 26vw, 420px);
+  --hud-event-w: clamp(300px, 22vw, 420px);
+  --hud-top: 208px;
+  /* The spent-weather strip stands in the board's left margin; the board
+     reserves that much so the strip never sits over the first card column. The
+     margin is derived from the strip's own width rather than restated as a
+     second constant, so the two cannot drift apart: the strip reads the same
+     token (readout.css), and the 26px is the inset it stands in plus the room
+     between it and the first card. */
+  --hud-spent-w: 100px;
+  --hud-margin-left: calc(var(--hud-spent-w) + 26px);
 }
 
 .pg-rail,
 .pg-table {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  background: var(--ground);
+  border: 0;
+  border-radius: 0;
   padding: 14px;
   overflow: auto;
   min-height: 0;
@@ -160,20 +189,31 @@
 
 /* The board and the HUD share the first row. The board's own z-indexes — a
    hovered hand card lifts to 60 — are sealed into a stacking context of its own
-   so none of them can climb over a pane floating above the board. The pop menus,
+   so none of them can climb over a block sitting above the board. The pop menus,
    the card preview and the browse overlay portal to the body and are unaffected. */
 .pg-body.is-live .pg-table {
   grid-area: 1 / 1;
   position: relative;
   z-index: 0;
-  background: var(--ground);
-  border: 0;
-  border-radius: 0;
 }
 
-/* The room under the seat frames, spent by the board rather than taken from it. */
+/* The room above the top card row, spent by the board rather than taken from it. */
+/* While an event stands, its prompt is the instruction on the table: the empty
+   board's hint steps aside rather than being read through a block. */
+.pg-body.is-live:has(.hud-event-host:not(.is-empty)) .tbl-bf-empty {
+  visibility: hidden;
+}
+
 .pg-body.is-live .tbl-battlefield {
   padding-top: var(--hud-top);
+  padding-left: var(--hud-margin-left);
+}
+
+/* Below 1100px the strip is hidden (readout.css), so the margin closes. */
+@media (max-width: 1100px) {
+  .pg-body.is-live {
+    --hud-margin-left: 14px;
+  }
 }
 
 .pg-rail > h2,
@@ -190,14 +230,13 @@
 
   .pg-legal {
     padding: 3px 16px 4px;
-    font-size: 11px;
     line-height: 1.25;
   }
 
-  /* The frames set a step tighter in a short window (readout.css), so the room
-     the board holds for them closes up by the same amount. */
+  /* The names step down in a short window (readout.css), so the room the board
+     holds above the top row closes up by the same amount. */
   .pg-body.is-live {
-    --hud-inset: 8px;
-    --hud-top: 72px;
+    --hud-inset: 10px;
+    --hud-top: 182px;
   }
 }

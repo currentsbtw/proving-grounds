@@ -21,8 +21,8 @@ import './scorecard.css';
 /**
  * The centre panel when no run is live and a run is selected. The milestone's
  * exit criterion is a brewer changing a real decklist because of something in
- * here, so every tile carries a sentence saying what its number means — a wall
- * of unexplained integers changes nobody's deck.
+ * here, so every reading carries a sentence saying what its number means — a
+ * wall of unexplained integers changes nobody's deck.
  */
 
 const RESULT_WORD: Record<RunResult, string> = {
@@ -314,7 +314,9 @@ function EventLedger({ card }: { card: Scorecard }) {
                 {row.cardEffect && <span className="sc-evt-effect">{row.cardEffect}</span>}
               </td>
               <td className="sc-cell-detail">{eventDetail(row)}</td>
-              <td className={`sc-term is-${row.terminal}`}>{row.terminal}</td>
+              <td>
+                <span className={`sc-term is-${row.terminal}`}>{row.terminal}</span>
+              </td>
               <td className="sc-cell-detail">
                 {eventOutcome(row)}
                 {row.note && <em className="sc-note"> “{row.note}”</em>}

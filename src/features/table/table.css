@@ -1,4 +1,10 @@
-/* ── Proving Grounds — table surface ─────────────────────────────────────── */
+/* ── Proving Grounds — the table, in the paper world ─────────────────────────
+   The board is the paper itself. Nothing on this surface is a panel: structure
+   is drawn with hairlines, the only fills are the card faces Scryfall printed,
+   and the one tonal step (--raised) is spent on exactly one thing, the hovered
+   row of a pop menu. A missing face and the library are hairline boxes on the
+   paper like everything else. No shadows, no radii except the 5px corners the
+   card art already has. */
 
 .pg-table.tbl-root {
   padding: 0;
@@ -26,22 +32,30 @@
 }
 
 .tbl-empty-hint h2 {
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   margin-bottom: 6px;
 }
 
 /* Battlefield ------------------------------------------------------------ */
 
+/* The field. No frame, no corner, nothing between the paper and the faces
+   standing on it. The top padding belongs to App.css, which holds the band the
+   seat fronts and the forming word are printed in (--hud-top); this rule must
+   never set it. */
 .tbl-battlefield {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  padding: 8px 16px 4px;
+  padding-inline: 16px;
+  padding-bottom: 4px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-radius: var(--radius) var(--radius) 0 0;
-  transition: box-shadow 120ms ease, background-color 120ms ease;
+  background: var(--ground);
+  border: 0;
 }
 
 /* Two equal halves: nonlands above, lands below, each exactly half the board's
@@ -74,15 +88,25 @@
   scrollbar-color: var(--rule) transparent;
 }
 
+/* The one rule inside the field: the horizon between what was played and what
+   pays for it. */
 .tbl-bf-row.is-lands {
   border-top: 1px solid var(--line);
   padding-top: 7px;
 }
 
+/* The hint is held to a measure that ends well before the casting seat's column:
+   set across the whole board it ran under the event block standing over the
+   centre, and the sentence that says how to start was the thing occluded. It
+   hangs off the left padding the board already keeps clear of the HUD. */
 .tbl-bf-empty {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.35;
   padding: 18px 2px;
+  max-width: 34ch;
+  margin-right: auto;
+  text-align: left;
 }
 
 /* Bottom strip ----------------------------------------------------------- */
@@ -98,9 +122,9 @@
    graveyard and the command zone stay one glance apart on an ultrawide instead
    of standing at opposite ends of the desk. */
 .tbl-strip {
-  /* One frame recipe for all five zones — graveyard, exile, hand, library,
-     command. The head row is lifted out of the flow and the frame reserves its
-     band as padding, so no zone's head can push its frame wider or taller than
+  /* One cell recipe for all five zones — graveyard, exile, hand, library,
+     command. The head row is lifted out of the flow and the cell reserves its
+     band as padding, so no zone's head can push its cell wider or taller than
      the card it holds, and the five stand at exactly the same height. */
   --zone-pad: 6px;
   --zone-head-h: 14px;
@@ -120,29 +144,31 @@
   align-items: flex-start;
 }
 
-/* Zone frames ------------------------------------------------------------ */
+/* Zone cells ------------------------------------------------------------- */
 
-/* Square frames in the printed rule, matching the chips and key squares in the
-   readout. The card faces inside them keep their own corners — those are
-   Scryfall's artwork, not our frame. */
+/* A zone is a ruled cell, not a box: one hairline across the top, the label and
+   its figure under it, the card under that. Nothing is filled and nothing is
+   framed — the card faces are the only material in the row. */
 .tbl-zone {
   position: relative;
-  /* The frame is its cards plus its own padding and rule, so a pile is exactly
-     as wide as the card it holds and the command zone is exactly as wide as its
+  /* The cell is its cards plus its own padding, so a pile is exactly as wide as
+     the card it holds and the command zone is exactly as wide as its
      commanders. The head is out of flow and contributes nothing here. */
   width: fit-content;
   padding: calc(var(--zone-pad) + var(--zone-head-h) + var(--zone-head-gap)) var(--zone-pad)
     var(--zone-pad);
-  background: var(--surface);
-  border: 1px solid var(--rule);
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
   border-radius: 0;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease;
   text-align: left;
 }
 
+/* The whole hover language: the rule comes up to full ink. Nothing moves. */
 .tbl-zone:hover {
-  border-color: var(--accent);
+  border-top-color: var(--ink);
 }
 
 /* Exactly one card tall in every zone, whether it is holding a card, a row of
@@ -157,9 +183,9 @@
   height: calc(var(--card-w) * 1.396);
 }
 
-/* The head row sits in the band the frame reserved for it: an 11px label on the
-   left, the count on the right, the same in all five zones. The pointer box is
-   the whole band rather than the 14px of printed type inside it. */
+/* The head sits in the band the cell reserved for it: the printed label on the
+   left, the figure it names on the right, the same in all five zones. The
+   pointer box is the whole band rather than the 11px of type inside it. */
 .tbl-zone-head {
   position: absolute;
   top: 0;
@@ -201,19 +227,25 @@
   white-space: nowrap;
 }
 
+/* The figure beside its label, in the weight every figure on the sheet takes. */
 .tbl-zone-count {
   flex: none;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 
+/* An empty pile says so: a dashed rule where the card would stand and the word
+   printed in it, so the state never reads by absence alone. */
 .tbl-zone-slot {
   position: relative;
   width: var(--card-w);
   aspect-ratio: 1 / 1.396;
   border-radius: 0;
-  background: var(--raised);
+  background: none;
   border: 1px dashed var(--rule);
   display: flex;
   align-items: center;
@@ -221,10 +253,20 @@
   overflow: hidden;
 }
 
+.tbl-zone-slot::before {
+  content: 'Empty';
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* The figure the command zone's Cast row used to carry. That row made this one
-   frame taller than the four beside it; the number it printed did not have to
-   go with it, and it belongs to the commander rather than to the zone — so it
-   is pinned to the card in the same chip a counter is printed in. */
+   cell taller than the four beside it; the number it printed did not have to go
+   with it, and it belongs to the commander rather than to the zone — so it is
+   pinned to the card in the same square chip a counter is printed in. */
 .tbl-commander {
   position: relative;
   flex: 0 0 auto;
@@ -235,13 +277,16 @@
   left: 3px;
   bottom: 3px;
   z-index: 3;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ground) 88%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  color: var(--accent);
-  font-size: 11px;
-  line-height: 1.35;
+  padding: 2px 5px;
+  border-radius: 0;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -249,48 +294,32 @@
 
 /* Library ---------------------------------------------------------------- */
 
-/* The library reads as a face-down card, not a number in a raised box: the
-   strip's one card size, the card faces' own corners, a thin inner rule, and
-   the count printed across it. Drawn in the theme's own ink — there is no
-   rendered prop in this world, and no image to fetch. */
+/* Not a slab: a hairline box on the paper with the count printed across it at
+   the figure size every other reading takes. There is no rendered card back in
+   this world, no image to fetch, and nothing on this surface is filled. */
 .tbl-lib-back {
   position: relative;
   width: var(--card-w);
   aspect-ratio: 1 / 1.396;
-  border-radius: 5px;
-  /* Mixed towards the accent rather than towards the ink, so the back is the
-     same warm slab a shade off the frame in both themes — mixing towards the
-     ink would darken it on paper and lighten it in the dark. */
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--accent) 26%, var(--ground)),
-    color-mix(in srgb, var(--accent) 9%, var(--ground)) 72%
-  );
-  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: none;
+  border: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.tbl-lib-back::before {
-  content: '';
-  position: absolute;
-  inset: 6px;
-  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
 .tbl-lib-count {
   position: relative;
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 0.78;
+  letter-spacing: -0.015em;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-/* The drop strips divide the back itself, so they need no offsets of their own
+/* The drop strips divide the slab itself, so they need no offsets of their own
    beyond the body they sit in. */
 .tbl-lib-strip {
   position: absolute;
@@ -308,7 +337,7 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: transparent;
-  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, color 120ms ease;
 }
 
 .tbl-lib-strip.is-top {
@@ -319,40 +348,40 @@
   bottom: 0;
 }
 
-/* "⋯" opens at itself the menu the right-click opens at the pointer, so the
-   rest of the library is reachable without a mouse. It sits on the back rather
-   than in the head because the head is the shared label-and-count row every
-   zone prints, and one card's width of it does not hold a third thing. */
+/* Three drawn dots open at themselves the menu the right-click opens at the
+   pointer, so the rest of the library is reachable without a mouse. They sit on
+   the frame rather than in the head because the head is the shared
+   label-and-figure row every zone prints, and one card's width of it does not
+   hold a third thing. */
 .tbl-lib-more {
   position: absolute;
   right: 1px;
   bottom: 1px;
   z-index: 2;
-  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
   background: none;
   border: 0;
   border-radius: 0;
-  font-size: 13px;
-  line-height: 16px;
+  line-height: 0;
   color: var(--muted);
 }
 
 .tbl-lib-more:hover:not(:disabled) {
-  color: var(--accent);
+  color: var(--ink);
   border-color: transparent;
 }
 
 .tbl-dragging .tbl-lib-strip {
   border-color: var(--line);
   color: var(--muted);
-  background: color-mix(in srgb, var(--ground) 70%, transparent);
 }
 
 .tbl-dragging .tbl-lib-strip.is-over {
-  border-color: var(--accent);
-  border-style: solid;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--rule);
+  color: var(--ink);
 }
 
 /* Narrow strip ----------------------------------------------------------- */
@@ -400,7 +429,7 @@
 
 /* Hand ------------------------------------------------------------------- */
 
-/* The positioning context for the mulligan bar, which floats above the frame
+/* The positioning context for the mulligan bar, which floats above the cell
    rather than sitting in this column. */
 .tbl-hand-col {
   position: relative;
@@ -408,10 +437,10 @@
   min-width: 0;
 }
 
-/* The hand's frame is the one that takes its width from the column rather than
-   from its cards; everything else about it is the frame recipe above, so it
+/* The hand's cell is the one that takes its width from the column rather than
+   from its cards; everything else about it is the cell recipe above, so it
    stands at exactly the height of the four piles beside it. It is a drop target,
-   not a control, so it keeps the plain cursor and the plain rule. */
+   not a control, so it keeps the plain cursor and the quiet rule. */
 .tbl-hand-zone {
   width: auto;
   flex: 1;
@@ -420,15 +449,15 @@
 }
 
 .tbl-hand-zone:hover {
-  border-color: var(--rule);
+  border-top-color: var(--line);
 }
 
-/* The row never scrolls: Hand.tsx sizes the cards (the unit, or down to 80% of it before they overlap) and
-   overlaps them to the measured width, so they are laid out by margin and the
-   body's own gap has to go. Vertical overflow stays visible so the hover lift
-   can rise out of the frame; horizontal is clipped purely as a backstop for a
-   squeezed-to-nothing column, with a margin so the hover scale still shows at
-   the edges. */
+/* The row never scrolls: Hand.tsx sizes the cards (the unit, or down to 80% of
+   it before they overlap) and overlaps them to the measured width, so they are
+   laid out by margin and the body's own gap has to go. Vertical overflow stays
+   visible so the hover lift can rise out of the cell; horizontal is clipped
+   purely as a backstop for a squeezed-to-nothing column, with a margin so the
+   hover scale still shows at the edges. */
 .tbl-hand-row {
   flex: 1;
   min-width: 0;
@@ -450,17 +479,14 @@
   transition: transform 110ms ease;
 }
 
-/* Hover un-overlaps the card so it stays readable at any hand size. */
+/* Hover un-overlaps the card so it stays readable at any hand size. The card
+   rises on its own; nothing is cast under it. */
 .tbl-hand-slot:hover {
   z-index: 60;
 }
 
 .tbl-hand-slot:hover .tbl-slot {
   transform: translateY(-8px) scale(1.06);
-}
-
-.tbl-hand-slot:hover .tbl-card-face {
-  box-shadow: 0 10px 22px var(--shadow-strong);
 }
 
 /* No peeking mid-drag — the drag overlay is the card you are moving. */
@@ -478,9 +504,8 @@
   }
 
   /* The drop targets settle instantly too. Every one of these is a 110–120ms
-     colour or border fade on a surface the player is dragging over, and the
-     state each one announces reads the same without the fade. */
-  .tbl-battlefield,
+     rule fade on a surface the player is dragging over, and the state each one
+     announces reads the same without the fade. */
   .tbl-zone,
   .tbl-lib-strip {
     transition: none;
@@ -489,23 +514,23 @@
 
 .tbl-hand-empty {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.35;
   margin: auto;
 }
 
-/* Drop highlight --------------------------------------------------------- */
+/* Drop rule -------------------------------------------------------------- */
 
+/* A target in the air is a dashed hairline drawn inside its own edge; the one
+   under the card is the same rule at full ink. No fill: the faces underneath
+   are the thing being aimed at and nothing may wash over them. */
 .tbl-dragging .tbl-drop {
-  box-shadow: inset 0 0 0 1px var(--line);
+  outline: 1px dashed var(--line);
+  outline-offset: -1px;
 }
 
 .tbl-dragging .tbl-drop.is-over {
-  box-shadow: inset 0 0 0 2px var(--accent);
-  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
-.tbl-dragging .tbl-zone.tbl-drop.is-over {
-  border-color: var(--accent);
+  outline-color: var(--rule);
 }
 
 /* Card ------------------------------------------------------------------- */
@@ -519,9 +544,9 @@
   position: absolute;
   inset: 0;
   border-radius: 5px;
-  background: var(--raised);
+  background: var(--ground);
   overflow: visible;
-  transition: transform 110ms ease, box-shadow 110ms ease, opacity 110ms ease;
+  transition: transform 110ms ease, opacity 110ms ease;
   transform-origin: 50% 50%;
   touch-action: none;
   outline: none;
@@ -531,7 +556,7 @@
    show where the keyboard is. `outline: none` above kills the ring a pointer
    drag would otherwise draw; this puts it back for the keyboard only. */
 .tbl-card:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
   z-index: 3;
 }
@@ -558,21 +583,23 @@
   opacity: 0.32;
 }
 
+/* The card in the air is separated by nothing but the cursor: this world has no
+   shadow to lift it with. */
 .tbl-card.is-lifted {
-  box-shadow: 0 14px 28px var(--shadow-strong);
   cursor: grabbing;
 }
 
+/* Two rings, both drawn inside the face so they never push the card off its
+   measured width: solid for the commander, dashed for a card the mulligan is
+   holding. Ink in both cases — "act now" is weight here, not hue. */
 .tbl-card.is-commander .tbl-card-face {
-  box-shadow: 0 0 0 2px var(--accent);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
 }
 
 .tbl-card.is-selected .tbl-card-face {
-  box-shadow: 0 0 0 2px var(--ok);
-}
-
-.tbl-card:focus-visible .tbl-card-face {
-  box-shadow: 0 0 0 2px var(--accent);
+  outline: 2px dashed var(--ink);
+  outline-offset: -2px;
 }
 
 .tbl-card-face {
@@ -581,7 +608,7 @@
   height: 100%;
   border-radius: 5px;
   overflow: hidden;
-  background: var(--raised);
+  background: var(--ground);
   border: 1px solid var(--line);
 }
 
@@ -593,6 +620,7 @@
   display: none;
 }
 
+/* The face is Scryfall's own artwork and nothing is laid over it. */
 .tbl-card-img {
   display: block;
   position: absolute;
@@ -605,6 +633,9 @@
 
 /* Text frame fallback */
 
+/* What a card is when its face never arrives: the paper, inside the hairline the
+   face itself is edged with, and the name set in it. This is the offline card,
+   so it has to be readable on its own — and nothing here is filled. */
 .tbl-frame {
   width: 100%;
   height: 100%;
@@ -612,7 +643,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--raised);
+  background: var(--ground);
 }
 
 .tbl-frame-top {
@@ -622,12 +653,11 @@
   gap: 4px;
 }
 
-/* This frame is what a card is when its Scryfall image never arrives, which is
-   the offline case, so the name has to survive without one: a word longer than
-   the frame breaks rather than running out of the card. */
+/* A word longer than the frame breaks rather than running out of the card. */
 .tbl-frame-name {
-  font-size: 11px;
-  line-height: 1.25;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
   color: var(--ink);
   overflow: hidden;
   display: -webkit-box;
@@ -639,7 +669,7 @@
 }
 
 .tbl-frame-cost {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -647,8 +677,8 @@
 
 .tbl-frame-type {
   margin-top: auto;
-  font-size: 9px;
-  line-height: 1.3;
+  font-size: 12px;
+  line-height: 1.25;
   color: var(--muted);
   border-top: 1px solid var(--line);
   padding-top: 4px;
@@ -661,7 +691,7 @@
 }
 
 .tbl-frame.is-token {
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border: 1px solid var(--line);
   border-radius: 5px;
   align-items: center;
   justify-content: center;
@@ -669,29 +699,30 @@
 }
 
 .tbl-frame.is-token .tbl-frame-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .tbl-frame-pt {
   font-size: 15px;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-/* A face-down card is the same plain slab as the library it came off. */
+/* A face-down card is the same plain paper as the library it came off. */
 .tbl-frame.is-facedown {
-  background: var(--raised);
+  background: var(--ground);
 }
 
 /* Card preview ----------------------------------------------------------- */
 
 /* Hover or the preview key lifts the card out of the board's sizing and prints
    it beside itself with the text no card at table size can carry. Portalled to
-   the body, so the hand row, the zone stacks and the browse overlay cannot clip
+   the body, so the hand row, the zone cells and the browse overlay cannot clip
    it; positioned by CardPreview.tsx, which flips it to the side with room and
-   clamps it inside the viewport. */
+   clamps it inside the viewport. Nothing floats in this world, so what separates
+   it from the board is a rule, not a shadow. */
 .tbl-preview {
   position: fixed;
   z-index: 65;
@@ -699,10 +730,9 @@
   flex-direction: column;
   max-height: calc(100vh - 16px);
   overflow: hidden;
-  background: var(--surface);
+  background: var(--ground);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 30px var(--shadow-strong);
+  border-radius: 0;
   /* A tooltip is never the thing you are pointing at. */
   pointer-events: none;
   animation: tbl-preview-in 120ms ease-out;
@@ -731,7 +761,7 @@
   min-height: 96px;
   flex: 0 1 auto;
   object-fit: contain;
-  background: var(--raised);
+  background: var(--ground);
 }
 
 .tbl-preview-text {
@@ -754,8 +784,8 @@
 }
 
 .tbl-preview-name {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--ink);
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
@@ -770,7 +800,7 @@
 .tbl-preview-pt {
   margin-top: 4px;
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.05;
   color: var(--ink);
 }
@@ -801,7 +831,8 @@
 
 /* Mana value badge ------------------------------------------------------- */
 
-/* The same small square the readout prints its hotkeys in. */
+/* The key square, printed on the card: an 18px box of paper with a rule around
+   it and the figure in it. */
 .tbl-mv {
   position: absolute;
   top: -6px;
@@ -809,12 +840,13 @@
   z-index: 4;
   min-width: 18px;
   height: 18px;
-  padding: 0 4px;
+  padding: 0 2px;
   border-radius: 0;
-  background: var(--raised);
+  background: var(--ground);
   border: 1px solid var(--rule);
   color: var(--ink);
   font-size: 11px;
+  font-weight: 700;
   line-height: 16px;
   text-align: center;
   pointer-events: none;
@@ -822,6 +854,8 @@
 
 /* Counters --------------------------------------------------------------- */
 
+/* Square chips, borders only. A counter never reads by colour: the kind is
+   printed in the chip — "+1/+1 ×3", "loyalty 4" — so greyscale loses nothing. */
 .tbl-counters {
   position: absolute;
   top: 3px;
@@ -836,31 +870,23 @@
 
 .tbl-counter {
   font-size: 11px;
-  line-height: 1.35;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ground) 88%, transparent);
-  border: 1px solid var(--line);
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 2px 5px;
+  border-radius: 0;
+  background: var(--ground);
+  border: 1px solid var(--rule);
   color: var(--ink);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.tbl-counter.is-plus {
-  color: var(--ok);
-  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
-}
-
-.tbl-counter.is-loyalty {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
 /* Mulligan bar ----------------------------------------------------------- */
 
-/* Over the board, not inside the strip: the hand frame has to stand at one card
+/* Over the board, not inside the strip: the hand cell has to stand at one card
    tall alongside the four piles whether or not the opening hand is still being
-   decided, so the bar cannot take a row in that column. */
+   decided, so the bar cannot take a row in that column. It occludes card faces,
+   so it is the paper itself — opaque, ruled off above and below. */
 .tbl-mull-float {
   position: absolute;
   left: 0;
@@ -869,20 +895,19 @@
   z-index: 30;
 }
 
-.tbl-mull-float .tbl-mull {
-  box-shadow: 0 10px 24px var(--shadow-strong);
-}
-
 .tbl-mull {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 10px;
-  padding: 5px 8px;
-  background: var(--raised);
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  border-radius: var(--radius);
+  padding: 6px 8px;
+  background: var(--ground);
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
   font-size: 13px;
+  line-height: 1.35;
 }
 
 .tbl-mull-label {
@@ -899,29 +924,37 @@
 }
 
 .tbl-mull button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 3px 9px;
   font-size: 12px;
   white-space: nowrap;
   flex: 0 0 auto;
 }
 
+/* The reversed plate belongs to the event's first response, and there is only
+   one on a screen. The hand's own preferred answer is the same hairline button
+   with its word at full weight. */
 .tbl-mull .is-primary {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--rule);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* Pop menus -------------------------------------------------------------- */
 
+/* Opaque paper with a rule around it: it covers card faces, so nothing about it
+   may be translucent and nothing may blur what is under it. */
 .tbl-menu {
   position: fixed;
   z-index: 60;
   min-width: 208px;
   max-width: 260px;
   padding: 4px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 30px var(--shadow-strong);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -929,7 +962,8 @@
 
 .tbl-menu-title {
   padding: 5px 8px 6px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
   margin-bottom: 3px;
@@ -947,13 +981,15 @@
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 5px 8px;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--ink);
   cursor: pointer;
 }
 
+/* The one place --raised is spent on a hover. */
 .tbl-menu-item:hover:not(:disabled) {
   background: var(--raised);
   border-color: transparent;
@@ -965,7 +1001,8 @@
 }
 
 .tbl-menu-item.is-accent {
-  color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .tbl-menu-item .tbl-menu-hint {
@@ -984,6 +1021,7 @@
   padding: 6px 8px 3px;
   font-size: 11px;
   font-weight: 500;
+  line-height: 1.2;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1010,6 +1048,8 @@
 
 /* Overlay ---------------------------------------------------------------- */
 
+/* Mist, not a dark box: the paper at 78%, so the board reads as continuing
+   behind the browser rather than being switched off. */
 .tbl-overlay {
   position: fixed;
   inset: 0;
@@ -1021,15 +1061,18 @@
   padding: 32px;
 }
 
-.tbl-overlay-panel {
+/* Two classes, because the browser still wears `panel` and `base.css` — which
+   loads after every feature stylesheet — resets that class to transparent and
+   unedged. A single `.tbl-overlay-panel` ties on specificity and loses the paper
+   and the rule to it, and this block has to occlude the card faces under it. */
+.tbl-overlay .tbl-overlay-panel {
   width: min(1040px, 100%);
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 24px 60px var(--shadow-strong);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -1043,6 +1086,8 @@
 
 .tbl-overlay-head h3 {
   font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .tbl-overlay-head .tbl-mull-spacer {
@@ -1053,16 +1098,21 @@
   overflow: auto;
   padding: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-w) * 0.9), 1fr));
+  /* The cell is ruled, so the track has to hold the card BrowseOverlay.tsx
+     draws (0.9 of the unit) plus the cell's own padding and rules. */
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-w) * 0.9 + 18px), 1fr));
   gap: 14px;
   align-content: start;
 }
 
+/* The browser is a table of cards, so its cells are ruled like one. */
 .tbl-overlay-cell {
   display: flex;
   flex-direction: column;
   gap: 5px;
   align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
 }
 
 .tbl-overlay-cell .tbl-cell-actions {
@@ -1079,6 +1129,8 @@
 
 .tbl-overlay-empty {
   color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
   padding: 24px 4px;
 }
 
@@ -1097,5 +1149,58 @@
   .pg-table.tbl-root {
     grid-template-rows: minmax(136px, 1fr) auto auto;
     overflow-y: auto;
+  }
+}
+
+/* Forced colours --------------------------------------------------------- */
+
+/* Every state on the table is a rule or a word, so the restatement is only a
+   matter of pointing them at the system's own ink: the rings that name a
+   commander and a chosen card, the dashed rules that name a target, the chips
+   and the key squares. */
+@media (forced-colors: active) {
+  .tbl-card.is-commander .tbl-card-face,
+  .tbl-card.is-selected .tbl-card-face {
+    outline-color: CanvasText;
+  }
+
+  .tbl-card:focus-visible {
+    outline-color: Highlight;
+  }
+
+  .tbl-dragging .tbl-drop {
+    outline-color: GrayText;
+  }
+
+  .tbl-dragging .tbl-drop.is-over,
+  .tbl-dragging .tbl-lib-strip.is-over,
+  .tbl-zone-slot {
+    border-color: CanvasText;
+    outline-color: CanvasText;
+  }
+
+  .tbl-mv,
+  .tbl-counter,
+  .tbl-tax-chip {
+    background: Canvas;
+    border-color: CanvasText;
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .tbl-lib-back {
+    border: 1px solid CanvasText;
+  }
+
+  .tbl-menu,
+  .tbl-preview,
+  .tbl-overlay .tbl-overlay-panel {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+
+  .tbl-menu-item:hover:not(:disabled) {
+    background: Highlight;
+    color: HighlightText;
   }
 }

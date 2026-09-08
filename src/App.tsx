@@ -50,15 +50,31 @@ function RunChip() {
 
 type Theme = 'dark' | 'light';
 
-const THEME_KEY = 'pg-theme';
+/**
+ * A new key, because the build before this one wrote 'dark' into the old one on
+ * every mount: every returning player had a stored choice they never made, and
+ * the paper default would never have reached any of them. Reading a key nobody
+ * has yet is what hands the new default out once; from there the toggle writes
+ * here and that choice is honoured for good. The old key is cleared as it is
+ * found, so nothing is left behind to migrate a second time.
+ */
+const THEME_KEY = 'pg-theme-v2';
+const THEME_KEY_LEGACY = 'pg-theme';
 
-/** Dark ships by default; the stored choice is the only thing that overrides it. */
+/** Paper ships by default; the stored choice is the only thing that overrides it. */
 function storedTheme(): Theme {
+  let theme: Theme = 'light';
   try {
-    return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+    theme = localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light';
   } catch {
-    return 'dark';
+    /* Storage can be refused; the paper default stands for this session. */
   }
+  try {
+    localStorage.removeItem(THEME_KEY_LEGACY);
+  } catch {
+    /* Nothing to clean up, or nothing we are allowed to clean up. */
+  }
+  return theme;
 }
 
 /** Flips the whole palette by swapping one attribute on the root element. */

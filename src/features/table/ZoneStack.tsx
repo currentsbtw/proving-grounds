@@ -144,6 +144,17 @@ export function CommandZone({ cards, onOpen }: { cards: CardInstance[]; onOpen: 
   );
 }
 
+/** The more-menu affordance, drawn rather than typed: three dots on a rule. */
+function MoreMark() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+      <circle cx="4" cy="8" r="1" fill="currentColor" />
+      <circle cx="8" cy="8" r="1" fill="currentColor" />
+      <circle cx="12" cy="8" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export interface LibraryStackProps {
   count: number;
   /** Draw one card — the same action as the D hotkey and the menu's "Draw 1". */
@@ -156,7 +167,7 @@ export interface LibraryStackProps {
  *
  * Drawing is the loop this zone is in the strip for, so it is the plain click,
  * everywhere on the frame; everything else is one right-click away. Both are
- * reachable without a mouse: the head button draws, and the "⋯" on the back —
+ * reachable without a mouse: the head button draws, and the dots on the back —
  * which is where the room for it is, the head being the shared label-and-count
  * row every zone prints — opens the same menu at itself.
  */
@@ -202,7 +213,7 @@ export function LibraryStack({ count, onDraw, onOpenMenu }: LibraryStackProps) {
               onOpenMenu(r.right, r.bottom);
             }}
           >
-            ⋯
+            <MoreMark />
           </button>
         </div>
         <div ref={setTopRef} className={`tbl-lib-strip is-top${overTop ? ' is-over' : ''}`}>

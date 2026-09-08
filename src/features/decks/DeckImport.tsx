@@ -283,9 +283,11 @@ export function DeckImport({ initialDeck, onSaved, onCancel }: DeckImportProps) 
             />
           </label>
           <div className="dk-row">
+            {/* Reading a list is a step on the way, not the commit: it is an edge
+                around its word. The reversed plate on this screen is Save. */}
             <button
               type="button"
-              className="dk-btn-primary dk-grow"
+              className="dk-grow"
               disabled={Boolean(busy) || text.trim().length === 0}
               onClick={() => void (link ? handleFetch(link) : handleResolve())}
             >

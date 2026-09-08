@@ -1,29 +1,38 @@
-/* ── Proving Grounds — M2 scorecard ──────────────────────────────────────── */
+/* ── Proving Grounds — the debrief, in the paper world ───────────────────── */
 
-/* Shared: result chips, used by the rail and the header alike. The full pill is
-   the between-runs vocabulary DESIGN.md names (result chips, ledger class chips,
-   profile tags, the rail's bracket chip); the play surface has no pills at all,
-   which is what keeps the two reading as different rooms. */
+/* The scorecard is the run read back on the same paper the run was played on:
+   one ground, hairlines where structure needs a rule, weight and tracking
+   carrying rank. No boxes, no fills, no radii, no accent hue — a figure is loud
+   because it is 700 at 24px, not because it sits in a tile. */
+
+/* Shared: the result chip, worn by the rail's run rows and the scorecard header
+   alike. Square, a hairline edge, the label recipe. The word is the whole
+   reading: WIN and LOSS are set in the same ink as everything else on the sheet,
+   and what separates a decided run from an abandoned one is weight and the edge
+   around it, never a hue. */
 .sc-chip {
   flex: none;
-  padding: 0 6px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 500;
   line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.sc-chip.is-win {
-  color: var(--ok);
-}
-
+.sc-chip.is-win,
 .sc-chip.is-loss,
 .sc-chip.is-concede {
-  color: var(--danger);
+  color: var(--ink);
+  font-weight: 700;
 }
 
+/* No result was recorded, so the chip is not a reading: it recedes. */
 .sc-chip.is-abandoned {
   color: var(--muted);
 }
@@ -33,36 +42,41 @@
 .sc-hist {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
+  gap: 2px;
+  margin-top: 18px;
 }
 
+/* The block's heading carries the rule, above it and under it: more room over a
+   heading than under it, and the run list hangs off the second line. */
 .sc-hist-head {
-  margin-bottom: 2px;
+  padding: 10px 0 6px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
 }
 
 .sc-hist-deck {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
+/* A deck group is a ruled row, not a button with a box round it. */
 .sc-hist-toggle {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
   text-align: left;
   background: transparent;
-  border-color: transparent;
-  padding: 3px 4px;
-  font-size: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0 6px 2px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .sc-hist-toggle:hover:not(:disabled) {
-  border-color: var(--line);
+  border-color: var(--ink);
 }
 
 /* Drawn, not typed: one chevron that turns a quarter when the deck opens. */
@@ -97,31 +111,30 @@
 .sc-hist-count {
   flex: none;
   font-size: 11px;
-  letter-spacing: 0.1em;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .sc-hist-list {
   list-style: none;
-  margin: 0 0 4px;
-  padding: 0 0 0 10px;
+  margin: 0 0 6px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .sc-hist-row {
   display: flex;
   align-items: center;
   gap: 2px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-bottom: 1px solid var(--line);
 }
 
+/* The one tonal step, spent on the row the centre panel is showing. */
 .sc-hist-row.is-selected {
   background: var(--raised);
-  border-color: var(--accent);
 }
 
 .sc-hist-open {
@@ -129,29 +142,39 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   flex-wrap: wrap;
   background: transparent;
-  border-color: transparent;
-  padding: 3px 5px;
+  border: 0;
+  padding: 5px 4px 5px 12px;
   font-size: 12px;
   text-align: left;
 }
 
 .sc-hist-open:hover:not(:disabled) {
-  border-color: var(--line);
+  background: var(--raised);
 }
 
-.sc-hist-turns {
-  color: var(--ink);
+.sc-hist-turns,
+.sc-hist-when {
+  flex: none;
   font-size: 12px;
-}
-
-.sc-hist-bracket {
   color: var(--muted);
-  font-size: 12px;
 }
 
+/* The bracket is a state word, so it wears the square chip the rest of them do. */
+.sc-hist-bracket {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid var(--rule);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* The seed is the run's name, so it is set as one. */
 .sc-hist-seed {
   flex: 1 1 auto;
   min-width: 0;
@@ -161,27 +184,22 @@
   font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
-  color: var(--muted);
+  font-weight: 700;
+  color: var(--ink);
   unicode-bidi: isolate;
 }
 
-.sc-hist-when {
-  flex: none;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* Sits in the same row as the run's result chip, so it takes that chip's pill
-   rather than the panel radius: two radii in one row read as two kinds of thing,
-   and these are both between-runs chips. */
+/* Same seed as the run on screen: a dashed square, because it is a relation
+   between two rows rather than a state of this one. */
 .sc-hist-pair {
   flex: none;
-  padding: 0 5px;
-  border: 1px dashed var(--accent);
-  border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  padding: 0 4px;
+  border: 1px dashed var(--rule);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -193,21 +211,37 @@
   min-width: 24px;
   min-height: 24px;
   background: transparent;
-  border-color: transparent;
+  border: 0;
   color: var(--muted);
   padding: 0 6px;
   line-height: 1;
 }
 
 .sc-hist-x:hover:not(:disabled) {
-  color: var(--danger);
-  border-color: transparent;
+  color: var(--ink);
 }
 
 .sc-hist-confirm {
   flex: none;
   display: inline-flex;
-  gap: 1px;
+  gap: 4px;
+  padding-right: 4px;
+}
+
+/* Two hairline buttons: destroying a run is a decision, so both halves of it
+   are edged and named. */
+.sc-hist-del,
+.sc-hist-keep {
+  padding: 2px 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* The half that destroys is the emphasised one: full ink and full weight, the
+   way "act now" is said everywhere else in this world. */
+.sc-hist-del {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* ── Centre: the scorecard ──────────────────────────────────────────────── */
@@ -215,7 +249,7 @@
 .pg-table.sc-root {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -223,9 +257,9 @@
 .sc-header {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
-  padding-bottom: 12px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -234,37 +268,45 @@
   min-width: 0;
 }
 
-/* The title step. It wraps (a deck name is player text), so it keeps a reading
-   line-height rather than the tighter one a single-line title would take. */
+/* Which run this is. It wraps — a deck name is player text — so it keeps a
+   reading line-height rather than the tighter one a single-line title takes. */
 .sc-deck {
-  font-size: 19px;
+  font-size: 20px;
+  font-weight: 700;
   line-height: 1.2;
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
 }
 
 .sc-verdict {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 4px 0 0;
+  margin: 8px 0 0;
 }
 
+/* The result as a square chip: the word is the whole reading, set in ink like
+   every other word on the sheet, and nothing is filled. */
 .sc-result {
+  padding: 2px 6px;
+  border: 1px solid var(--rule);
   font-family: var(--font-body);
-  font-size: 24px;
-  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
-.sc-result.is-win {
-  color: var(--ok);
-}
-
+.sc-result.is-win,
 .sc-result.is-loss,
 .sc-result.is-concede {
-  color: var(--danger);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .sc-result.is-abandoned {
@@ -277,6 +319,8 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The seed is copied often enough to be a control, and quiet enough to be an
+   underlined word rather than a button. */
 .sc-seed {
   font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
@@ -284,69 +328,93 @@
   align-items: center;
   min-height: 24px;
   font-size: 12px;
-  letter-spacing: 0.05em;
   color: var(--muted);
   background: transparent;
-  border-color: transparent;
-  padding: 1px 5px;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
 }
 
 .sc-seed:hover:not(:disabled) {
   color: var(--ink);
-  border-color: var(--line);
+  text-decoration-color: var(--ink);
 }
 
 .sc-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 /* ── Banners ────────────────────────────────────────────────────────────── */
 
+/* A banner is a word and a sentence, ruled off at the left. No fill, no
+   thickened bar: the word is what says which kind of notice this is, so it
+   survives greyscale and forced colours. */
 .sc-banner {
-  margin: 0;
-  padding: 6px 10px;
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  margin: 12px 0 0;
+  padding: 2px 0 2px 12px;
   border-left: 1px solid var(--line);
-  background: var(--ground);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.sc-banner.is-good {
-  border-left-color: var(--ok);
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--ink);
 }
 
-.sc-banner.is-warn {
-  border-left-color: var(--accent);
+.sc-banner::before {
+  content: 'NOTE';
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-banner.is-good::before {
+  content: 'DONE';
+}
+
+.sc-banner.is-warn::before {
+  content: 'WARNING';
 }
 
 .sc-banner.is-error {
+  color: var(--danger);
   border-left-color: var(--danger);
+}
+
+.sc-banner.is-error::before {
+  content: 'ERROR';
   color: var(--danger);
 }
 
+/* The share result: the word, then the two things to do with the image. */
 .sc-share-row {
-  display: flex;
+  grid-template-columns: max-content max-content;
+  column-gap: 16px;
   align-items: center;
-  gap: 12px;
+}
+
+.sc-share-row::before {
+  grid-column: 1 / -1;
 }
 
 .sc-empty {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
-  font-style: italic;
+  font-size: 13px;
 }
 
 .sc-hint {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 12px;
   color: var(--muted);
-  letter-spacing: 0.02em;
 }
 
 .sc-dim {
@@ -355,55 +423,55 @@
 
 /* ── Compare picker ─────────────────────────────────────────────────────── */
 
+/* Hairline rows, not a popover with a box: the list is part of the sheet. */
 .sc-picker {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  background: var(--ground);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  margin-top: 12px;
 }
 
 .sc-picker-head {
   font-size: 11px;
-  letter-spacing: 0.14em;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 2px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
 }
 
 .sc-picker-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: transparent;
-  border-color: transparent;
-  padding: 3px 6px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 4px;
   font-size: 12px;
   text-align: left;
 }
 
 .sc-picker-item:hover:not(:disabled) {
-  border-color: var(--line);
+  background: var(--raised);
 }
 
 .sc-picker-item.is-picked {
-  border-color: var(--accent);
   background: var(--raised);
+  font-weight: 700;
 }
 
 /* ── The verdict ────────────────────────────────────────────────────────── */
 
-/* The debrief opens by naming the finding. Seven figures of equal weight state
-   nothing on their own; this is the sentence the tiles below are evidence for. */
+/* The debrief opens by naming the finding. Eight readings of equal weight state
+   nothing on their own; this is the sentence the list below is evidence for. */
 .sc-verdict-line {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 14px;
   margin: 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
+  padding: 14px 0 16px;
 }
 
 .sc-verdict-line > .panel-heading {
@@ -411,40 +479,39 @@
   white-space: nowrap;
 }
 
-/* One step under the deck name and well over body prose, which is the whole
-   hierarchy of the panel's head: the deck is which run this is, the verdict is
-   what the run says. The type scale has nothing between body and the title step
-   the deck name takes, so this sentence keeps the 17px DESIGN.md records. */
+/* The finding, at the weight the deck name is set in: the deck is which run
+   this is, the verdict is what the run says. */
 .sc-verdict-text {
   min-width: 0;
-  font-size: 17px;
-  line-height: 1.3;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
 
 /* Nothing crossed a threshold: still a reading, just not a warning. */
 .sc-verdict-text.is-clear {
+  font-weight: 400;
   color: var(--muted);
 }
 
-/* ── Metric slots ───────────────────────────────────────────────────────── */
+/* ── Metric readings ────────────────────────────────────────────────────── */
 
-/* The same printed slots as the readout column: a small-caps label over a
-   tabular figure, ruled off from the row above. No fill, no border, no radius —
-   the debrief is the run's numbers written into the same form, not a dashboard
-   of tiles. */
+/* A ruled list, not tiles. Label, figure, sentence — read left to right on one
+   line, so eight readings are eight lines rather than a wall of boxes. */
 .sc-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  display: block;
 }
 
 .sc-tile {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 18px 9px 0;
+  display: grid;
+  grid-template-columns: 160px auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 20px;
+  padding: 9px 0 10px;
   border-top: 1px solid var(--line);
 }
 
@@ -452,37 +519,28 @@
   font-size: 11px;
   font-weight: 500;
   line-height: 1.2;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-/* Figures are read, not branded: the display face is the wordmark's alone. */
 .sc-tile-value {
   font-family: var(--font-body);
   font-size: 24px;
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.015em;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
 /* Nothing to measure is not a measurement. It recedes rather than sitting at
-   the same weight as a real figure beside it. */
+   the weight of a real figure beside it. */
 .is-na {
   color: var(--muted);
   font-weight: 400;
   letter-spacing: 0;
-}
-
-/* Held between the 24px figure it replaces and the 12px caption under it. The
-   type scale has no step in that gap: at body size "n/a" reads as a second
-   caption line rather than as the slot's value, and at the title step it is
-   nearly as loud as a real reading. DESIGN.md records the 16px. */
-.sc-tile-value.is-na {
-  font-size: 16px;
 }
 
 .sc-tile-sub {
@@ -492,22 +550,32 @@
   overflow-wrap: anywhere;
 }
 
-/* ── Sections ───────────────────────────────────────────────────────────── */
+/* Narrow centre panel: the sentence drops under the figure it qualifies rather
+   than being squeezed into a ribbon. */
+@media (max-width: 900px) {
+  .sc-tile {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
 
-.sc-section {
-  padding: 4px 0 12px;
-  border-bottom: 1px solid var(--line);
+  .sc-tile-sub {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
 }
 
-.sc-root > .sc-section:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+/* ── Sections ───────────────────────────────────────────────────────────── */
+
+/* Every block is a rule and a heading; the rule sits above, so there is more
+   room over a heading than under it. */
+.sc-section {
+  padding: 16px 0 4px;
+  border-top: 1px solid var(--line);
 }
 
 /* Where the section's heading is its whole head row, it is the head row. */
 .sc-section > .panel-heading {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .sc-section-head {
@@ -515,7 +583,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 /* ── Chart ──────────────────────────────────────────────────────────────── */
@@ -531,7 +599,7 @@
 
 .sc-chart-axis {
   fill: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
 }
@@ -539,16 +607,21 @@
 .sc-chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 6px;
-  font-size: 12px;
+  gap: 6px 16px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
 .sc-key {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 /* Square, like the marks it is a key for: the chart draws its bars and bands as
@@ -557,42 +630,42 @@
   content: '';
   width: 10px;
   height: 10px;
-  border-radius: 0;
   flex: none;
 }
 
-/* The accent is not spent on a chart series: it is reserved for what needs an
-   answer, and a bar chart is a reading. The bars carry the ink instead. */
+/* The three series are told apart by weight and by these words, not by hue:
+   the deployment bar is a solid block of ink, the lands bar a narrow one in
+   rain, the board line a rule of ink and life a broken rule in rain. */
 .sc-key-bar::before {
   background: var(--ink);
-  opacity: 0.7;
 }
 
 .sc-key-land::before {
-  background: var(--muted);
+  background: var(--rain);
   width: 4px;
 }
 
 .sc-key-board::before {
-  background: var(--mana-u);
+  background: var(--ink);
   height: 2px;
 }
 
 .sc-key-life::before {
   background: repeating-linear-gradient(
     to right,
-    var(--muted) 0 4px,
+    var(--rain) 0 4px,
     transparent 4px 7px
   );
   height: 2px;
 }
 
+/* The one tonal step, which is exactly what the wipe band is on the plot. */
 .sc-key-wipe::before {
-  background: var(--mana-w);
-  opacity: 0.35;
+  background: var(--raised);
+  border: 1px solid var(--line);
 }
 
-/* ── Tables (event ledger, compare) ─────────────────────────────────────── */
+/* ── Tables (event ledger, compare, cards) ──────────────────────────────── */
 
 .sc-table-wrap {
   overflow-x: auto;
@@ -602,23 +675,24 @@
 .sc-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .sc-table th {
   text-align: left;
-  font-weight: 400;
   font-size: 11px;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 0 8px 4px 0;
+  padding: 0 10px 6px 0;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
 .sc-table td {
-  padding: 4px 8px 4px 0;
+  padding: 7px 10px 7px 0;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
   font-variant-numeric: tabular-nums;
@@ -633,144 +707,184 @@
   color: var(--ink);
 }
 
-/* The card the seat cast, on its own line under the class chip. Held to a short
+/* The card the seat cast, on its own line under the class. Held to a short
    measure so a 141-character printed name cannot widen the Event column and
    push the ledger into a horizontal scroll at 1024. */
 .sc-evt-card {
   display: block;
   max-width: 18ch;
-  margin-top: 3px;
+  margin-top: 4px;
   color: var(--ink);
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
 }
 
-/* Event accents, mirroring the dock stripe in `pressure.css`. One declaration
-   feeds the ledger chip, the chart's markers and the chart's key. */
+/* Event classes. One declaration feeds the ledger's class mark, the chart's
+   markers and the chart's key, so the mnemonic cannot drift between them. */
 .sc-evt.type-wipe,
-.sc-evt-mark.type-wipe {
+.sc-evt-mark.type-wipe,
+.sc-mark-key.type-wipe {
   --sc-evt: var(--mana-w);
 }
 
 .sc-evt.type-removal,
 .sc-evt.type-resource,
 .sc-evt-mark.type-removal,
-.sc-evt-mark.type-resource {
+.sc-evt-mark.type-resource,
+.sc-mark-key.type-removal,
+.sc-mark-key.type-resource {
   --sc-evt: var(--mana-b);
 }
 
 .sc-evt.type-counter,
-.sc-evt-mark.type-counter {
+.sc-evt-mark.type-counter,
+.sc-mark-key.type-counter {
   --sc-evt: var(--mana-u);
 }
 
 .sc-evt.type-combat,
-.sc-evt-mark.type-combat {
+.sc-evt-mark.type-combat,
+.sc-mark-key.type-combat {
   --sc-evt: var(--mana-r);
 }
 
 .sc-evt.type-clock,
-.sc-evt-mark.type-clock {
+.sc-evt-mark.type-clock,
+.sc-mark-key.type-clock {
   --sc-evt: var(--mana-g);
 }
 
 /* A hate piece is colourless in the game's own vocabulary, so it wears Magic's
-   colourless grey here. The letter H beside it is what carries the class; the
-   hue is only the mnemonic. */
+   colourless slate. The word beside it is what carries the class; the hue is
+   only the mnemonic. */
 .sc-evt.type-hate,
-.sc-evt-mark.type-hate {
+.sc-evt-mark.type-hate,
+.sc-mark-key.type-hate {
   --sc-evt: var(--mana-c);
 }
 
+/* The class mark: a 10px square of the class's colour beside the class word in
+   ink. The one coloured thing on the sheet, and the colour never travels
+   without the name. */
 .sc-evt {
-  display: inline-block;
-  padding: 0 6px;
-  border: 1px solid var(--sc-evt, var(--line));
-  border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--sc-evt, var(--muted));
+  color: var(--ink);
   white-space: nowrap;
+}
+
+.sc-evt::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--sc-evt, var(--muted));
 }
 
 .sc-seed-inline {
   text-transform: none;
   font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
   letter-spacing: 0;
 }
 
-/* The chart marks an event with the letter its class is keyed by, printed in
-   that class's mana colour. The colour is the mnemonic; the letter is what
-   carries the class in greyscale, and the key under the chart names both. */
+/* The chart marks an event with the letter its class is keyed by, set in ink,
+   with the class's colour as a swatch under it. The letter is what carries the
+   class in greyscale, and the key under the chart names both. */
 .sc-evt-mark {
-  fill: var(--sc-evt, var(--muted));
-  color: var(--sc-evt, var(--muted));
+  fill: var(--ink);
+  color: var(--ink);
   font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+.sc-evt-swatch {
+  fill: var(--sc-evt, var(--muted));
+  background: var(--sc-evt, var(--muted));
 }
 
 /* An answered event is struck through: it arrived, but it never landed. */
 .sc-evt-strike {
-  stroke: var(--sc-evt, var(--muted));
+  stroke: var(--rain);
   stroke-width: 1.2;
 }
 
 .sc-legend-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 14px;
+  align-items: center;
+  gap: 6px 16px;
   width: 100%;
 }
 
 .sc-mark-key {
   display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
+  align-items: center;
+  gap: 5px;
 }
 
 .sc-mark-key .sc-evt-mark {
   font-size: 12px;
+  line-height: 1;
+}
+
+/* The legend's own swatch, drawn the width the chart draws it. */
+.sc-mark-key .sc-evt-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  flex: none;
 }
 
 /* The key's own sample of a struck marker, drawn the way the chart draws it. */
 .sc-mark-struck {
   text-decoration: line-through;
-  color: var(--muted);
+  fill: var(--rain);
+  color: var(--rain);
 }
 
+/* How an event ended, as a square word rather than a coloured cell. */
 .sc-term {
-  font-size: 12px;
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--rule);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
   white-space: nowrap;
 }
 
 .sc-term.is-responded {
-  color: var(--ok);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .sc-term.is-resolved {
   color: var(--muted);
 }
 
-.sc-term.is-unresolved {
-  color: var(--accent);
-}
-
 .sc-note {
   color: var(--muted);
-  font-style: italic;
+  font-style: normal;
 }
 
-.sc-delta.is-better {
-  color: var(--ok);
-}
-
+/* Better and worse are said by the sign and the word beside them; the column is
+   set in ink and weight is all that lifts a changed reading off a flat one. */
+.sc-delta.is-better,
 .sc-delta.is-worse {
-  color: var(--danger);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .sc-delta.is-flat {
@@ -780,95 +894,129 @@
 /* ── Seats ──────────────────────────────────────────────────────────────── */
 
 .sc-seats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: block;
 }
 
 .sc-seat {
-  flex: 1 1 150px;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 2px 0;
+  display: grid;
+  grid-template-columns: 160px auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 20px;
+  padding: 9px 0 10px;
+  border-top: 1px solid var(--line);
 }
 
-/* The row says "eliminated T9" in words; the dimming only underlines it. */
-.sc-seat.is-dead {
-  opacity: 0.55;
+/* The row says "eliminated T9" in words; rain and the strike only underline it. */
+.sc-seat.is-dead .sc-seat-name,
+.sc-seat.is-dead .sc-seat-dmg,
+.sc-seat.is-dead .sc-seat-sub,
+.sc-seat.is-dead .sc-dim {
+  color: var(--rain);
+}
+
+.sc-seat.is-dead .sc-seat-name {
+  text-decoration: line-through;
 }
 
 .sc-seat-name {
+  grid-column: 1;
   font-family: var(--font-body);
   font-size: 11px;
-  letter-spacing: 0.18em;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
 .sc-seat-dmg {
+  grid-column: 2;
   font-family: var(--font-body);
   font-size: 24px;
-  line-height: 1.15;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.015em;
   color: var(--ink);
 }
 
 .sc-seat-sub {
+  grid-column: 3;
   font-size: 12px;
+  line-height: 1.35;
   color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .sc-seat {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+
+  .sc-seat-sub {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ── Deck profile ───────────────────────────────────────────────────────── */
 
+/* Label-beside-figure pairs, each on its own ruled cell. */
 .sc-profile {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0 20px;
   margin: 0;
 }
 
 .sc-profile > div {
-  min-width: 96px;
+  min-width: 0;
+  padding: 8px 0 9px;
+  border-top: 1px solid var(--line);
 }
 
 .sc-profile dt {
   font-size: 11px;
-  letter-spacing: 0.1em;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .sc-profile dd {
-  margin: 0;
-  font-size: 13px;
+  margin: 3px 0 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 
 .sc-profile dd .sc-dim {
   font-size: 12px;
+  font-weight: 400;
 }
 
 .sc-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 14px;
 }
 
 .sc-tag {
-  padding: 1px 9px;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  color: var(--accent);
+  padding: 2px 7px;
+  border: 1px solid var(--rule);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
 
 /* ── Review ─────────────────────────────────────────────────────────────── */
 
-/* Ruled rows, not cards: the same printed-sheet form the readout blocks and the
-   metric slots use. The kind is a word before it is a colour, so MISS still
-   reads as a miss in greyscale and under forced colours. */
+/* Ruled rows, not cards: the same printed-sheet form the metric readings take.
+   The kind is a word before it is a colour, so MISS still reads as a miss in
+   greyscale and under forced colours. */
 .sc-review-list {
   list-style: none;
   margin: 0;
@@ -877,10 +1025,10 @@
 
 .sc-review-row {
   display: grid;
-  grid-template-columns: 42px 46px minmax(0, 1fr);
+  grid-template-columns: 52px 52px minmax(0, 1fr);
   align-items: baseline;
-  gap: 0 10px;
-  padding: 7px 0 8px;
+  gap: 0 12px;
+  padding: 8px 0 9px;
   border-top: 1px solid var(--line);
 }
 
@@ -888,17 +1036,21 @@
   font-size: 11px;
   font-weight: 500;
   line-height: 1.2;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
+/* MISS is the row the list exists for, so it comes up to full ink at full
+   weight. GOOD is a reading like any other and stays in the label grey: neither
+   of them is told by hue. */
 .sc-review-row.is-miss .sc-review-kind {
-  color: var(--danger);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .sc-review-row.is-good .sc-review-kind {
-  color: var(--ok);
+  color: var(--ink);
 }
 
 /* Turns are figures and sit in a fixed slot, so the column never reflows as the
@@ -913,7 +1065,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .sc-review-title {
@@ -924,7 +1076,7 @@
 }
 
 .sc-review-row.is-miss .sc-review-title {
-  color: var(--danger);
+  font-weight: 700;
 }
 
 .sc-review-detail {
@@ -936,8 +1088,8 @@
 
 /* The limits of the reading, printed once under the list it qualifies. */
 .sc-review-foot {
-  margin: 8px 0 0;
-  padding-top: 8px;
+  margin: 10px 0 0;
+  padding-top: 9px;
   border-top: 1px solid var(--line);
   font-size: 12px;
   line-height: 1.35;
@@ -948,7 +1100,7 @@
    than squeezing the detail into a ribbon. */
 @media (max-width: 720px) {
   .sc-review-row {
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 52px minmax(0, 1fr);
   }
 
   .sc-review-turn {
@@ -957,28 +1109,27 @@
 
   .sc-review-body {
     grid-column: 1 / -1;
-    margin-top: 2px;
+    margin-top: 3px;
   }
 }
 
 /* ── Patterns ───────────────────────────────────────────────────────────── */
 
 /* What keeps happening, under the deck's figures and its tags. The same ruled
-   review rows, minus the turn column: a turn belongs to one run and says
-   nothing across six, so the grid loses that slot rather than printing an empty
-   one. Ruled off above like every other block on the sheet. */
+   rows, minus the turn column: a turn belongs to one run and says nothing
+   across six, so the grid loses that slot rather than printing an empty one. */
 .sc-patterns {
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 
 .sc-patterns > .panel-heading {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .sc-patterns .sc-review-row {
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
 }
 
 /* The first row would otherwise double the block's own rule. */
@@ -1002,7 +1153,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 26ch;
-  margin-top: 2px;
+  margin-top: 3px;
   font-size: 12px;
   line-height: 1.35;
   color: var(--muted);
@@ -1012,9 +1163,9 @@
 
 /* ── Cards across runs ──────────────────────────────────────────────────── */
 
-/* Sortable headings. The heading *is* the control, so the button carries no
-   chrome of its own until it is focused or active — a row of nine boxed buttons
-   would read as a toolbar sitting on top of the table rather than as its head. */
+/* Sortable headings. The heading *is* the control, so it is an underlined word
+   rather than a button with a box — a row of nine boxed buttons would read as a
+   toolbar sitting on top of the table rather than as its head. */
 .sc-sort {
   display: inline-flex;
   align-items: baseline;
@@ -1027,11 +1178,15 @@
   text-transform: inherit;
   color: inherit;
   cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
 }
 
 .sc-sort:hover,
 .sc-sort.is-active {
   color: var(--ink);
+  text-decoration-color: var(--ink);
 }
 
 /* Reserves the arrow's width on every heading so switching the sort does not
@@ -1068,27 +1223,28 @@
 }
 
 .sc-cards-mv {
-  margin-left: 6px;
+  margin-left: 8px;
   font-size: 11px;
 }
 
 /* A word, never a colour on its own: CMDR and "low cast" have to survive
    greyscale and forced colours the same way the review kinds do. */
 .sc-flag {
-  margin-left: 6px;
+  margin-left: 8px;
   padding: 0 4px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  border: 1px solid var(--rule);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink);
   white-space: nowrap;
 }
 
+/* The row this table exists to find. The word says it and the weight says it. */
 .sc-flag.is-cut {
-  border-color: var(--danger);
-  color: var(--danger);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .sc-cards-toggle {
@@ -1106,6 +1262,35 @@
 }
 
 .sc-cards-skipped {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 12px;
+}
+
+/* ── Forced colours ─────────────────────────────────────────────────────── */
+
+/* The class swatch, the chips and the strike are the three things that carry
+   meaning as a mark rather than as a word, so each restates itself in the
+   system palette when the user has one. */
+@media (forced-colors: active) {
+  .sc-evt::before,
+  .sc-evt-swatch {
+    background: CanvasText;
+    fill: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .sc-chip,
+  .sc-result,
+  .sc-term,
+  .sc-tag,
+  .sc-flag,
+  .sc-hist-bracket,
+  .sc-hist-pair {
+    border-color: CanvasText;
+  }
+
+  .sc-hist-row.is-selected,
+  .sc-picker-item.is-picked {
+    outline: 1px solid Highlight;
+  }
 }

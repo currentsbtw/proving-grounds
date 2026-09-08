@@ -5,19 +5,29 @@
     "ignoreFiles": [],
     "ignoreValues": [
       {
-        "rule": "design-system-radius",
-        "value": "999px",
-        "createdAt": "2026-09-04T08:26:39.252Z"
-      },
-      {
-        "rule": "design-system-font-size",
-        "value": "17px",
-        "createdAt": "2026-09-04T08:26:39.370Z"
-      },
-      {
         "rule": "design-system-font-size",
         "value": "16px",
         "createdAt": "2026-09-04T08:26:39.463Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "13px",
+        "createdAt": "2026-09-08T00:01:43.767Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "15px",
+        "createdAt": "2026-09-08T00:01:43.859Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "26px",
+        "createdAt": "2026-09-08T00:01:43.932Z"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "4px",
+        "createdAt": "2026-09-08T00:01:44.058Z"
       }
     ]
   }

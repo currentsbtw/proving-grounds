@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { PROFILES, colorLetters } from '../../data/profiles';
 import type { Seat, SeatId } from '../../domain/types';
 import { highestThreatSeat, livingSeats } from '../../engine/pressure';
@@ -72,9 +73,12 @@ interface FrameProps {
    */
   acting: boolean;
   /**
-   * Whether the HIT chip is printed. A narrow frame has no room for a third
-   * chip beside CLOCK and ARMED, and the accent already runs round the whole
-   * frame; the reading in `aria-label` is unconditional either way.
+   * Whether the HIT chip is printed. It is the one chip the front can spare on
+   * a narrow window: the seat to hit is already set into the wind in the name
+   * above it, a wrapped chips row would push the whole event block down by a
+   * row's height, and the reading in `aria-label` is unconditional either way.
+   * TURN is not on this gate — nothing else on the board says whose turn the
+   * event belongs to.
    */
   showHit: boolean;
   /** Whether this seat is the one pinned open; one seat at a time. */
@@ -89,9 +93,9 @@ interface FrameProps {
 }
 
 /**
- * One opponent, as a unit frame over the board: the seat letter, its life as the
- * figure, its state chips, and the threat meter under them. The frame is a
- * button because the whole of it is the pin target — hover reads, click pins —
+ * One opponent, as a front over the board: the seat's name set monumental, its
+ * readings inside the name's own measure, and its states as words under them.
+ * The front is a button because the whole of it is the pin target — hover reads, click pins —
  * so nothing inside it may be interactive, and the detail it opens is its
  * sibling rather than its child.
  */
@@ -207,7 +211,7 @@ export default function SeatFrame({
       <button
         type="button"
         className={
-          'hud-frame pg-pane' +
+          'hud-frame' +
           (dead ? ' is-out' : '') +
           (acting && !dead ? ' is-acting' : '') +
           (hit && !dead ? ' is-hit' : '')
@@ -219,57 +223,77 @@ export default function SeatFrame({
         onBlur={() => setNear(false)}
         onClick={onTogglePin}
       >
-        <span className="hud-frame-top">
-          <span className="hud-seat-id" aria-hidden="true">
-            {seat.id}
-          </span>
-          {/* The archetype rides with the letter, because it names the same
-              thing: which opponent this is. Its own title carries the line the
-              chip has no room for. */}
+        {/* The seat letter and the archetype it pilots, set as one word run:
+            this is the seat's name, not a letter with a chip beside it. The
+            archetype keeps the title carrying the line the name has no room
+            for. */}
+        <span
+          className="hud-seat-name"
+          aria-hidden="true"
+          // The name is set to fit its column: the stylesheet divides the
+          // column width by this count, so MIDRANGE and AGGRO both fit.
+          style={{ '--name-chars': (seat.id + ' ' + (profile?.label ?? '')).trim().length } as CSSProperties}
+        >
+          <span className="hud-seat-id">{seat.id}</span>
           {profile && (
-            <span className="rd-chip is-profile" aria-hidden="true" title={profileTitle}>
+            <span className="hud-seat-arch" title={profileTitle}>
               {profile.label}
             </span>
           )}
-          <span className="hud-life num" aria-hidden="true">
-            {seat.life}
-          </span>
-          <span className="rd-label" aria-hidden="true">
-            life
-          </span>
-
-          <span className="rd-chips" aria-hidden="true">
-            {dead && <span className="rd-chip is-out">OUT</span>}
-            {/* Whose turn the player is answering. The word is the signal; the
-                rule down the frame's edge only agrees with it. */}
-            {/* Same width rule as HIT: a narrow frame keeps the is-acting rule and drops the chip. */}
-            {!dead && acting && showHit && <span className="rd-chip is-turn">TURN</span>}
-            {!dead && hasClock && <span className="rd-chip is-clock">CLOCK</span>}
-            {!dead && armedThreshold !== null && (
-              <span className="rd-chip is-armed">ARMED {armedThreshold}+</span>
-            )}
-            {/* The word is the whole signal; the colourless grey only agrees
-                with it. The count rides along once a seat holds more than one,
-                because the pane below is then the only place saying so. */}
-            {hazards.length > 0 && (
-              <span className="rd-chip is-hate" title={hazards.map((h) => h.card.name).join(', ')}>
-                HATE{hazards.length > 1 ? ` ${hazards.length}` : ''}
-              </span>
-            )}
-            {!dead && hit && showHit && <span className="rd-chip is-hit">HIT</span>}
-          </span>
         </span>
 
-        {/* Ten bordered segments, the number, and the word for which way it is
-            going — the word carries the direction, so no arrow rides along. */}
-        <span className="hud-frame-meter" aria-hidden="true">
-          <span className="rd-threat-bar">
-            {Array.from({ length: THREAT_SEGMENTS }, (_, i) => (
-              <span key={i} className={'rd-threat-seg' + (i < filled ? ' is-on' : '')} />
-            ))}
+        {/* The readings, inside the name's own measure: life, the ten threat
+            cells with their number and the word for which way it is going — the
+            word carries the direction, so no arrow rides along — and the seat's
+            colour identity as its own letters. */}
+        <span className="hud-frame-read" aria-hidden="true">
+          <span className="rd-read">
+            <span className="hud-life num">{seat.life}</span>
+            <span className="rd-label">life</span>
           </span>
-          <span className="rd-threat-num num">{filled}</span>
-          <span className={'rd-trend is-' + trend}>{trend}</span>
+
+          <span className="hud-frame-meter">
+            <span className="rd-threat-bar">
+              {Array.from({ length: THREAT_SEGMENTS }, (_, i) => (
+                <span key={i} className={'rd-threat-seg' + (i < filled ? ' is-on' : '')} />
+              ))}
+            </span>
+            <span className="rd-threat-num num">{filled}</span>
+            <span className={'rd-trend is-' + trend}>{trend}</span>
+          </span>
+
+          {profile && profile.colors.length > 0 && (
+            <span className="rd-colors">
+              {profile.colors.map((color) => (
+                <span key={color} className={'rd-color is-' + color.toLowerCase()}>
+                  {color}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+
+        <span className="rd-chips" aria-hidden="true">
+          {dead && <span className="rd-chip is-out">OUT</span>}
+          {/* Whose turn the player is answering. The word is the whole signal —
+              nothing is drawn down the front's edge to agree with it — so it is
+              printed at every width. It used to give way with HIT at 1280,
+              which left the three fronts saying nothing at all about which of
+              them the event in front of the player had come out of. */}
+          {!dead && acting && <span className="rd-chip is-turn">TURN</span>}
+          {!dead && hasClock && <span className="rd-chip is-clock">CLOCK</span>}
+          {!dead && armedThreshold !== null && (
+            <span className="rd-chip is-armed">ARMED {armedThreshold}+</span>
+          )}
+          {/* The word is the whole signal. The count rides along once a seat
+              holds more than one, because the detail below is then the only
+              place saying so. */}
+          {hazards.length > 0 && (
+            <span className="rd-chip is-hate" title={hazards.map((h) => h.card.name).join(', ')}>
+              HATE{hazards.length > 1 ? ` ${hazards.length}` : ''}
+            </span>
+          )}
+          {!dead && hit && showHit && <span className="rd-chip is-hit">HIT</span>}
         </span>
       </button>
 

@@ -1,5 +1,6 @@
-/* Dark ships by default. Light is the same design with swapped values — a token
-   swap, never a redesign — and is selected by data-theme on the root element. */
+/* Paper ships by default: the world is a white field with one grotesk on it, and
+   the night field is the same design with swapped values — a token swap, never a
+   redesign — selected by data-theme="dark" on the root element. */
 
 /* The card unit is registered rather than merely declared, so the browser
    resolves the clamp below to a single length and hands JavaScript that number
@@ -15,63 +16,81 @@
 }
 
 :root {
-  /* Surfaces */
-  --ground: #17181c;
-  --surface: #1f2127;
-  --raised: #262932;
-  /* Hairline that separates blocks; never carries meaning on its own. */
-  --line: #33353c;
-  /* The heavier printed rule: chip borders, empty threat segments, key squares. */
-  --rule: #6a6d77;
+  /* Surfaces. There is one surface in this world: the paper. --surface is the
+     same colour as --ground on purpose, kept as a name so every existing rule
+     still resolves; nothing may rely on the two differing. */
+  --ground: #f6f5f1;
+  --surface: #f6f5f1;
+  /* The single tonal step, spent only where a slab has to read as a slab with no
+     border to help it: a missing card face, the library, a hovered row, a key
+     square at rest. */
+  --raised: #efeee9;
+  /* Hairline that separates blocks and edges a card; never carries meaning. */
+  --line: #d9dbde;
+  /* The printed rule: the 2px storm rule above the active event, chip borders,
+     key squares, the control edge. Full ink, because a rule in this world is
+     drawn with the same black as the type. */
+  --rule: #101010;
 
   /* Text */
-  --ink: #e8e6e1;
-  --muted: #a0a3aa;
+  --ink: #101010;
+  --muted: #6b6f76;
+  /* Spent weather: an answered event's word, a struck log line, an eliminated
+     seat's readings. Grey enough to read as past, never used for live prose. */
+  --rain: #b9bdc4;
+  /* The flash: the letters of a word still forming, one step off the paper. It
+     is a motion state, so it never carries information on its own. */
+  --silver: #d8dde3;
 
-  /* Signals. Danger is held a hue away from --mana-r: a combat event and a life
-     loss can sit on the same screen, and they must not read as the same signal. */
-  --accent: #c9a85c;
-  --danger: #f0899f;
-  --ok: #8fc49e;
+  /* Signals. "Act now" is not a colour here — it is ink at full weight, so
+     --accent is deliberately equal to --ink and the emphasis comes from the
+     reversed plate, the tracking and the 900 name. Danger and ok are the two
+     hues the world admits, and each always prints its word beside it. */
+  --accent: #101010;
+  --danger: #9c1f45;
+  --ok: #2f6b45;
 
-  /* Mana chips */
-  --mana-w: #e5d9a5;
-  --mana-u: #8fc1e8;
-  --mana-b: #bba9c9;
-  --mana-r: #e58a76;
-  --mana-g: #8fc49e;
-  /* Colourless, for the classes that wear no colour at all. Held a clear step
-     brighter than --muted: a hate piece is a live state, and a chip in the muted
-     grey would read as a caption rather than as something standing. */
-  --mana-c: #ccd0d8;
+  /* Mana. These colour the class chip's swatch and its word, nothing else: the
+     mnemonic never travels without the class name beside it. */
+  --mana-w: #6f6224;
+  --mana-u: #275b80;
+  --mana-b: #57406d;
+  --mana-r: #9d3b1f;
+  --mana-g: #2f6b45;
+  /* Colourless, for the classes that wear no colour at all: a cool slate, held
+     clear of the warm --muted so a hate piece never reads as a caption. */
+  --mana-c: #454c56;
 
-  /* Depth. Translucent black is not theme-neutral: a near-opaque near-black
-     scrim over a paper ground is a dark design with a light patch in it, so
-     both the scrim and the two shadow strengths swap with everything else. */
-  --scrim: rgb(10 11 13 / 72%);
-  --shadow: rgb(0 0 0 / 30%);
-  --shadow-strong: rgb(0 0 0 / 55%);
+  /* Mist behind an overlay: the ground itself at 78%, so an overlay reads as the
+     page continuing rather than as a dark box dropped over it. */
+  --scrim: rgb(246 245 241 / 78%);
+  /* The world has no shadows. The names stay so old declarations resolve to
+     nothing; a floating thing is separated by a 1px --rule border instead. */
+  --shadow: transparent;
+  --shadow-strong: transparent;
 
-  /* The HUD's panes: the ground itself at two strengths, blurred behind, so a
-     frame reads as a sheet laid over the board rather than as a new surface
-     colour. Both are the theme's own ground, so light stays paper. 84% is the
-     floor at which a frame over a run of card faces still reads as one sheet
-     rather than as text sitting on the art. */
-  --pane: rgb(23 24 28 / 84%);
-  --pane-strong: rgb(23 24 28 / 94%);
+  /* The blocks that have to occlude a card face — the active event, a seat's
+     detail, a drawer — are the paper itself: fully opaque, never blurred, edged
+     with a hairline. Both strengths are the same opaque ground, kept as two
+     names because the stylesheets still ask for both. */
+  --pane: rgb(246 245 241 / 100%);
+  --pane-strong: rgb(246 245 241 / 100%);
 
-  /* Type */
-  --font-body: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-  --font-display: 'Marcellus', Georgia, 'Times New Roman', serif;
+  /* Type. One family carries the whole app; weight, size and tracking carry rank.
+     --font-display is the same stack: the display voice is this face at 900. */
+  --font-body: 'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-display: 'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif;
   /* A decklist is columnar text, so the paste box is the one monospace surface.
      Declared here so the type system is readable in one file. */
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
 
-  /* Layout. There is no right rail during a run any more: the HUD floats over
-     a full-width board, and its own widths live with the live shell in App.css. */
+  /* Layout. There is no right rail during a run any more: the HUD sits over a
+     full-width board, and its own widths live with the live shell in App.css. */
   --rail-left: 280px;
   --titlebar-h: 44px;
-  --radius: 6px;
+  /* Nothing in this world is rounded. The one exception is a card face, which
+     keeps Scryfall's own 5px corner and sets it locally. */
+  --radius: 0;
   --gap: 12px;
 
   /* One card width for the whole app, scaled to the window between a floor at
@@ -92,47 +111,48 @@
   --card-w: round(clamp(84px, min(11vw, 18.6vh), 158px), 1px);
 
   /* The widest the eye should have to travel to read one row. The three seat
-     frames and the five zones of the bottom strip are centred inside this,
+     fronts and the five zones of the bottom strip are centred inside this,
      while the battlefield keeps the whole window — more cards per row there is
      useful, but three seat readings 1500px apart on an ultrawide is not one
      row of information any more. */
   --table-max: 2000px;
 }
 
-:root[data-theme='light'] {
+/* The night field: the same paper world inverted. Every value below is the swap
+   of its light twin, so no rule anywhere needs to know which theme is up. */
+:root[data-theme='dark'] {
   /* Surfaces */
-  --ground: #f5f2ec;
-  --surface: #efece4;
-  --raised: #fbf9f4;
-  --line: #d0c9b9;
-  --rule: #8d8478;
+  --ground: #101010;
+  --surface: #101010;
+  --raised: #1a1a1a;
+  --line: #2a2c30;
+  --rule: #f6f5f1;
 
   /* Text */
-  --ink: #1a1a17;
-  --muted: #6b6b63;
+  --ink: #f6f5f1;
+  --muted: #a2a6ad;
+  --rain: #4f5358;
+  --silver: #6d737b;
 
-  /* Signals */
-  --accent: #7d5f16;
-  --danger: #9c1f45;
-  --ok: #2f6b45;
+  /* Signals: accent is still ink, danger and ok lifted off the dark ground. */
+  --accent: #f6f5f1;
+  --danger: #f0899f;
+  --ok: #8fc49e;
 
-  /* Depth: a warm dark at a lower alpha, so the paper ground stays paper. */
-  --scrim: rgb(43 36 26 / 55%);
-  --shadow: rgb(74 62 44 / 16%);
-  --shadow-strong: rgb(74 62 44 / 30%);
+  /* Mana, lifted the same way; still chip swatch and class word only. */
+  --mana-w: #e5d9a5;
+  --mana-u: #8fc1e8;
+  --mana-b: #bba9c9;
+  --mana-r: #e58a76;
+  --mana-g: #8fc49e;
+  --mana-c: #ccd0d8;
 
-  /* Same recipe, the light ground: the pane is never a tinted glass, it is the
-     page's own paper at the same two strengths. */
-  --pane: rgb(245 242 236 / 84%);
-  --pane-strong: rgb(245 242 236 / 94%);
+  /* Mist and the absent shadows */
+  --scrim: rgb(16 16 16 / 78%);
+  --shadow: transparent;
+  --shadow-strong: transparent;
 
-  /* Mana chips */
-  --mana-w: #6f6224;
-  --mana-u: #275b80;
-  --mana-b: #57406d;
-  --mana-r: #9d3b1f;
-  --mana-g: #2f6b45;
-  /* The same colourless, on paper: a cool slate, darker and cooler than the warm
-     grey --muted so the two never read as one ink. */
-  --mana-c: #454c56;
+  /* The opaque ground again: an occluding block is the field, not a new colour. */
+  --pane: rgb(16 16 16 / 100%);
+  --pane-strong: rgb(16 16 16 / 100%);
 }

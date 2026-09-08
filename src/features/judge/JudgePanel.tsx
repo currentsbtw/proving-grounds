@@ -215,6 +215,12 @@ export default function JudgePanel() {
           </span>
           <button type="submit" className="jd-send" disabled={pending || question.trim() === ''}>
             Ask
+            {/* The key that already sends, printed beside the word the way the
+                player bar prints its own. Decoration only: the placeholder says
+                it in a sentence, so a screen reader is not told twice. */}
+            <span className="rd-key" aria-hidden="true">
+              Enter
+            </span>
           </button>
         </div>
       </form>

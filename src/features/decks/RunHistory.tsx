@@ -150,7 +150,7 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
                     <span className="sc-hist-confirm">
                       <button
                         type="button"
-                        className="dk-btn-quiet dk-btn-danger"
+                        className="sc-hist-del"
                         onClick={() => {
                           setConfirmId(null);
                           if (isSelected) selectRun(null);
@@ -161,7 +161,7 @@ function DeckRuns({ deckId, deckName }: { deckId: string; deckName: string }) {
                       </button>
                       <button
                         type="button"
-                        className="dk-btn-quiet"
+                        className="sc-hist-keep"
                         onClick={() => setConfirmId(null)}
                       >
                         Keep

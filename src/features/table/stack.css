@@ -1,8 +1,8 @@
 /* ── Proving Grounds — the stack tray ────────────────────────────────────── */
 
-/* A band ruled off the board above and the hand below, in the same ink as the
-   strip it sits on. It is not a panel: the play surface has rules, not boxes,
-   and this one only exists while something is waiting on it.
+/* A band ruled off the board above and the hand below, on the same paper. It is
+   not a panel: this surface has rules, not boxes, and this one only exists while
+   something is waiting on it.
 
    It is also capped. A deep turn scrolls its own list rather than pushing the
    board out of the window: whatever the stack is holding, the head that names
@@ -35,9 +35,13 @@
   flex: none;
 }
 
+/* The figure beside its label, in the weight every figure on the sheet takes. */
 .tbl-tray-count {
   flex: none;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -91,12 +95,43 @@
   border-top: 0;
 }
 
+/* The next thing that happens is the heaviest rule in the band, and it says so
+   in a word as well: a rule alone would read by weight only. */
+.tbl-tray-row.is-top {
+  border-top: 2px solid var(--ink);
+}
+
+.tbl-tray-row.is-top .tbl-tray-label {
+  font-weight: 700;
+}
+
 .tbl-tray-pos {
   flex: none;
   min-width: 13px;
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* The word the top rule is saying, printed in the square chip every other state
+   on the sheet wears. */
+.tbl-tray-row.is-top .tbl-tray-pos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.tbl-tray-row.is-top .tbl-tray-pos::after {
+  content: 'Top';
+  padding: 2px 6px;
+  border: 1px solid var(--rule);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
 
 /* The readout's chip, held to one printed slot so the labels beside them start
@@ -107,11 +142,13 @@
   text-align: center;
 }
 
-/* The counter wears the counterspell mnemonic the way HIT wears the accent, and
-   carries its own printed word with it, so it never reads by colour alone. */
+/* A counter is the one item on the stack that is answered somewhere else, so it
+   is set at full weight in the ink the rest of the sheet is printed in. The chip
+   it sits in is the readout's own square rule; this may change the word, never
+   its colour. */
 .rd-chip.is-counter {
-  border-color: var(--mana-u);
-  color: var(--mana-u);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* Card names and typed trigger text both land here, and either can run past any
@@ -126,7 +163,7 @@
   unicode-bidi: isolate;
 }
 
-/* The same small square the card face prints its mana value in. */
+/* The same key square the card face prints its mana value in. */
 .tbl-tray-mv {
   flex: none;
   display: inline-flex;
@@ -134,12 +171,13 @@
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 4px;
+  padding: 0 2px;
   border-radius: 0;
-  background: var(--raised);
+  background: var(--ground);
   border: 1px solid var(--rule);
   color: var(--ink);
   font-size: 11px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -155,7 +193,7 @@
   min-width: 152px;
 }
 
-/* The one control on the surface, square and outlined like the readout's. */
+/* The one control on the surface: an edge around its own word. */
 .tbl-tray-resolve {
   flex: none;
   display: inline-flex;
@@ -171,14 +209,15 @@
   white-space: nowrap;
 }
 
-/* Accent is spent on whatever needs an answer now. With an event waiting, that
-   is the event card, and this button stands down to the printed rule. */
+/* "Act now" is weight, not hue, and the reversed plate belongs to the event's
+   first response. With no event waiting this is the thing to press, so its word
+   and its key come up to full weight inside the same hairline. */
 .tbl-tray-resolve.is-accent:not(:disabled) {
-  border-color: var(--accent);
+  font-weight: 700;
 }
 
 .tbl-tray-resolve:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--ink);
 }
 
 .tbl-tray-resolve:disabled {
@@ -186,8 +225,9 @@
 }
 
 .tbl-tray-resolve.is-accent:not(:disabled) .rd-key {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--rule);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* Taking something back off the stack is a correction, not a play: the readout's
@@ -224,8 +264,6 @@
   font-size: 13px;
 }
 
-/* Square and outlined: this is the play surface, and the 6px slab belongs to the
-   panels between runs. */
 .tbl-tray-push {
   flex: none;
   min-width: 90px;
@@ -239,7 +277,7 @@
 }
 
 .tbl-tray-push:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--ink);
 }
 
 /* Drop rule -------------------------------------------------------------- */
@@ -248,8 +286,8 @@
    go over a row, the note or the ability field is a card let go over the tray,
    not a cast. Only a surface while a card the stack would accept is in the air,
    and drawn the way the library's drop strips are — a dashed rule that names
-   itself, going solid accent when the card is over it. Deep enough to be aimed
-   at without care. */
+   itself, coming up to full ink when the card is over it. Deep enough to be
+   aimed at without care. */
 .tbl-tray-drop {
   display: none;
 }
@@ -267,14 +305,12 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
-  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, color 120ms ease;
 }
 
 .tbl-tray-drop.is-live.is-over {
-  border-style: solid;
-  border-color: var(--accent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--rule);
+  color: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -319,5 +355,32 @@
        when even that does not fit. */
     min-height: auto;
     max-height: 96px;
+  }
+}
+
+/* Forced colours --------------------------------------------------------- */
+
+/* The rule that marks the top of the stack, the word beside it and the dashed
+   target all have to survive the system's own palette. */
+@media (forced-colors: active) {
+  .tbl-tray-row.is-top {
+    border-top-color: CanvasText;
+  }
+
+  .tbl-tray-row.is-top .tbl-tray-pos::after,
+  .tbl-tray-mv {
+    background: Canvas;
+    border-color: CanvasText;
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .tbl-tray-drop.is-live {
+    border-color: GrayText;
+  }
+
+  .tbl-tray-drop.is-live.is-over {
+    border-color: CanvasText;
+    color: CanvasText;
   }
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PressureEvent, SeatId } from '../../domain/types';
 import type { ResolveEventPayload } from '../../state/gameStore';
 import { cardName, isCreatureCard, useGameStore } from '../../state/gameStore';
+import { resolveCards } from '../../services/scryfall';
 import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 import { EVENT_RESPONSE_EVENT } from '../../hooks/useHotkeys';
 import type { EventResponseDetail } from '../../hooks/useHotkeys';
@@ -507,6 +508,68 @@ function ClockAnswer() {
   );
 }
 
+/**
+ * Faces already settled this session, so a run never asks after the same cited
+ * card twice. A miss is remembered as a miss — the line reads perfectly well
+ * without a face, and a card Scryfall has nothing for should not be asked about
+ * on every event that cites it.
+ */
+const citedFaces = new Map<string, string | null>();
+
+/**
+ * The cited card's Scryfall face, cache-first and never in the way. It resolves
+ * through the same `resolveCards` path the deck does, so a card already in the
+ * Dexie cache — which every cited card in a run generally is — comes back
+ * without a request. Nothing waits on it: the citation renders the moment the
+ * event lands and the face joins it if and when it arrives. A failure is
+ * silent, because a missing thumbnail is not something to tell the player about
+ * while they are holding a decision.
+ */
+function useCitedFace(name: string | undefined): string | undefined {
+  // The answer, and the card it is the answer for: a URL, null for a card with
+  // no face, and undefined while a lookup is still out. Seeded from the module
+  // map, so a card already settled this session is on screen in the first
+  // render rather than a frame later.
+  const [settled, setSettled] = useState<{
+    name: string | undefined;
+    face: string | null | undefined;
+  }>(() => ({ name, face: name ? citedFaces.get(name) : undefined }));
+
+  useEffect(() => {
+    if (!name || citedFaces.has(name)) return;
+
+    let live = true;
+    resolveCards([name])
+      .then((result) => {
+        const found = result.found[0];
+        citedFaces.set(name, found?.imageNormal ?? found?.imageSmall ?? null);
+      })
+      .catch(() => {
+        // No face, and no notice: the citation reads without one. The miss is
+        // recorded like any other answer, so a card Scryfall cannot resolve —
+        // or a lookup that failed outright — is not asked after on every event
+        // that cites it for the rest of the session.
+        citedFaces.set(name, null);
+      })
+      // Found or missed, the guard above has its answer and the slot is told
+      // to stop waiting. Both paths settle, so a failed lookup ends as a
+      // card-shaped gap rather than as a box that waits for ever.
+      .then(() => {
+        if (live) setSettled({ name, face: citedFaces.get(name) ?? null });
+      });
+    return () => {
+      live = false;
+    };
+  }, [name]);
+
+  if (!name) return undefined;
+  // A new event cites its card a render before the effect runs, so the map is
+  // what answers for a card this hook has not settled on yet — which is also
+  // every card another mount already looked up.
+  const face = settled.name === name ? settled.face : citedFaces.get(name);
+  return face ?? undefined;
+}
+
 interface EventDockProps {
   /**
    * Raised as an event retires. A seat id asks the HUD to post the post-wipe
@@ -529,6 +592,7 @@ interface EventDockProps {
 export default function EventDock({ onWipeResolved }: EventDockProps) {
   const event = useGameStore((s) => s.activeEvent);
   const clock = useGameStore((s) => s.clock);
+  const citedFace = useCitedFace(event?.card?.name);
 
   const standing = event ?? clock;
   const type = event?.type ?? 'clock';
@@ -558,25 +622,30 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
         {standing && (
           <>
             {/* A window is three seat turns, drained in turn order, so the head
-                names whose turn the thing in front of the player belongs to
-                rather than calling it "the active event". Whatever is waiting
-                behind this one is printed under the seat that will throw it, so
-                the head still carries no count. */}
+                names whose turn the thing in front of the player belongs to.
+                The class is printed once, on the chip below, so the live
+                region reads seat, then class, then the prompt. */}
             <div className="pgp-dock-head">
               <span className="pgp-head-label">
                 {event
                   ? event.type === 'counter'
                     ? // A counter is raised on the player's own cast, outside any
                       // window, so it is the one event that is not a seat's turn.
-                      `your turn · ${EVENT_LABEL[event.type]}`
-                    : `${seatLabel(event.seatId)}'s turn · ${EVENT_LABEL[event.type]}`
+                      'your turn'
+                    : `${seatLabel(event.seatId)}'s turn`
                   : 'race clock'}
               </span>
             </div>
 
             <div className="pgp-dock-main">
               <span className="pgp-seat">{seatLabel(seatId!)}</span>
-              <span className={`pgp-type type-${type}`}>{EVENT_LABEL[type]}</span>
+              <span className={`pgp-type type-${type}`}>
+                {/* The mana-colour mnemonic, and the only colour on the chip:
+                    the class word beside it is ink, so the colour never has to
+                    be read on its own. */}
+                <span className="pgp-type-swatch" aria-hidden="true" />
+                {EVENT_LABEL[type]}
+              </span>
             </div>
 
             {/* The prose the player actually reads under time pressure, so the
@@ -591,26 +660,44 @@ export default function EventDock({ onWipeResolved }: EventDockProps) {
                 way when the foot is short. */}
             {event?.card && (
               <div className="pgp-cite">
-                <div className="pgp-cite-head">
-                  <span className="pgp-cite-name" title={event.card.name}>
-                    {event.card.name}
-                  </span>
-                  <span className="pgp-cite-mv" title={`Mana value ${event.card.mv}`}>
-                    {event.card.mv}
-                  </span>
-                </div>
-                <p className="pgp-cite-effect" title={event.card.effect}>
-                  <Glossed text={event.card.effect} />
-                </p>
-                {/* A hate piece is the one citation that does not finish when
-                    the window does, so the effect is followed by what the player
-                    will keep paying if they let it stand — the same sentence
-                    that goes on to sit under the seat all game. */}
-                {event.card.tell && (
-                  <p className="pgp-cite-tell">
-                    <Glossed text={event.card.tell} />
-                  </p>
+                {/* The card's own face, beside its name. Decorative: the name,
+                    the mana value and the effect are all printed next to it, so
+                    it carries nothing a reader would lose without it — which is
+                    also why the line renders whole while the face is still
+                    being resolved, and stays whole if it never arrives.
+
+                    The slot is held either way. While the lookup is out, and
+                    for good if it comes back with nothing, what stands there is
+                    the empty slab: a card-shaped gap the line is already set
+                    around, so an arriving face lands in its place rather than
+                    pushing the name and the effect across. */}
+                {citedFace ? (
+                  <img className="pgp-cite-face" src={citedFace} alt="" aria-hidden="true" />
+                ) : (
+                  <div className="pgp-cite-face" aria-hidden="true" />
                 )}
+                <div className="pgp-cite-meta">
+                  <div className="pgp-cite-head">
+                    <span className="pgp-cite-name" title={event.card.name}>
+                      {event.card.name}
+                    </span>
+                    <span className="pgp-cite-mv" title={`Mana value ${event.card.mv}`}>
+                      {event.card.mv}
+                    </span>
+                  </div>
+                  <p className="pgp-cite-effect" title={event.card.effect}>
+                    <Glossed text={event.card.effect} />
+                  </p>
+                  {/* A hate piece is the one citation that does not finish when
+                      the window does, so the effect is followed by what the
+                      player will keep paying if they let it stand — the same
+                      sentence that goes on to sit under the seat all game. */}
+                  {event.card.tell && (
+                    <p className="pgp-cite-tell">
+                      <Glossed text={event.card.tell} />
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </>

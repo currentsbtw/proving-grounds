@@ -12,8 +12,8 @@ body,
   height: 100%;
 }
 
-/* Every figure in the app is a value in a printed slot: lining and tabular, so a
-   number never changes width as it ticks. */
+/* Every figure in the app is a reading, so the numerals are lining and tabular:
+   a number never changes width as it ticks. */
 html {
   font-variant-numeric: tabular-nums lining-nums;
 }
@@ -23,23 +23,25 @@ body {
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
+  /* The caret is part of the type, not a browser default sitting in it. */
+  caret-color: var(--ink);
 }
 
+/* One family, one set of numerals: a heading is the body face with weight on it,
+   never a second voice. Nothing in this world is set in a serif. */
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  /* The display face survives in the wordmark only; every other heading is the
-     grotesk, so headings and figures share one set of numerals. */
   font-family: var(--font-body);
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 
 p,
@@ -65,16 +67,26 @@ textarea {
   color: inherit;
 }
 
+/* A control is an edge around its own word: no fill, no radius, nothing to make
+   it a plate. The one reversed plate on a screen is drawn where it lives, not
+   here. */
 button {
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
   padding: 5px 10px;
+  color: var(--ink);
   cursor: pointer;
 }
 
+/* The whole hover language: an edge comes up to full ink. Controls that set a
+   hairline rest edge of their own are the ones this reads on; nothing moves. */
+/* The control edge is already ink, so hover is the one tonal step the world
+   allows: the button takes the raised paper behind its label. */
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  background: var(--raised);
+  border-color: var(--ink);
+  text-decoration: none;
 }
 
 button:disabled {
@@ -82,23 +94,82 @@ button:disabled {
   cursor: default;
 }
 
-/* The printed rule, not the hairline: a field's boundary is a control edge and
-   has to clear 3:1 the way the buttons beside it already do. */
+/* A field is the paper with a control edge drawn around it. */
 input,
 select,
 textarea {
   background: var(--ground);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 5px 8px;
 }
 
+/* A select left to the browser is a plate with a rounded corner and a filled
+   arrow in someone else's grey — the one control on the sheet still drawn by
+   another world. It is taken over here: the paper, the control edge, and a
+   chevron drawn as a hairline like every other mark in this app. The glyph is a
+   background image, which cannot resolve a custom property, so the ink is
+   written out and swapped with the theme below. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--ground);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 L5 5.5 L9 1.5' fill='none' stroke='%23101010' stroke-width='1'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px 7px;
+  padding-right: 26px;
+}
+
+:root[data-theme='dark'] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 L5 5.5 L9 1.5' fill='none' stroke='%23f6f5f1' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+/* Forced colours paint their own control; the drawn chevron would sit on top of
+   the one the system supplies. */
+@media (forced-colors: active) {
+  select {
+    background-image: none;
+    padding-right: 8px;
+  }
+}
+
+/* The tick is the one place a browser widget is left to draw itself, so it is at
+   least drawn in this world's ink and sized to the type beside it. */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--ground);
+  vertical-align: -2px;
+  cursor: pointer;
+}
+
+/* Checked is the reversed plate at control size: ink fill, a paper tick. */
+input[type='checkbox']:checked {
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4 L4 7 L9 1' fill='none' stroke='%23f6f5f1' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+:root[data-theme='dark'] input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath d='M1 4 L4 7 L9 1' fill='none' stroke='%23101010' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+/* Focus is ink at full weight, standing off the control so it reads over a
+   card face as clearly as over the paper. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .num {
@@ -109,13 +180,16 @@ button:focus-visible {
   color: var(--muted);
 }
 
+/* There are no panels in this world. The class survives because the surfaces
+   still group their content with it; it just draws nothing. Structure is a
+   hairline where a block needs one, set by the block itself. */
 .panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
-/* The printed label: small caps over the value it names, everywhere. */
+/* The printed label: tracked small caps, beside or under the figure it names. */
 .panel-heading {
   font-family: var(--font-body);
   font-size: 11px;
@@ -126,14 +200,26 @@ button:focus-visible {
   color: var(--muted);
 }
 
+/* Selected text is the page reversed: ink ground, paper letters. */
+::selection {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+/* The scrollbar is a hairline too, not a browser default in someone else's grey. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--line);
-  border-radius: 5px;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-track {

@@ -26,10 +26,10 @@ interface PickerProps {
  * so it covers cards rather than the readout. Escape closes it; nothing is
  * focus-trapped.
  *
- * The keyboard reaches every choice: the arrows walk the row (it scrolls
- * sideways, so left/right and up/down do the same thing), Enter picks the
- * focused card because it is an ordinary button, and Escape leaves without
- * answering.
+ * The keyboard reaches every choice: the arrows walk the list (both axes step
+ * one row, so a player who reaches for left/right lands where up/down would),
+ * Enter picks the focused card because it is an ordinary button, and Escape
+ * leaves without answering.
  *
  * It lives here rather than in the dock because `AnswerPicker` is the thing two
  * features share, and a picker whose only implementation sat in `EventDock`

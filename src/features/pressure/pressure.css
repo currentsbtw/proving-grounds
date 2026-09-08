@@ -1,4 +1,9 @@
-/* ── Proving Grounds — M1 pressure layer ─────────────────────────────────── */
+/* ── Proving Grounds — the pressure layer, in The Weather ─────────────────
+   The world is paper: one field colour, one grotesk, hairlines where structure
+   needs a rule, and exactly one reversed plate — the active event's first
+   response. Nothing here carries a fill, a shadow, a radius or a glow, and the
+   class's mana colour appears in exactly two places: the chip's swatch, and the
+   2px rule across the top of the picker. */
 
 /* ── Shared bits ────────────────────────────────────────────────────────── */
 
@@ -16,15 +21,6 @@
   border: 1px solid var(--rule);
   border-radius: 0;
   color: var(--ink);
-}
-
-/* The answer the table is waiting on wears the accent; nothing else here does. */
-.pgp-btn.is-primary {
-  border-color: var(--accent);
-}
-
-.pgp-btn.is-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* The underlined word keeps its printed size; the box is padded out to the
@@ -55,14 +51,20 @@
 
 /* ── Active event ───────────────────────────────────────────────────────── */
 
-/* Not a card: the contents of the pane the HUD hangs under the seat that threw
-   the event. The pane itself — its width, its accent border and where it aligns
-   — is `.hud-event-host` in readout.css; this is only the rhythm inside it. */
+/* Not a card: the contents of the paper block the HUD hangs under the seat that
+   threw the event. The block itself — its width, its 2px storm rule and where
+   it aligns — is `.hud-event-host` in readout.css; this is only the rhythm
+   inside it.
+
+   It is the picker's containing block, and the picker hangs below its foot, so
+   neither this block nor anything it nests inside may take an overflow of its
+   own: a clip here is the whole list of choices gone. */
 .pgp-dock {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
+  padding: 10px 12px 11px;
   animation: pgp-dock-in 140ms ease-out;
 }
 
@@ -72,7 +74,7 @@
 .pgp-say {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -95,8 +97,10 @@
   color: var(--muted);
 }
 
+/* An event standing is the one thing on the board asking for an answer, so its
+   head is ink; a bare race clock is a reading, and reads as one. */
 .pgp-head-label {
-  color: var(--accent);
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -104,8 +108,8 @@
   color: var(--muted);
 }
 
-/* The class chip carries the mana-colour mnemonic, and carries its own name with
-   it, so the event never reads by colour alone. */
+/* The class chip's swatch carries the mana-colour mnemonic, and the class word
+   is printed beside it, so the event never reads by colour alone. */
 .pgp-dock.type-wipe {
   --pgp-accent: var(--mana-w);
 }
@@ -131,11 +135,9 @@
 @keyframes pgp-dock-in {
   from {
     opacity: 0;
-    transform: translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
@@ -148,59 +150,89 @@
 .pgp-dock-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-/* Seat and class are chips of the same anatomy as the seat states above. The
-   seat is a fact, so it stays neutral; the class chip wears its mana colour as
-   the mnemonic, and carries its own name so it never reads by colour alone. */
+/* Square chips, borders only, in the world's one chip recipe. The seat is a
+   fact and stays plain; the class chip is the only chip that carries colour,
+   and it carries it as a 10px square rather than in its border or its word. */
 .pgp-seat,
 .pgp-type {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 6px;
+  background: transparent;
   border: 1px solid var(--rule);
   border-radius: 0;
-  font-size: 11px;
-  line-height: 1.2;
-  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink);
   white-space: nowrap;
 }
 
-.pgp-type {
-  border-color: var(--pgp-accent, var(--accent));
-  color: var(--pgp-accent, var(--accent));
+.pgp-type-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--pgp-accent, var(--ink));
 }
 
 .pgp-prompt {
   min-width: 0;
   margin: 0;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 1.25;
   color: var(--ink);
   /* The prompt names cards, and a card name can run past any column width. */
   overflow-wrap: anywhere;
+  /* Three lines, then the prompt scrolls inside its slot: the block must never
+     grow down into the strip. */
+  max-height: 3.8em;
+  overflow-y: auto;
 }
 
 /* ── The cited card ─────────────────────────────────────────────────────── */
 
-/* Name and mana value on one row, the effect under them. No colour of its own:
-   the class chip above already carries the mana mnemonic, and spending a second
-   accent here would break the One Accent Rule for a line that is evidence, not
-   an alarm. */
+/* The card's own face at 56px, its name and mana value beside it, its effect
+   under them. No colour of its own: the class chip above already carries the
+   mnemonic, and this line is evidence, not an alarm. */
 .pgp-cite {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 11px;
   min-width: 0;
+}
+
+/* Scryfall's own corners, the world's one radius. The slab behind it means a
+   face that is still loading is a card-shaped gap rather than a jump. */
+.pgp-cite-face {
+  flex: none;
+  width: 56px;
+  height: 78px;
+  object-fit: cover;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.pgp-cite-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .pgp-cite-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -209,7 +241,7 @@
    characters and the foot is pinned. */
 .pgp-cite-name {
   min-width: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.3;
   color: var(--ink);
@@ -233,6 +265,7 @@
   border: 1px solid var(--rule);
   border-radius: 0;
   font-size: 11px;
+  font-weight: 700;
   line-height: 16px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -256,8 +289,8 @@
 }
 
 /* What the player will keep honouring if the piece stands. It is a consequence
-   rather than card text, so it is printed in ink under the effect's muted grey
-   and kept whole — this is the sentence the run is actually asking about. */
+   rather than card text, so it is printed in ink under the effect's grey and
+   kept whole — this is the sentence the run is actually asking about. */
 .pgp-cite-tell {
   min-width: 0;
   margin: 0;
@@ -270,8 +303,29 @@
 /* A short foot has to keep both response buttons on screen: the effect drops to
    two lines before anything else in the dock moves. */
 @media (max-height: 820px) {
+  /* Two lines of prompt in a short window: the block's foot is pinned above
+     the strip, and the prompt is the row that can give a line without losing a
+     fact; the cited card under it names what was cast. */
+  .pgp-prompt {
+    max-height: 2.6em;
+  }
+
+  .pgp-dock {
+    gap: 5px;
+    padding: 8px 12px 9px;
+  }
+
+  .pgp-say {
+    gap: 6px;
+  }
+
   .pgp-cite-effect {
     -webkit-line-clamp: 2;
+  }
+
+  .pgp-cite-face {
+    width: 48px;
+    height: 67px;
   }
 }
 
@@ -279,7 +333,7 @@
 
 .pgp-answers {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .pgp-answers .pgp-btn {
@@ -288,11 +342,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 7px;
-  padding: 4px 9px 4px 5px;
+  gap: 8px;
+  padding: 5px 9px 5px 6px;
   font-size: 13px;
   white-space: normal;
   text-align: left;
+}
+
+/* The screen's one reversed plate: the first response, filled in ink, the
+   paper's own colour for its word and its key. Everything else on the field is
+   type on paper, so this is the only element the eye has to find. The 2px edge
+   is paid for out of the padding, so both buttons stand the same height. */
+.pgp-answers .pgp-btn:first-child {
+  padding: 4px 8px 4px 5px;
+  background: var(--ink);
+  border: 2px solid var(--ink);
+  color: var(--ground);
+}
+
+.pgp-answers .pgp-btn:first-child .pgp-answer-key {
+  border-color: var(--ground);
+  color: var(--ground);
+}
+
+.pgp-answers .pgp-btn:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.pgp-answers .pgp-btn:disabled .pgp-answer-key {
+  border-color: var(--line);
+  color: var(--muted);
 }
 
 /* The answer names the card it destroys, and card names run to 141 characters.
@@ -317,21 +397,17 @@
   height: 18px;
   padding: 0 4px;
   border: 1px solid var(--rule);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.pgp-btn.is-primary .pgp-answer-key {
-  border-color: var(--accent);
-  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
 }
 
 .pgp-declare {
   align-self: flex-start;
 }
 
-/* A clock with no event in front of it: the same card, nothing to answer. */
+/* A clock with no event in front of it: the same block, nothing to answer. */
 .pgp-dock.is-quiet .pgp-prompt {
   color: var(--muted);
 }
@@ -396,7 +472,7 @@
 }
 
 .pgp-toggle input {
-  accent-color: var(--pgp-accent, var(--accent));
+  accent-color: var(--ink);
   width: 13px;
   height: 13px;
   padding: 0;
@@ -415,17 +491,22 @@
 
 /* ── Picker (hangs over the top of the battlefield) ─────────────────────── */
 
+/* Opaque paper with a hairline edge and no shadow — a floating thing in this
+   world is separated by its border, not by depth. The class's mana colour has
+   moved off the border and onto the 2px rule across the top, the one place it
+   is printed with the class word already in the head. */
 .pgp-picker {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: -1px;
   right: -1px;
   z-index: 40;
-  padding: 8px 10px 10px;
-  background: var(--surface);
-  border: 1px solid var(--pgp-accent, var(--accent));
-  border-radius: var(--radius);
-  box-shadow: 0 12px 26px var(--shadow);
+  padding: 0 10px 10px;
+  background: var(--pane);
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--pgp-accent, var(--rule));
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .pgp-picker-head {
@@ -433,7 +514,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 7px;
+  padding-top: 9px;
+  margin-bottom: 8px;
 }
 
 /* A reading, not a gate: how much mana is actually open while the player claims
@@ -452,7 +534,7 @@
 /* The way out of the answer picker: an answer the app has no card for is still
    an answer, and the link says so without dressing itself up as a choice. */
 .pgp-picker-unbound {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .pgp-picker-close {
@@ -464,6 +546,7 @@
   margin: -4px -4px -4px 0;
   background: none;
   border: none;
+  border-radius: 0;
   color: var(--muted);
   line-height: 1;
   padding: 0 4px;
@@ -480,47 +563,354 @@
   color: var(--muted);
 }
 
+/* Ruled lines rather than a shelf of tiles: the choices read down the column
+   the way the log does, and a long hand scrolls inside its own box rather than
+   pushing the picker past the board. */
 .pgp-picker-row {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  flex-direction: column;
+  max-height: min(44vh, 300px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
 }
 
+/* The 54px thumbnail sets the row's height, so the padding comes down to keep
+   the rule spacing tight: a ruled list of rows, not a stack of tiles. The
+   picker's own cap cuts the last visible row in half, which is what says there
+   is more of the hand below. */
 .pgp-pick {
-  flex: 0 0 auto;
-  width: 62px;
+  flex: none;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 3px;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 6px;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  text-align: left;
+}
+
+.pgp-picker-row .pgp-pick:first-child {
+  border-top: none;
 }
 
 .pgp-pick:hover {
-  border-color: var(--accent);
+  background: var(--raised);
 }
 
+/* The row the player has already named, reversed the way the primary response
+   is: this picker is open on its own, so nothing else on screen is reversed
+   while it stands. */
 .pgp-pick.is-picked {
-  border-color: var(--pgp-accent, var(--accent));
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--ink);
+  color: var(--ground);
+}
+
+.pgp-pick.is-picked .pgp-pick-name {
+  color: var(--ground);
 }
 
 .pgp-pick-name {
-  width: 100%;
-  font-size: 12px;
-  line-height: 1.2;
-  color: var(--muted);
-  text-align: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--ink);
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   unicode-bidi: isolate;
 }
 
+/* ── The forming front ──────────────────────────────────────────────────── */
+
+/* The class word gathering over the seat that cast it, and the bounded scatter
+   of rain under it. It sits in the HUD's own slot inside the board's top
+   clearance, and takes no pointer: it is weather, not a control. */
+/* One formula sets the word, at every step: the step below is the ceiling, and
+   the column's own width divided by the glyph count is what a long class word
+   comes down to. COUNTERSPELL is therefore always set smaller than REMOVAL, on
+   every window, rather than jumping over it at a breakpoint. `--pgf-n` is the
+   letter count the component prints; `--hud-frame-w` is the seat column it is
+   forming over, inherited from `.pg-body.is-live`. */
+.pgf {
+  --pgf-size: min(76px, calc(var(--hud-frame-w) / var(--pgf-n, 8) * 1.3));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ink);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The rain is bounded by the word it falls from, so the body is sized by the
+   word and the strip stretches to match. */
+.pgf-body {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 100%;
+}
+
+.pgf-word {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  font-family: var(--font-display, var(--font-body));
+  font-weight: 900;
+  font-size: var(--pgf-size);
+  line-height: 0.8;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pgf-letter {
+  display: inline-block;
+  color: var(--ink);
+}
+
+/* The word's own spaces, kept as boxes so a two-word class breaks where it
+   would be typeset rather than where the letter spans happen to end. */
+.pgf-space {
+  display: inline-block;
+  flex: none;
+  width: 0.3em;
+}
+
+/* Letters and spaces are never squeezed: a word wider than its column overflows
+   it, centred, rather than losing its spaces to flex shrinkage. */
+.pgf-word > * {
+  flex: none;
+}
+
+/* The rain is the word coming apart: small letterforms drawn from the class word
+   itself, scattered across its measure. The strip's height is the bound — every
+   drop is placed inside it and the box clips — so the rain never reaches the
+   cards below. */
+.pgf-rain {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 40px;
+  /* The word's line box is taller than its caps, so the rain starts inside it
+     and the pair reads as one front rather than as a word above a chart. */
+  margin-top: -12px;
+  overflow: hidden;
+  color: inherit;
+}
+
+.pgf-drop {
+  position: absolute;
+  font-family: var(--font-display, var(--font-body));
+  font-weight: 500;
+  line-height: 1;
+  color: var(--rain);
+}
+
+/* A quarter of the drops keep the word's own ink, so the strip reads as the
+   letters of that word rather than as uniform grey texture. */
+.pgf-drop.is-ink {
+  color: var(--ink);
+}
+
+/* The product's one focal motion: the letters drop into their baseline out of
+   silver, the last of them holding the flash until they land, and the rain
+   falls with them. */
+@keyframes pgf-settle {
+  from {
+    transform: translateY(calc(var(--pgf-y, 0px) * -1));
+    color: var(--silver);
+  }
+  to {
+    transform: none;
+    color: var(--ink);
+  }
+}
+
+@keyframes pgf-settle-flash {
+  from {
+    transform: translateY(calc(var(--pgf-y, 0px) * -1));
+    color: var(--silver);
+  }
+  84% {
+    color: var(--silver);
+  }
+  to {
+    transform: none;
+    color: var(--ink);
+  }
+}
+
+@keyframes pgf-rainfall {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pgf-strike {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.pgf.is-forming .pgf-letter {
+  animation: pgf-settle 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--pgf-d, 0ms);
+}
+
+.pgf.is-forming .pgf-letter.is-flash {
+  animation-name: pgf-settle-flash;
+}
+
+.pgf.is-forming .pgf-rain {
+  animation: pgf-rainfall 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Answered or resolved: the whole front goes rain grey and takes a strike
+   drawn left to right, and stays there long enough to be read before the next
+   word forms. */
+.pgf.is-spent {
+  color: var(--rain);
+}
+
+.pgf.is-spent .pgf-letter,
+.pgf.is-spent .pgf-drop {
+  color: var(--rain);
+}
+
+.pgf.is-spent .pgf-word::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 54%;
+  height: 1px;
+  background: var(--rain);
+  transform-origin: left center;
+  animation: pgf-strike 180ms linear both;
+}
+
+/* Reduced motion: the word is already formed in ink and the strike is already
+   drawn. Nothing moves, and nothing is lost — both states still print. */
+@media (prefers-reduced-motion: reduce) {
+  .pgf.is-forming .pgf-letter,
+  .pgf.is-forming .pgf-letter.is-flash,
+  .pgf.is-forming .pgf-rain {
+    animation: none;
+  }
+
+  .pgf.is-spent .pgf-word::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
+/* The word steps down with the seat names it forms above: each step lowers the
+   ceiling, and the glyph-count division rides along inside it, so viewport and
+   word length compose rather than one overruling the other. */
+@media (max-width: 1279px) {
+  .pgf {
+    --pgf-size: min(64px, calc(var(--hud-frame-w) / var(--pgf-n, 8) * 1.3));
+  }
+}
+
+@media (max-width: 1099px) {
+  .pgf {
+    --pgf-size: min(52px, calc(var(--hud-frame-w) / var(--pgf-n, 8) * 1.3));
+  }
+}
+
+@media (max-height: 820px) {
+  .pgf {
+    --pgf-size: min(60px, calc(var(--hud-frame-w) / var(--pgf-n, 8) * 1.3));
+  }
+}
+
+/* ── The spent weather strip ────────────────────────────────────────────── */
+
+/* The run read as the fronts that passed: each one struck through in the
+   board's left margin, newest at the foot, the way the log runs. The drawer is
+   the record; this is the memory. */
+.pgw {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The world's printed label, in rain grey: the strip is a memory rather than a
+   reading, so the only thing it changes about `.panel-heading` is the colour. */
+.pgw-label {
+  color: var(--rain);
+}
+
+.pgw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pgw-row {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--rain);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--rain);
+  letter-spacing: 0.01em;
+}
+
+/* ── Forced colours ─────────────────────────────────────────────────────── */
+
+/* The three things in this layer that are read as fills rather than as type —
+   the class swatch, the reversed plate and the picked row — restate in system
+   colours, and the strike keeps a colour of its own so a spent front still
+   reads as spent. */
+@media (forced-colors: active) {
+  .pgp-type-swatch {
+    border: 1px solid CanvasText;
+  }
+
+  .pgp-answers .pgp-btn:first-child,
+  .pgp-answers .pgp-btn:first-child .pgp-answer-key {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+
+  .pgp-pick.is-picked,
+  .pgp-pick.is-picked .pgp-pick-name {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .pgf.is-spent .pgf-word::after {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}
 
 /* The counter-armed tell has exactly two renderings: the ARMED n+ chip on the
    seat frame that locates it, and the one-line tell hanging under that frame.

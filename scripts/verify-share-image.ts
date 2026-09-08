@@ -58,8 +58,8 @@ const DEVICE_SCALE = 2;
  */
 const VERDICT_BAND = { top: 124, bottom: 158 };
 const TILE_TOP = 172;
-const INK = '#e8e6e1';
-const MUTED = '#a0a3aa';
+const INK = '#101010';
+const MUTED = '#6b6f76';
 
 // ---------------------------------------------------------------------------
 // A synthetic 99 + 1 deck (the minimum from verify-scorecard.ts)
@@ -606,14 +606,14 @@ async function main(): Promise<void> {
   check(
     'the verdict sentence is set in headline type, on one line',
     verdictRun !== undefined &&
-      /^600 /.test(verdictRun.font) &&
+      /^700 /.test(verdictRun.font) &&
       fontSizeOf(verdictRun.font) >= 18 &&
       !verdictRun.text.includes('\n'),
     verdictRun?.font ?? '(not drawn)',
   );
-  // DESIGN.md, the One Accent Rule: accent is spent on what needs an answer now,
-  // never on a heading. The sentence prints in ink here exactly as it does on
-  // screen, and drops to muted when no metric crossed its threshold.
+  // There is no accent hue in this world — "act now" is ink at full weight — so
+  // the sentence prints in ink here exactly as it does on screen, and drops to
+  // muted when no metric crossed its threshold.
   check(
     'a verdict naming a finding is printed in ink, not the accent',
     verdictRun !== undefined && verdictRun.color === (verdict.clear ? MUTED : INK),
@@ -645,22 +645,22 @@ async function main(): Promise<void> {
   );
 
   // --- the type contract ----------------------------------------------------
-  // OWN-WORLD: one grotesk for every word and every figure, and the display
-  // face confined to the wordmark. The receipt is the only artefact that leaves
-  // the app, so it is the one most able to stop looking like it.
-  const displayRuns = recording.texts.filter((t) => /Marcellus|Georgia/.test(t.font));
+  // OWN-WORLD: one grotesk carries the whole world, and weight carries rank.
+  // There is no second face any more — the display voice is this family at 900 —
+  // so the contract is that every run is Archivo and that the heaviest weight is
+  // spent on the mark alone. The receipt is the only artefact that leaves the
+  // app, so it is the one most able to stop looking like it.
+  const strayFonts = recording.texts.filter((t) => !/Archivo/.test(t.font));
   check(
-    'the display face is used for the wordmark and nothing else',
-    displayRuns.length === 1 && displayRuns[0].text === 'PROVING GROUNDS',
-    displayRuns.map((t) => `"${t.text}" in ${t.font}`).join('; ') || '(no display run at all)',
-  );
-  const strayFonts = recording.texts.filter(
-    (t) => !/IBM Plex Sans/.test(t.font) && !/Marcellus|Georgia/.test(t.font),
-  );
-  check(
-    'every other run is set in the app grotesk',
+    'every drawn run is set in the app grotesk',
     strayFonts.length === 0,
     strayFonts.map((t) => `"${t.text}" in ${t.font}`).join('; '),
+  );
+  const displayRuns = recording.texts.filter((t) => /^900 /.test(t.font));
+  check(
+    'the heaviest weight is used for the wordmark and nothing else',
+    displayRuns.length > 0 && displayRuns.every((t) => t.text === 'PROVING GROUNDS'),
+    displayRuns.map((t) => `"${t.text}" in ${t.font}`).join('; ') || '(no 900 run at all)',
   );
   check(
     'no run is set below 9px',
@@ -739,7 +739,7 @@ async function main(): Promise<void> {
   const hateMarks = eventMarks.filter((t) => t.text === EVENT_MARK.hate);
   check(
     'a hate piece is marked in colourless grey, not a mana colour',
-    hateRows.length === 0 || hateMarks.some((t) => t.color === '#b8b5ae'),
+    hateRows.length === 0 || hateMarks.some((t) => t.color === '#454c56'),
     hateMarks.map((t) => t.color).join(', ') || '(no hate mark drawn)',
   );
 

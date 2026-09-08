@@ -31,26 +31,26 @@ export interface ShareImageOptions {
 // A canvas cannot resolve custom properties itself, but the document can: the
 // values are read off the root element when the card is drawn, so the receipt
 // carries the palette the player is actually looking at and a token edit cannot
-// leave a fork of it behind here. The literals below are the dark theme's
-// values, used only where there is no document — the headless verification
-// harness draws with them.
+// leave a fork of it behind here. The literals below are the shipping light
+// theme's values — the paper field — used only where there is no document: the
+// headless verification harness draws with them.
 
 const FALLBACK = {
-  ground: '#17181c',
-  surface: '#1f2127',
-  raised: '#262932',
-  line: '#33353c',
-  ink: '#e8e6e1',
-  muted: '#a0a3aa',
-  accent: '#c9a85c',
-  danger: '#f0899f',
-  ok: '#8fc49e',
-  manaW: '#e5d9a5',
-  manaU: '#8fc1e8',
-  manaB: '#bba9c9',
-  manaR: '#e58a76',
-  manaG: '#8fc49e',
-  manaC: '#b8b5ae',
+  ground: '#f6f5f1',
+  surface: '#f6f5f1',
+  raised: '#efeee9',
+  line: '#d9dbde',
+  ink: '#101010',
+  muted: '#6b6f76',
+  accent: '#101010',
+  danger: '#9c1f45',
+  ok: '#2f6b45',
+  manaW: '#6f6224',
+  manaU: '#275b80',
+  manaB: '#57406d',
+  manaR: '#9d3b1f',
+  manaG: '#2f6b45',
+  manaC: '#454c56',
 };
 
 type Palette = typeof FALLBACK;
@@ -114,30 +114,31 @@ function eventColor(C: Palette, type: string): string {
 }
 
 /**
- * The app's own two faces, self-hosted and imported in `src/main.tsx`. The
- * receipt is the one artefact that leaves the app, so it is set in the app's
- * type: the grotesk for every word and every figure, and the display face for
- * the wordmark alone.
+ * The app's one face, self-hosted and imported in `src/main.tsx`. The receipt is
+ * the artefact that leaves the app, so it is set in the app's type: a single
+ * grotesk for every word and every figure, with weight — 900 for the mark, 700
+ * for names and figures, 500 for labels, 400 for prose — carrying rank. There is
+ * no second voice here, on screen or on the receipt.
  *
- * Canvas 2D has no switch for OpenType `tnum`, so the figures here are Plex's
+ * Canvas 2D has no switch for OpenType `tnum`, so the figures here are Archivo's
  * default lining numerals rather than the tabular ones the DOM asks for. That
  * costs nothing on a static receipt — each figure is drawn once, left-aligned
  * in its own slot, and never has to line up under a figure drawn later.
  */
-const BODY_FONT = `'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif`;
+const BODY_FONT = `'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif`;
 
 /**
  * A canvas asked for a font the document has not loaded silently draws the
  * fallback, and the fallback for a 34px deck name is whatever the platform
- * happens to have. Ask for the four faces the card uses and wait for them.
+ * happens to have. Ask for the four weights the card uses and wait for them.
  */
 async function ensureFonts(): Promise<void> {
   if (typeof document === 'undefined' || !document.fonts) return;
   const faces = [
-    '400 34px "IBM Plex Sans"',
-    '500 12px "IBM Plex Sans"',
-    '600 30px "IBM Plex Sans"',
-    '400 26px Marcellus',
+    '900 20px "Archivo Variable"',
+    '700 34px "Archivo Variable"',
+    '500 12px "Archivo Variable"',
+    '400 13px "Archivo Variable"',
   ];
   try {
     await Promise.all(faces.map((face) => document.fonts.load(face)));
@@ -157,7 +158,8 @@ const CARD_X = 24;
 const CARD_Y = 24;
 const CARD_W = SHARE_IMAGE_WIDTH - CARD_X * 2;
 const CARD_H = SHARE_IMAGE_HEIGHT - CARD_Y * 2;
-const CARD_RADIUS = 16;
+/* Nothing in this world is rounded. */
+const CARD_RADIUS = 0;
 
 /** Left and right content edges inside the card. */
 const L = CARD_X + 32;
@@ -241,23 +243,6 @@ function acquireTarget(width: number, height: number): RenderTarget {
   };
 }
 
-/**
- * The wordmark's face, and nowhere else's. `ensureFonts` has already asked for
- * it; if the answer was no — a cold cache, a blocked file — Georgia stands in,
- * so the wordmark is always *some* deliberate serif rather than whatever the
- * platform's default happens to be.
- */
-function displayFont(): string {
-  try {
-    if (typeof document !== 'undefined' && document.fonts?.check('20px Marcellus')) {
-      return `'Marcellus', Georgia, 'Times New Roman', serif`;
-    }
-  } catch {
-    // `check` throws on a malformed font shorthand in some engines; fall through.
-  }
-  return `Georgia, 'Times New Roman', serif`;
-}
-
 // ---------------------------------------------------------------------------
 // Drawing helpers
 // ---------------------------------------------------------------------------
@@ -310,8 +295,6 @@ function fit(ctx: Ctx2D, text: string, maxWidth: number, tracking = 0): string {
 interface TextStyle {
   size: number;
   color: string;
-  /** The display face; used for the wordmark only. */
-  display?: boolean;
   weight?: number;
   tracking?: number;
   align?: CanvasTextAlign;
@@ -322,7 +305,7 @@ interface TextStyle {
 function text(ctx: Ctx2D, value: string, x: number, y: number, style: TextStyle): number {
   const tracking = style.tracking ?? 0;
   const weight = style.weight ?? 400;
-  ctx.font = `${weight} ${style.size}px ${style.display ? displayFont() : BODY_FONT}`;
+  ctx.font = `${weight} ${style.size}px ${BODY_FONT}`;
   ctx.fillStyle = style.color;
   ctx.textAlign = style.align ?? 'left';
   ctx.textBaseline = 'alphabetic';
@@ -501,8 +484,9 @@ function formatDate(stamp: number | null): string {
 function drawHeader(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const result = resultWordOf(card, C);
 
-  // The chip is measured first: the deck name gets whatever is left over.
-  ctx.font = `600 26px ${BODY_FONT}`;
+  // The chip is measured first: the deck name gets whatever is left over. Square
+  // and unfilled — the word is the reading and the colour only underlines it.
+  ctx.font = `700 26px ${BODY_FONT}`;
   const chipTracking = 3;
   const wordWidth = measure(ctx, result.word, chipTracking);
   const chipW = wordWidth + 44;
@@ -511,31 +495,33 @@ function drawHeader(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const chipY = CHIP_Y;
 
   box(ctx, chipX, chipY, chipW, chipH, {
-    fill: alpha(result.color, 0.14),
-    stroke: alpha(result.color, 0.55),
-    radius: 14,
+    stroke: C.ink,
+    lineWidth: 1,
+    radius: 0,
   });
   text(ctx, result.word, chipX + chipW / 2, chipY + 31, {
     size: 26,
     color: result.color,
-    weight: 600,
+    weight: 700,
     tracking: chipTracking,
     align: 'center',
   });
 
   const nameWidth = chipX - 24 - L;
 
-  // The one run on the card allowed the display face.
+  // The mark: the one family every other word is set in, at the one weight
+  // nothing else on the receipt takes. There is no second face to switch to —
+  // the 900 is the whole distinction.
   text(ctx, 'PROVING GROUNDS', L, WORDMARK_Y, {
     size: 13,
-    color: C.accent,
-    display: true,
+    color: C.ink,
+    weight: 900,
     tracking: 4.5,
   });
   text(ctx, card.deckName || 'Untitled deck', L, NAME_Y, {
     size: 34,
     color: C.ink,
-    weight: 500,
+    weight: 700,
     maxWidth: nameWidth,
   });
 
@@ -578,7 +564,7 @@ function drawVerdictLine(ctx: Ctx2D, card: Scorecard, C: Palette): void {
 
   let size = VERDICT_SIZES[VERDICT_SIZES.length - 1];
   for (const candidate of VERDICT_SIZES) {
-    ctx.font = `600 ${candidate}px ${BODY_FONT}`;
+    ctx.font = `700 ${candidate}px ${BODY_FONT}`;
     if (measure(ctx, verdict.text, VERDICT_TRACKING) <= maxWidth) {
       size = candidate;
       break;
@@ -587,12 +573,12 @@ function drawVerdictLine(ctx: Ctx2D, card: Scorecard, C: Palette): void {
 
   text(ctx, verdict.text, L, VERDICT_Y, {
     size,
-    // Ink, the same as on screen. Accent is spent on what needs an answer now
-    // and on interaction affordances, never on a heading (DESIGN.md, the One
-    // Accent Rule), and nothing on a receipt can be answered. A run with nothing
-    // over a threshold has nothing to report either, so it drops to muted.
+    // Ink, the same as on screen. There is no accent hue in this world — "act
+    // now" is ink at full weight — and nothing on a receipt can be answered
+    // anyway. A run with nothing over a threshold has nothing to report either,
+    // so it drops to muted.
     color: verdict.clear ? C.muted : C.ink,
-    weight: 600,
+    weight: 700,
     tracking: VERDICT_TRACKING,
     maxWidth,
   });
@@ -602,10 +588,13 @@ function drawTiles(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   const tiles = tilesFor(card);
   tiles.forEach((tile, i) => {
     const x = L + i * (TILE_W + TILE_GAP);
-    box(ctx, x, TILE_Y, TILE_W, TILE_H, { fill: C.raised, stroke: C.line, radius: 8 });
+    // A hairline over each reading, not a box around it: the receipt is the same
+    // paper the debrief is printed on, and a reading is a label, a figure and a
+    // sentence hanging off a rule.
+    line(ctx, x, TILE_Y, x + TILE_W, TILE_Y, C.line);
 
-    const inner = TILE_W - 24;
-    text(ctx, tile.label, x + 12, TILE_Y + 24, {
+    const inner = TILE_W - 4;
+    text(ctx, tile.label, x, TILE_Y + 22, {
       size: 11,
       color: C.muted,
       weight: 500,
@@ -614,13 +603,13 @@ function drawTiles(ctx: Ctx2D, card: Scorecard, C: Palette): void {
     });
     // A word like "standing" cannot be shown at the numeral size; drop a step
     // rather than ellipsing a five-letter verdict into nonsense.
-    text(ctx, tile.value, x + 12, TILE_Y + 62, {
+    text(ctx, tile.value, x, TILE_Y + 60, {
       size: tile.value.length > 4 ? 22 : 30,
       color: C.ink,
-      weight: 600,
+      weight: 700,
       maxWidth: inner,
     });
-    text(ctx, tile.sub, x + 12, TILE_Y + 84, {
+    text(ctx, tile.sub, x, TILE_Y + TILE_H - 18, {
       size: 11,
       color: C.muted,
       maxWidth: inner,
@@ -635,7 +624,7 @@ const KEY_GAPS = [18, 12, 8];
 function keyRowWidth(ctx: Ctx2D, gap: number): number {
   let width = 0;
   for (const { type, word } of EVENT_MARK_KEY) {
-    ctx.font = `600 12px ${BODY_FONT}`;
+    ctx.font = `700 12px ${BODY_FONT}`;
     width += measure(ctx, EVENT_MARK[type] ?? '?') + 4;
     ctx.font = `400 11px ${BODY_FONT}`;
     width += measure(ctx, word) + gap;
@@ -674,7 +663,9 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   for (const wipe of card.wipes ?? []) {
     const index = Math.round(finite(wipe.turn)) - 1;
     if (index < 0 || index >= rows.length) continue;
-    line(ctx, centerOf(index), PLOT_TOP - 8, centerOf(index), AXIS_Y, alpha(C.manaW, wipe.negated ? 0.3 : 0.6));
+    // Grey, not a mana colour: on this sheet a hue only ever travels beside a
+    // class word, and a rule on the plot carries no word.
+    line(ctx, centerOf(index), PLOT_TOP - 8, centerOf(index), AXIS_Y, alpha(C.muted, wipe.negated ? 0.35 : 0.7));
   }
   ctx.restore();
   ctx.setLineDash([]);
@@ -687,11 +678,11 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
     const value = Math.max(0, finite(rows[i].mvDeployed));
     const scaled = (value / maxMv) * PLOT_H;
     const height = Math.max(scaled, 2);
-    // Ink, not the accent — the same call the app's own chart makes. One accent,
-    // held for what needs attention, and a bar chart is a reading.
+    // Ink, square — the same call the app's own chart makes. A bar chart is a
+    // reading, and in this world a reading is drawn in the type's own black.
     box(ctx, centerOf(i) - barW / 2, AXIS_Y - height, barW, height, {
-      fill: alpha(C.ink, scaled > 0 ? 0.7 : 0.2),
-      radius: Math.min(3, barW / 2),
+      fill: scaled > 0 ? C.ink : alpha(C.ink, 0.2),
+      radius: 0,
     });
   }
 
@@ -702,11 +693,13 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
     if (i === 0) ctx.moveTo(centerOf(i), y);
     else ctx.lineTo(centerOf(i), y);
   });
-  ctx.strokeStyle = C.ok;
+  // Grey against the ink bars: two series told apart by weight, the way the
+  // app's own chart tells them apart.
+  ctx.strokeStyle = C.muted;
   ctx.lineWidth = 1.75;
   ctx.stroke();
   if (rows.length === 1) {
-    dot(ctx, centerOf(0), AXIS_Y - (finite(rows[0].boardValueEnd) / maxBoard) * PLOT_H, 3, C.ok);
+    dot(ctx, centerOf(0), AXIS_Y - (finite(rows[0].boardValueEnd) / maxBoard) * PLOT_H, 3, C.muted);
   }
 
   // Event marks, newest nearest the bars. A letter rather than a dot: this
@@ -719,7 +712,7 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
       const type = (typeById.get(ids[d]) ?? 'combat') as EventType;
       text(ctx, EVENT_MARK[type] ?? '?', centerOf(i), DOT_BAND_BOTTOM - d * DOT_SPACING + 4, {
         size: 12,
-        weight: 600,
+        weight: 700,
         color: eventColor(C, type),
         align: 'center',
       });
@@ -748,7 +741,7 @@ function drawTimeline(ctx: Ctx2D, card: Scorecard, C: Palette): void {
   for (const { type, word } of EVENT_MARK_KEY) {
     const markW = text(ctx, EVENT_MARK[type] ?? '?', keyX, KEY_Y, {
       size: 12,
-      weight: 600,
+      weight: 700,
       color: eventColor(C, type),
     });
     const wordW = text(ctx, word, keyX + markW + 4, KEY_Y, { size: 11, color: C.muted });
@@ -791,12 +784,13 @@ function drawStrip(ctx: Ctx2D, C: Palette, options?: ShareImageOptions): void {
     ctx.font = `400 11px ${BODY_FONT}`;
     const width = measure(ctx, tag, 0.6) + 20;
     if (x + width > limit) break;
+    // A square hairline chip, the same one the deck profile prints on screen.
     box(ctx, x, STRIP_Y, width, STRIP_H, {
-      fill: alpha(C.accent, 0.1),
-      stroke: alpha(C.accent, 0.35),
-      radius: 11,
+      stroke: C.ink,
+      lineWidth: 1,
+      radius: 0,
     });
-    text(ctx, tag, x + 10, STRIP_Y + 15, { size: 11, color: C.accent, tracking: 0.6 });
+    text(ctx, tag, x + 10, STRIP_Y + 15, { size: 11, color: C.ink, tracking: 0.6 });
     x += width + 6;
   }
 }

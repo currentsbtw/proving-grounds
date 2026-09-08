@@ -1,4 +1,9 @@
-/* Keyword glossary ------------------------------------------------------- */
+/* ── Proving Grounds — keyword glossary ──────────────────────────────────── */
+/*
+   A definition is weather that passes over the word being read: it gathers on
+   the same paper the card sits on, stays for as long as the eye is on the term,
+   and leaves nothing behind. One hairline is the whole of its edge.
+*/
 
 /* Rules text printed by <Glossed>. The wrapper only has to keep the line
    breaks the source wrote: an oracle text is read one ability to a line, and
@@ -9,7 +14,7 @@
 
 /* A glossed word is marked the way a printed rulebook marks one — a dotted rule
    under it, not a colour change — so a creature with six keywords does not read
-   as six links. Hover is where it commits to the accent. */
+   as six links. */
 .gl-kw {
   position: relative;
   border-bottom: 1px dotted var(--rule);
@@ -22,11 +27,12 @@
   pointer-events: auto;
 }
 
+/* The rule closes from dotted to solid. Nothing else moves and no colour is
+   spent: a word you are merely pointing at is not the thing to act on. */
 .gl-kw:hover,
 .gl-kw:focus-visible {
-  border-bottom-color: var(--accent);
-  color: var(--accent);
-  outline: none;
+  border-bottom-style: solid;
+  color: var(--ink);
 }
 
 /* The pane. Fixed rather than absolute so no scrolling or clipped ancestor can
@@ -35,6 +41,7 @@
    coordinates onto the word itself and flips the pane below when the word sits
    too near the top of the screen for it to fit above. */
 .gl-tip {
+  /* Read back by Glossed.tsx as TIP_WIDTH; the two must stay equal. */
   --gl-tip-w: 240px;
 
   position: fixed;
@@ -42,12 +49,12 @@
   left: var(--gl-x, 0);
   width: var(--gl-tip-w);
   max-width: calc(100vw - 16px);
-  padding: 7px 9px 8px;
-  background: var(--pane-strong, var(--surface));
-  backdrop-filter: blur(8px);
+  padding: 8px 10px 9px;
+  /* Opaque paper over the board, separated by its rule rather than by a lift:
+     the world has no shadows to float on. */
+  background: var(--ground);
   border: 1px solid var(--rule);
   border-radius: 0;
-  box-shadow: 0 8px 22px var(--shadow-strong);
   /* The definition is read in place; it is never the thing you are pointing at,
      and it must not swallow a click meant for the board underneath. */
   pointer-events: none;
@@ -81,29 +88,31 @@
   }
 }
 
-/* The term is named in the same small printed label the readout uses for the
-   value it sits over, so the pane reads as part of the same document. */
+/* The term is named at the weight the world names things with, not shrunk into
+   a label: it is the heading of the two sentences under it. */
 .gl-tip-term {
   display: block;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
 .gl-tip-text {
   display: block;
-  margin-top: 4px;
-  font-size: 11.5px;
-  line-height: 1.4;
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--ink);
 }
 
+/* The citation is the caption of the pane: quiet, and set in figures that line
+   up between one keyword and the next. */
 .gl-tip-cr {
   display: block;
-  margin-top: 5px;
-  font-size: 11px;
+  margin-top: 7px;
+  font-size: 12px;
   line-height: 1.2;
   color: var(--muted);
+  font-variant-numeric: tabular-nums lining-nums;
 }

@@ -8,8 +8,11 @@ import { EVENT_MARK, EVENT_MARK_KEY } from './eventMarks';
  * there is no chart library in the dependency list and this needs exactly one
  * chart.
  *
- * Event colours are not chosen here: a `type-<event>` class picks up the same
- * `--mana-*` accent the dock's stripe uses, so the two cannot drift.
+ * Drawn in ink on the paper: the three series are told apart by weight — a solid
+ * bar, a narrow one, a rule — and by the words in the key under them, never by
+ * hue. The only colour on the plot is the class swatch under an event's letter,
+ * and a `type-<event>` class picks that up from the same `--mana-*` declaration
+ * the ledger's class mark uses, so the two cannot drift.
  */
 
 const W = 700;
@@ -58,6 +61,18 @@ export default function TimelineChart({ card }: TimelineChartProps) {
   const barW = Math.max(3, Math.min(18, colW * 0.42));
   const landW = Math.max(2, Math.min(7, colW * 0.16));
 
+  // Every sweep that landed, with the turn range it opened resolved to pixels
+  // once. The band behind the plot and the dashed rule over it are two readings
+  // of the same wipe, and working the same arithmetic out twice was how they
+  // could come to disagree about where a wrath fell.
+  const wipes = card.wipes
+    .filter((wipe) => !wipe.negated)
+    .map((wipe) => {
+      const from = Math.min(Math.max(1, wipe.turn), n) - 1;
+      const to = wipe.recoveredTurn === null ? n - 1 : Math.min(wipe.recoveredTurn, n) - 1;
+      return { wipe, x1: mid(from), x2: mid(to) };
+    });
+
   return (
     <figure className="sc-chart">
       <svg
@@ -67,6 +82,21 @@ export default function TimelineChart({ card }: TimelineChartProps) {
         role="img"
         aria-label={`Turn-by-turn chart over ${n} turns`}
       >
+        {/* The wipe bands go down first, under the gridlines: they are the one
+            tonal step of the world, not a highlight sitting over the plot. */}
+        {wipes.map(({ wipe, x1, x2 }) =>
+          x2 <= x1 ? null : (
+            <rect
+              key={`band-${wipe.eventId}`}
+              x={x1}
+              y={PAD.t}
+              width={x2 - x1}
+              height={PLOT_H}
+              fill="var(--raised)"
+            />
+          ),
+        )}
+
         {/* Gridlines and the board-value axis. */}
         {[0, 0.5, 1].map((frac) => {
           const y = BASE - frac * PLOT_H;
@@ -95,44 +125,26 @@ export default function TimelineChart({ card }: TimelineChartProps) {
           0
         </text>
 
-        {/* Wipes: a dashed rule where the sweep landed, shaded until the board came back. */}
-        {card.wipes
-          .filter((wipe) => !wipe.negated)
-          .map((wipe) => {
-            const from = Math.min(Math.max(1, wipe.turn), n) - 1;
-            const to = wipe.recoveredTurn === null ? n - 1 : Math.min(wipe.recoveredTurn, n) - 1;
-            const x1 = mid(from);
-            const x2 = mid(to);
-            return (
-              <g key={wipe.eventId}>
-                {x2 > x1 && (
-                  <rect
-                    x={x1}
-                    y={PAD.t}
-                    width={x2 - x1}
-                    height={PLOT_H}
-                    fill="var(--mana-w)"
-                    opacity={wipe.recoveredTurn === null ? 0.06 : 0.1}
-                  />
-                )}
-                <line
-                  x1={x1}
-                  x2={x1}
-                  y1={PAD.t - 6}
-                  y2={BASE}
-                  stroke="var(--mana-w)"
-                  strokeWidth={1}
-                  strokeDasharray="3 3"
-                  opacity={0.8}
-                />
-                <title>
-                  {wipe.recoveredTurn === null
-                    ? `Wrath on turn ${wipe.turn}. Never rebuilt to 70% of ${wipe.boardValueBefore} MV`
-                    : `Wrath on turn ${wipe.turn}. Rebuilt by turn ${wipe.recoveredTurn} (${wipe.turnsToRecover} turns)`}
-                </title>
-              </g>
-            );
-          })}
+        {/* Where each sweep landed: a dashed rule in rain, the colour of things
+            already spent. */}
+        {wipes.map(({ wipe, x1 }) => (
+          <g key={wipe.eventId}>
+            <line
+              x1={x1}
+              x2={x1}
+              y1={PAD.t - 6}
+              y2={BASE}
+              stroke="var(--rain)"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+            <title>
+              {wipe.recoveredTurn === null
+                ? `Wrath on turn ${wipe.turn}. Never rebuilt to 70% of ${wipe.boardValueBefore} MV`
+                : `Wrath on turn ${wipe.turn}. Rebuilt by turn ${wipe.recoveredTurn} (${wipe.turnsToRecover} turns)`}
+            </title>
+          </g>
+        ))}
 
         {/* Deployment bars, plus the thin lands bar beside them. */}
         {rows.map((row, i) => {
@@ -148,7 +160,6 @@ export default function TimelineChart({ card }: TimelineChartProps) {
                   width={barW}
                   height={barH}
                   fill="var(--ink)"
-                  opacity={0.7}
                 />
               )}
               {landH > 0 && (
@@ -157,36 +168,36 @@ export default function TimelineChart({ card }: TimelineChartProps) {
                   y={BASE - landH}
                   width={landW}
                   height={landH}
-                  fill="var(--muted)"
-                  opacity={0.65}
+                  fill="var(--rain)"
                 />
               )}
             </g>
           );
         })}
 
-        {/* Life, then board value on top — board value is the headline series. */}
+        {/* Life, then board value on top — board value is the headline series,
+            so it is the one drawn in ink at full weight. */}
         <polyline
           points={lifeLine}
           fill="none"
-          stroke="var(--muted)"
+          stroke="var(--rain)"
           strokeWidth={1}
           strokeDasharray="4 3"
-          opacity={0.55}
         />
-        <polyline points={boardLine} fill="none" stroke="var(--mana-u)" strokeWidth={1.75} />
+        <polyline points={boardLine} fill="none" stroke="var(--ink)" strokeWidth={1.75} />
         {rows.map((row, i) => (
           <circle
             key={row.turn}
             cx={mid(i)}
             cy={yValue(row.boardValueEnd)}
             r={2}
-            fill="var(--mana-u)"
+            fill="var(--ink)"
           />
         ))}
 
-        {/* Event markers in the band above the plot: one letter per event, in
-            its class's colour, struck through when the event was answered. */}
+        {/* Event markers in the band above the plot: one letter per event, set
+            in ink with its class's colour as a swatch under it, struck through
+            when the event was answered. */}
         {rows.map((row, i) => {
           const marks = row.eventIds
             .map((id) => byId.get(id))
@@ -200,6 +211,7 @@ export default function TimelineChart({ card }: TimelineChartProps) {
                 <text x={x} y={y} textAnchor="middle" className="sc-evt-mark">
                   {EVENT_MARK[event.type]}
                 </text>
+                <rect className="sc-evt-swatch" x={x - 5} y={y + 3} width={10} height={3} />
                 {event.terminal === 'responded' && (
                   <line
                     className="sc-evt-strike"
@@ -247,11 +259,13 @@ export default function TimelineChart({ card }: TimelineChartProps) {
           <span className="sc-key sc-key-wipe">wrath &amp; rebuild</span>
         </span>
         {/* The marker key: the letter is what a reader without the colour has,
-            so it is printed beside the word it stands for. */}
+            so it is printed beside the word it stands for, over the same swatch
+            the plot draws under it. */}
         <span className="sc-legend-row">
           {EVENT_MARK_KEY.map(({ type, word }) => (
-            <span key={type} className="sc-mark-key">
-              <span className={`sc-evt-mark type-${type}`}>{EVENT_MARK[type]}</span>
+            <span key={type} className={`sc-mark-key type-${type}`}>
+              <span className="sc-evt-mark">{EVENT_MARK[type]}</span>
+              <span className="sc-evt-swatch" aria-hidden="true" />
               {word}
             </span>
           ))}

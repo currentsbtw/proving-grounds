@@ -1,18 +1,21 @@
 /* ── HUD panels ─────────────────────────────────────────────────────────── */
 /*
-   What is left of the old right-hand rail: the panels the readout column's
-   drawer opens — tokens, the run log, and ending the run.
+   What the player bar's tabs open over the board: the run log, tokens, and
+   ending the run. None of them is a panel — a block here is its content with a
+   hairline where the content needs a rule, on the same paper as everything
+   else.
 */
 
 .pg-hud-block {
-  background: var(--ground);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   flex: none;
 }
 
-/* Dense buttons throughout the rail */
+/* Dense controls throughout the drawer. The edge is base.css's hairline; only
+   the size changes. */
 .pg-hud button {
   padding: 3px 7px;
   font-size: 12px;
@@ -56,8 +59,8 @@
   display: grid;
   grid-template-columns: 1fr 44px 44px 44px;
   gap: 4px;
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
   align-items: center;
 }
@@ -75,11 +78,14 @@
   justify-content: flex-end;
 }
 
+/* The one label over the form's four fields, in the world's own label voice. */
 .hud-token-form-labels {
   grid-column: 1 / -1;
   font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
-  letter-spacing: 0.06em;
 }
 
 /* ── 2. Run log ─────────────────────────────────────────────────────────── */
@@ -101,33 +107,39 @@
 
 /* The scroll region is a tab stop, so it shows where the keyboard is. */
 .hud-log-scroll:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
 
 .hud-log-empty {
   color: var(--muted);
   font-size: 12px;
-  font-style: italic;
 }
 
 /* Says what is not on screen, so a long run's log does not read as a short one. */
 .hud-log-trimmed {
   margin: 0 0 6px;
-  padding-bottom: 5px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
 }
 
+/* The log is a table of what happened, so it reads as one: hairline-ruled rows,
+   the turn number as the index column, the entry beside it. */
 .hud-log-row {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: baseline;
   font-size: 12px;
   line-height: 1.4;
-  padding: 1px 0;
+  padding: 3px 0;
+  border-top: 1px solid var(--line);
   color: var(--ink);
+}
+
+.hud-log-scroll > .hud-log-row:first-child {
+  border-top: 0;
 }
 
 /* The turn number is the log's index — the column a pilot scans to find the
@@ -153,11 +165,13 @@
 }
 
 .hud-log-row.kind-commander .hud-log-msg {
-  color: var(--accent);
+  font-weight: 500;
 }
 
+/* The run's own bookends. Ink at weight rather than a colour: starting and
+   ending a run is structure in the log, not an event class. */
 .hud-log-row.kind-run .hud-log-msg {
-  color: var(--accent);
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -170,15 +184,16 @@
 
 /* Opponent windows read as chapter breaks, not as another line of prose. */
 .hud-log-window {
-  margin: 7px 0 4px;
+  margin: 10px 0 4px;
 }
 
 .hud-log-window-rule {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -201,7 +216,7 @@
 .hud-log-window-sum {
   display: flex;
   flex-direction: column;
-  margin-top: 2px;
+  margin-top: 3px;
   padding-left: 18px;
   font-size: 12px;
   line-height: 1.35;
@@ -211,7 +226,6 @@
 
 .hud-log-row.kind-threat .hud-log-msg {
   color: var(--muted);
-  font-size: 12px;
 }
 
 /* Default for a response that answered no typed event (a declared interaction);
@@ -220,7 +234,9 @@
   color: var(--ok);
 }
 
-/* Event class colours, matching the dock stripe. */
+/* Event classes carry their mana colour on the letters of the line and nowhere
+   else — never a fill, never a rule — and the line always names the class it is
+   coloured for, so the colour is never the reading on its own. */
 .hud-log-row.evt-wipe .hud-log-msg {
   color: var(--mana-w);
 }
@@ -243,11 +259,13 @@
 }
 
 .hud-log-row.is-flow {
-  /* Phase and turn chatter recedes by colour alone. The opacity that used to
-     ride on top of --muted is what put the log's smallest text under 4.5:1. */
-  font-size: 12px;
+  /* Phase and turn chatter recedes by colour alone, and gives up its rule: a
+     hairline over every phase step would be a ruled page rather than a table.
+     The opacity that used to ride on top of --muted is what put the log's
+     smallest text under 4.5:1. */
+  padding: 1px 0;
+  border-top-color: transparent;
   color: var(--muted);
-  padding: 0;
 }
 
 .hud-log-row.is-flow .hud-log-msg {
@@ -260,7 +278,7 @@
 
 .hud-log-jump {
   align-self: center;
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -268,8 +286,8 @@
 .hud-note-form {
   display: flex;
   gap: 4px;
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
 }
 
@@ -282,8 +300,9 @@
 
 .hud-endrun {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex: none;
 }
 
@@ -291,24 +310,27 @@
   flex: 1 1 auto;
 }
 
+/* Loss, Concede and "Keep playing" are set in ink, and only the win keeps a
+   colour. They are resting controls — nothing has happened yet, and none of
+   them commits until the confirm behind it is answered — so the word and the
+   confirm carry them. `--danger` in this world is life leaving and the line
+   that says ERROR, never a button waiting to be pressed; and it read backwards
+   in the confirm besides, where it was painting "Keep playing", the one answer
+   that ends nothing. */
 .hud-endrun button.is-win {
   color: var(--ok);
 }
 
-.hud-endrun button.is-loss,
-.hud-endrun button.is-concede {
-  color: var(--danger);
-}
-
+/* The question, inside the edge of the thing it is about to do. */
 .hud-confirm {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 5px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
   font-size: 12px;
-  color: var(--accent);
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -319,11 +341,7 @@
 }
 
 .hud-confirm button.is-yes {
-  color: var(--ok);
-}
-
-.hud-confirm button.is-no {
-  color: var(--danger);
+  color: var(--ink);
 }
 
 /* The seed is whatever the player typed in the deck rail, so it truncates like

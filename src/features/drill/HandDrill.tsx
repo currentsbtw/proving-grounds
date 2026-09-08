@@ -102,7 +102,7 @@ function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many;
 }
 
-/** Printed label over its figure — the readout's unit, as the deck rail draws it. */
+/** Label beside its figure — the reading unit the rest of the app is set in. */
 function Slot({ label, value }: { label: string; value: string }) {
   return (
     <div className="dr-slot">

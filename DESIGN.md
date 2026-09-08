@@ -1,55 +1,97 @@
 ---
 name: Proving Grounds
-description: Solo Commander playtest trainer; a kneeboard readout floating over a real table of Scryfall card faces.
+description: Solo Commander playtest trainer; pressure is typographic weather on a paper-white field, one grotesk over untouched card faces.
 colors:
-  ground: "#17181c"
-  surface: "#1f2127"
-  raised: "#262932"
-  line: "#33353c"
-  rule: "#6a6d77"
-  ink: "#e8e6e1"
-  muted: "#a0a3aa"
-  accent: "#c9a85c"
-  danger: "#f0899f"
-  ok: "#8fc49e"
-  mana-w: "#e5d9a5"
-  mana-u: "#8fc1e8"
-  mana-b: "#bba9c9"
-  mana-r: "#e58a76"
-  mana-g: "#8fc49e"
-  pane: "rgb(23 24 28 / 84%)"
-  pane-strong: "rgb(23 24 28 / 94%)"
+  ground: "#f6f5f1"
+  raised: "#efeee9"
+  line: "#d9dbde"
+  rule: "#101010"
+  ink: "#101010"
+  muted: "#6b6f76"
+  rain: "#b9bdc4"
+  silver: "#d8dde3"
+  danger: "#9c1f45"
+  ok: "#2f6b45"
+  mana-w: "#6f6224"
+  mana-u: "#275b80"
+  mana-b: "#57406d"
+  mana-r: "#9d3b1f"
+  mana-g: "#2f6b45"
+  mana-c: "#454c56"
+  scrim: "rgb(246 245 241 / 78%)"
+  night-ground: "#101010"
+  night-raised: "#1a1a1a"
+  night-line: "#2a2c30"
+  night-ink: "#f6f5f1"
+  night-muted: "#a2a6ad"
+  night-rain: "#4f5358"
+  night-silver: "#6d737b"
+  night-danger: "#f0899f"
+  night-ok: "#8fc49e"
 typography:
-  display:
-    fontFamily: "Marcellus, Georgia, 'Times New Roman', serif"
-    fontSize: "18px"
-    fontWeight: 400
-    lineHeight: 1
-    letterSpacing: "0.03em"
-  headline:
-    fontFamily: "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
+  front:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "min(76px, calc(var(--hud-frame-w) / var(--pgf-n) * 1.3))"
+    fontWeight: 900
+    lineHeight: 0.8
+    letterSpacing: "0.025em"
+  monumental:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "min(64px, calc(var(--hud-frame-w) / var(--name-chars) * 1.25))"
+    fontWeight: 900
+    lineHeight: 0.78
+    letterSpacing: "-0.02em"
+  figure-l:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "32px"
+    fontWeight: 700
+    lineHeight: 0.78
+    letterSpacing: "-0.015em"
+  figure-m:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
     fontSize: "24px"
-    fontWeight: 600
-    lineHeight: 1.15
+    fontWeight: 700
+    lineHeight: 1
     letterSpacing: "-0.01em"
-  title:
-    fontFamily: "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
+  figure-s:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
     fontSize: "19px"
-    fontWeight: 600
-    lineHeight: 1.05
-    letterSpacing: "-0.005em"
+    fontWeight: 700
+    lineHeight: 1
+  headline:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "20px"
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: "-0.01em"
   body:
-    fontFamily: "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
-    fontSize: "13px"
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.35
     letterSpacing: "normal"
+  small:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.35
   label:
-    fontFamily: "'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
     fontSize: "11px"
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: "0.16em"
+  chip:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "10px"
+    fontWeight: 500
+    lineHeight: 1.2
+    letterSpacing: "0.16em"
+  key:
+    fontFamily: "'Archivo Variable', 'Archivo', 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontSize: "11px"
+    fontWeight: 700
+    lineHeight: 1
   mono:
     fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace"
     fontSize: "12px"
@@ -57,314 +99,229 @@ typography:
     lineHeight: 1.45
 rounded:
   none: "0"
-  panel: "6px"
   card: "5px"
 spacing:
-  hairline: "1px"
-  xs: "4px"
-  sm: "8px"
+  hairline-gap: "6px"
+  row: "8px"
+  block: "10px"
   gap: "12px"
-  block: "14px"
-  md: "16px"
-  titlebar: "44px"
-  rail-left: "280px"
-  hud-inset: "10px"
-  hud-frame: "clamp(212px, 19vw, 272px)"
-  hud-event: "clamp(300px, 22vw, 320px)"
-  hud-drawer: "360px"
-  card-w: "round(clamp(84px, min(11vw, 18.6vh), 158px), 1px)"
-  table-max: "2000px"
+  panel: "14px"
+  shell: "16px"
 components:
-  button-base:
-    backgroundColor: "{colors.raised}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.panel}"
-    padding: "5px 10px"
-  button-outline:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.none}"
-    padding: "4px 9px"
-  button-answer-primary:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.none}"
-    padding: "4px 9px 4px 5px"
-  button-filled:
-    backgroundColor: "{colors.accent}"
+  button-plate:
+    backgroundColor: "{colors.ink}"
     textColor: "{colors.ground}"
     typography: "{typography.body}"
-    rounded: "{rounded.panel}"
+    rounded: "{rounded.none}"
+    padding: "4px 8px 4px 5px"
+  button-edge:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.none}"
     padding: "5px 10px"
-  button-quiet-word:
+  button-edge-hover:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.ink}"
+  button-word:
     backgroundColor: "transparent"
     textColor: "{colors.muted}"
+    typography: "{typography.small}"
     rounded: "{rounded.none}"
     padding: "0 2px"
-    height: "24px"
   chip-state:
     backgroundColor: "transparent"
-    textColor: "{colors.muted}"
-    typography: "{typography.label}"
-    rounded: "{rounded.none}"
-    padding: "2px 6px"
-  chip-hit:
-    backgroundColor: "transparent"
-    textColor: "{colors.accent}"
-    typography: "{typography.label}"
+    textColor: "{colors.ink}"
+    typography: "{typography.chip}"
     rounded: "{rounded.none}"
     padding: "2px 6px"
   key-square:
     backgroundColor: "transparent"
-    textColor: "{colors.muted}"
+    textColor: "{colors.ink}"
+    typography: "{typography.key}"
     rounded: "{rounded.none}"
     padding: "0 4px"
     height: "18px"
-    width: "18px"
-  input:
+  input-field:
     backgroundColor: "{colors.ground}"
     textColor: "{colors.ink}"
     typography: "{typography.body}"
-    rounded: "{rounded.panel}"
+    rounded: "{rounded.none}"
     padding: "5px 8px"
-  panel:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.panel}"
-    padding: "14px"
-  pane:
-    backgroundColor: "{colors.pane}"
+  sheet:
+    backgroundColor: "{colors.ground}"
     textColor: "{colors.ink}"
     rounded: "{rounded.none}"
-    padding: "7px 10px 8px"
-  seat-frame:
-    backgroundColor: "{colors.pane}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.none}"
-    padding: "7px 10px 8px"
-    width: "{spacing.hud-frame}"
-  bar-tab:
-    backgroundColor: "transparent"
-    textColor: "{colors.muted}"
-    typography: "{typography.label}"
-    rounded: "{rounded.none}"
-    padding: "0 8px"
-    height: "26px"
-  zone-stack:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.muted}"
-    rounded: "{rounded.none}"
-    padding: "6px"
-    width: "92px"
+    padding: "10px 12px 11px"
+  card-face:
+    backgroundColor: "{colors.ground}"
+    rounded: "{rounded.card}"
 ---
 
 # Design System: Proving Grounds
 
 ## Overview
 
-**Creative North Star: "The Kneeboard"**
+**Creative North Star: "The Weather"**
 
-Proving Grounds is a solo Commander playtest trainer. Its readout is a pilot's kneeboard, not an instrument panel: pre-printed small-caps labels sit in the same place every turn, and the current figures are written into them in large tabular numerals. During a run the kneeboard is laid over the table rather than beside it — three opponent frames along the top edge of the board, whatever a seat is telling you hanging under its own frame, and your own numbers as one bar across the foot. The panes are the page's own ground at 84-94% with an 8px backdrop blur and a single hairline: a sheet on the board, never a new surface colour. Card faces from Scryfall are the only imagery and they are never filtered, tinted, or framed beyond a 1px hairline.
+Pressure is typographic weather. The whole app is one paper-white field with one grotesk on it, and the only mass on screen is type: three seat names set monumental across the top of the board, each seat's readings sitting inside its own name's measure, and an event's class word (BOARD WIPE, REMOVAL, COUNTERSPELL, COMBAT, RACE CLOCK, RESOURCE, HATE PIECE) gathering over the seat that cast it, coming apart into a short rain of its own letters, then turning rain grey with a strike once it is answered or resolved. The Scryfall card faces are the only image in the world and are never treated; the type stands beside and above them, on the same paper.
 
-The surface is ink on matte. Dark ships by default; light is the same design with swapped token values and is selected by `data-theme="light"` on the root element. Nothing glows, blooms, bevels, or textures. One warm accent is held back for whatever needs an answer now: the seat to hit and the active event's primary response. Everything else is stated in ink and muted ink, and every state is a printed word inside a border, so it survives greyscale and forced colours.
+Nothing here is a panel. There are no fills, no shadows, no radii, no gradients, no blur and no glass. Structure is a 1px hairline where a block needs a rule, a 2px ink rule where a block is the one thing asking to be read, and exactly one reversed ink plate per screen (the active event's key-1 response during a run; the deck rail's Start run between runs). Emphasis is weight, tracking and that one plate; "act now" is not a colour. The world admits two hues, danger and ok, and both always print their word. Mana colours exist only as a mnemonic beside the word or letter they name.
 
-The build refused two things by name and the refusal is durable: the three-column admin shell (seats as sidebar cards, metrics as KPI tiles), and rendered instruments (gauges, needles, lamps, dials, drawn card backs). The threat meter is ten printed segments, filled or outlined, not a dial. An eliminated seat keeps its row and takes a rule through it, so the scan never changes.
+Density is a reading, not a dashboard: every figure is lining and tabular, sized by rank (32 / 24 / 19 at 700), labelled by an 11px tracked caption beside or under it, and the whole HUD stands in the board's own margins rather than in a rail. The night field (`data-theme="dark"`) is the same design with every token swapped; no rule anywhere knows which theme is up. Confirmed anti-references: the previous "Kneeboard" world (dark matte, IBM Plex Sans with a Marcellus wordmark, brass accent, translucent HUD panes, printed label-over-figure slots), literal instruments of any kind (gauges, needles, dials, lamps, rendered props), and the dark gaming client with panels laid over the table.
 
 **Key Characteristics:**
-- Printed label over tabular figure is the unit of every reading, on the readout and on the scorecard alike.
-- Ruled rows, not boxes: `border-top` or `border-bottom` hairlines carry structure; fills and four-sided borders are reserved for floating layers and the between-runs rail. A HUD pane is the one four-sided hairline on the play surface, because it is floating.
-- One grotesk (IBM Plex Sans 400/500/600) for every heading, figure and label; the serif display face (Marcellus) exists in the wordmark and on the three seat letters, and nowhere else.
-- Dark default, light as a pure token swap, including scrim and shadow colours.
-- Square chips and key squares on the play surface; 6px radius only on panels, menus and pickers that float.
-- Motion is a 240ms settle on turn advance and 110-140ms fades elsewhere, every one of them disabled under reduced motion.
+- One surface: `--ground` is every surface, including the board, the strip, the rail, inputs and overlays; `--surface` equals `--ground` by design.
+- One family: Archivo Variable (self-hosted, wdth build), 400 through 900; weight, size and tracking carry rank.
+- One rule, one plate: a single 2px storm rule and a single reversed ink plate per screen.
+- Two hues plus mnemonics: `--danger` and `--ok` always beside their word; mana colours only beside the class word or colour letter.
+- No depth at all: `--shadow` tokens resolve to transparent; a floating thing is separated by a 1px border on opaque paper.
+- Weather is the only authored motion: the forming front (560ms), its rain, its strike, and the fronts' settle on turn advance (240ms).
 
 ## Colors
 
-A near-black matte with warm off-white ink, one gold accent, two signal colours, and five desaturated mana hues carried as a product mnemonic.
+A paper field and a storm-black ink, two greys for time (muted for captions, rain for what has passed), one silver for a word mid-change, two signal hues that always print their word, and six mana mnemonics.
 
 ### Primary
-- **Brass Accent** (`accent`): the one colour that means "act now". It borders the HIT chip on the seat to attack, the ACTIVE EVENT head label, the primary response button and its key square, the commander's ring on the battlefield, drop targets while dragging, hover borders, and every focus ring (`outline: 2px solid`). It fills exactly one control, the deck rail's Start-run button, whose ink is `ground` so it inverts with the theme. Charts do not use it; bars are drawn in `ink`.
-
-### Secondary
-- **Rose Danger** (`danger`): life loss, the losing verdict, the player's own OUT chip, the last-turn clock reading, damage lines in the log, destructive confirmations. Deliberately held a hue away from `mana-r` so a combat event and a life loss on the same screen never read as one signal.
-- **Sage OK** (`ok`): the winning verdict, a selected card's ring, +1/+1 counters, answered events in the ledger, "better" deltas in a compare.
-
-### Tertiary (mana mnemonic)
-Event classes wear the mana colour that most often produces them. This is a product convention (PRODUCT.md) rather than a visual-world decision, and the colour never travels without its name: the class chip prints BOARD WIPE / REMOVAL / COUNTERSPELL / COMBAT / RACE CLOCK / RESOURCE, the chart prints a letter mark, the log prints the sentence.
-- **Parchment White** (`mana-w`): board wipes.
-- **Sky Blue** (`mana-u`): counterspells; also the board-size series in the scorecard chart.
-- **Dusk Violet** (`mana-b`): targeted removal and resource attacks.
-- **Clay Red** (`mana-r`): combat pressure.
-- **Sage Green** (`mana-g`): the race clock. Same value as `ok` in dark; distinct roles, so keep both tokens.
+- **Storm Ink** (`--ink`, `#101010`): every figure, name, prose line and control edge, the filled threat cells, the focus ring, the one reversed plate's fill. `--accent` and `--rule` are both this same value on purpose: the accent of this world is ink at full weight, and a rule is drawn with the same black as the type.
 
 ### Neutral
-- **Ground** (`ground`): the page, the live table, the player bar, input fields, the legal footer. The default surface a reading sits on.
-- **Pane** (`pane` 84%, `pane-strong` 94%): the same ground at two strengths, used only by the HUD's floating panes with `backdrop-filter: blur(8px)`. `pane` carries the reading panes (seat frames, details, tells), `pane-strong` the ones that hold controls (the active event, the drawer). 84% is the floor at which a frame over a run of card faces still reads as one sheet rather than as text sitting on the art. Both swap with the theme like every other token, so the light HUD is paper rather than tinted glass.
-- **Surface** (`surface`): panels between runs, zone stacks, the drawer, pickers, menus, overlay panels.
-- **Raised** (`raised`): buttons at rest, library and empty-slot slabs, card-face fallbacks, hover rows, selected history rows.
-- **Ink** (`ink`): all figures and prose, the filled threat segments, the open tab's underline, the chart bars.
-- **Muted Ink** (`muted`): every printed label, captions, chip text at rest, trend words, secondary buttons' text. Clears AA on every surface it is used on at full strength; it is never additionally dimmed with opacity.
-- **Hairline** (`line`): the rule between blocks and rows, panel borders, base button borders, card-face edges. Never carries meaning on its own.
-- **Printed Rule** (`rule`): the heavier rule that is a control edge or a printed frame: chip borders, key squares, outlined readout buttons, empty threat segments, input borders, zone-stack frames, the tell's left rule, the strike through an eliminated seat, thin scrollbars. Clears 3:1 non-text contrast where `line` does not.
+- **Paper** (`--ground`, `#f6f5f1`): the field. Also `--surface`, `--pane` and `--pane-strong` (opaque, 100%); the blocks that must occlude a card face (the event sheet, a seat's detail, the drawer, pickers, overlays) are the paper itself, fully opaque, never blurred.
+- **Raised Paper** (`--raised`, `#efeee9`): the single tonal step, spent only where a slab must read as a slab with no border: a missing card face, the library slab, a hovered row or button, a key square at rest.
+- **Hairline** (`--line`, `#d9dbde`): the 1px rule that separates blocks and edges a card face; carries no meaning.
+- **Caption Grey** (`--muted`, `#6b6f76`): labels, captions, secondary prose, resting title-bar controls. Clears 4.5:1 on paper; never dimmed further.
+- **Rain** (`--rain`, `#b9bdc4`): spent things only: an answered event's word and its strike, the PASSED margin strip, an eliminated seat's name and readings. Never live prose.
+- **Silver** (`--silver`, `#d8dde3`): the flash on the last letters of a word still forming. A motion state; it never carries information on its own.
+- **Mist** (`--scrim`, `rgb(246 245 241 / 78%)`): the ground at 78% behind an overlay, so an overlay reads as the page continuing rather than a dark box.
 
-### Depth colours
-- **Scrim** (`rgb(10 11 13 / 72%)` dark, `rgb(43 36 26 / 55%)` light) behind overlays.
-- **Shadow** (`rgb(0 0 0 / 30%)` dark, `rgb(74 62 44 / 16%)` light) under the drawer and pickers.
-- **Shadow Strong** (`rgb(0 0 0 / 55%)` dark, `rgb(74 62 44 / 30%)` light) under menus, overlay panels and lifted cards.
+### Signals
+- **Loss** (`--danger`, `#9c1f45`): life leaving (the player bar's delta, life and damage log lines), the losing verdict, END RUN and Delete words, the scorecard banner text after the word ERROR. Never a resting button's fill.
+- **Win** (`--ok`, `#2f6b45`): the winning verdict and the Win choice at end of run, answered events in the ledger.
 
-Light theme values for every token above live in `src/styles/tokens.css` under `:root[data-theme='light']` and in the sidecar's `colorMeta.*.light`.
+### Mana mnemonics
+- **W / U / B / R / G / C** (`--mana-w #6f6224`, `--mana-u #275b80`, `--mana-b #57406d`, `--mana-r #9d3b1f`, `--mana-g #2f6b45`, `--mana-c #454c56`): the event-class chip's 10px swatch (wipe W, removal and resource B, counter U, combat R, clock G, hate piece C), the 2px top rule of the answer picker that hangs under that chip, a seat's colour letters on its front, the log's class words, and the scorecard timeline's event marks. Always beside the class word or the letter it names.
+
+### Night field
+Under `data-theme="dark"` every token swaps and nothing else changes: ground `#101010`, raised `#1a1a1a`, line `#2a2c30`, ink and rule and accent `#f6f5f1`, muted `#a2a6ad`, rain `#4f5358`, silver `#6d737b`, danger `#f0899f`, ok `#8fc49e`, mana lifted to `#e5d9a5 / #8fc1e8 / #bba9c9 / #e58a76 / #8fc49e / #ccd0d8`, scrim `rgb(16 16 16 / 78%)`. Paper ships by default; the choice is stored under `pg-theme-v2`.
 
 ### Named Rules
-**The Token Swap Rule.** Light is not a redesign. Every colour, including scrims and shadows, is a custom property with a value in both theme blocks; no literal hex, rgb or rgba appears in component CSS, and the share image reads the same custom properties at render time. Transparent black is not theme-neutral.
+**The One Plate Rule.** Exactly one element per screen is reversed (ink fill, paper letters, 2px ink edge): the active event's key-1 response during a run, the deck rail's Start run between runs. The answer picker's picked row reverses only while the picker is open on its own. Nothing else on the field carries a fill.
 
-**The One Accent Rule.** `accent` is spent on what needs an answer now (HIT, the active event's head and primary response) and on interaction affordances (focus, hover border, drop target, commander ring). It is not a chart series, not a heading colour, not a second chip on the same seat row. CLOCK and ARMED print in `rule`.
+**The Word Beside It Rule.** No colour stands alone. Danger and ok print beside their word (LIFE -5, WIN, ERROR); a mana colour appears only as a swatch or letter next to the class word or colour letter it names; a spent front is grey and struck, an eliminated seat is grey and struck and says OUT.
 
-**The Word Inside a Border Rule.** No state is carried by colour alone. A chip is a word with a border; a trend prints "rising"; the threat meter is filled versus outlined; an answered event is struck through. Colour underlines the word, never replaces it.
+**The Rain Rule.** `--rain` marks what has passed and nothing else. Anything the player still has to act on is set in ink or muted.
 
 ## Typography
 
-**Display Font:** Marcellus 400 (with Georgia, Times New Roman, serif), self-hosted via `@fontsource/marcellus`.
-**Body Font:** IBM Plex Sans 400 / 500 / 600 (with Segoe UI, Helvetica, Arial, sans-serif), self-hosted via `@fontsource/ibm-plex-sans`.
-**Mono Font:** ui-monospace stack (SFMono-Regular, Cascadia Mono, Consolas), the decklist paste box only.
+**Display Font:** Archivo Variable at 900 (with Archivo, Segoe UI, Helvetica, Arial, sans-serif)
+**Body Font:** Archivo Variable at 400 through 700 (same stack)
+**Label/Mono Font:** ui-monospace stack, for the decklist paste box only
 
-**Character:** One grotesk does all the work. Labels are small tracked caps in muted ink; figures are heavy, tight, and tabular, so a number never changes width as it ticks. The serif wordmark is the only thing on screen that is not the grotesk, and the h1 rule in `base.css` has to be overridden to let it through.
+**Character:** One grotesk carries the whole app; the display voice is the body face with weight on it, never a second family and never a serif. The wdth build is self-hosted from `@fontsource-variable/archivo` so no figure ever renders in a fallback face. Every numeral is lining and tabular (`font-variant-numeric: tabular-nums lining-nums` on the root) so a reading never changes width as it ticks.
 
 ### Hierarchy
-- **Display** (400, 18-20px, 1, 0.03em): the wordmark "Proving Grounds" in the title bar, the PROVING GROUNDS mark on the share image, and the seat letter on a HUD frame (20px, 0.06em, in `ink`; 17px in a short window). Nowhere else.
-- **Headline** (600, 24-26px, 1.15, -0.01em): the largest figures. Scorecard metric values and seat commander damage (24px); the library count (26px); the verdict word WIN / LOSS in uppercase at 0.12em.
-- **Title** (600, 19-22px, 1.05, -0.005em): readout figures. Seat life on a frame (22px, -0.01em); player-bar slot values (19px); the clock sentence one step down (16px). A short window steps these to 19/16/14px.
-- **Body** (400, 13px, 1.35): prose, prompts, answer buttons, the deck name in the rail (15px), the scorecard deck name (20px) and verdict sentence (17px, 1.3). Card names and player text are `overflow-wrap: anywhere` with `unicode-bidi: isolate`.
-- **Small body** (400, 12px, 1.3-1.4): captions, sub-lines, log rows, trend words, table cells, the legal line, underlined action words.
-- **Label** (500, 11px, 1.2, 0.16em, uppercase, muted): the printed label. Block titles (ACTIVE EVENT, the drawer heads), slot labels (TURN, MANA, LIFE), zone heads (LIBRARY, GRAVE), table heads, picker heads. Chips use the same recipe at 0.12em; the bar's tabs at 0.1em; narrow windows tighten chips to 0.06em.
-- **Key** (600, 12px): the hotkey square, 18px tall, `rule` border.
-- **Mono** (400, 12px, 1.45): the decklist textarea.
-
-All headings h1-h6 are set in the grotesk at 600 with 0.01em tracking. The root declares `font-variant-numeric: tabular-nums lining-nums`, so every figure in the app inherits fixed-width numerals.
+- **Front word** (900, `min(76px, column width / letter count * 1.3)`, line-height 0.8, tracking 0.025em, uppercase): the forming class word over the casting seat. `--pgf-n` is the glyph count the component prints, so COUNTERSPELL always sets smaller than REMOVAL inside the same column. Ceiling steps to 64px below 1280px and 52px below 1100px; 60px in a window under 820px tall.
+- **Monumental** (900 for the acting seat and the seat to hit, 700 otherwise; `min(64px, column width / name characters * 1.25)`, line-height 0.78, tracking -0.02em, uppercase): the three seat names across the top of the board. `--name-chars` is set from the seat id plus archetype so the name fills its column and never overflows it. The seat to hit opens its tracking to 0.12em. Ceiling steps to 56px below 1280px and 44px below 1100px, and to 56px under 820px tall.
+- **Figure L** (700, 32px, line-height 0.78, tracking -0.015em): a seat's life, the library count, scorecard metric values. 26px in a short window.
+- **Figure M** (700, 24px, line-height 1): player-bar readings on a wide window, commander damage.
+- **Figure S** (700, 19px): threat numbers; player-bar readings below 1280px and in short windows.
+- **Headline** (700, 20px, line-height 1.1 to 1.2, tracking -0.01em): the wordmark (at 900, tracking -0.005em), the scorecard's deck name and verdict, the empty-table hint.
+- **Body** (400, 14px, line-height 1.35; 13px in dense tables, buttons and picker rows; 15px for the event prompt): prose, tells, card names in the cited line at 500.
+- **Small** (400, 12px, line-height 1.35): captions, card effect text, the run line in the title bar, spent-weather rows, the legal footer at 11px.
+- **Label** (500, 11px, line-height 1.2, tracking 0.16em, uppercase, `--muted`): every printed label (LIFE, THREAT, TURN, MANA, block heads, zone heads, tab names, the title bar's KEYBOARD and THEME). Labels sit beside or under their figure, inside the name's measure; the active event's head label is set in ink because it is the one label asking for an answer.
+- **Chip** (500, 10px, tracking 0.16em, uppercase, ink): state words inside a hairline box.
+- **Key** (700, 11px, line-height 1): the character inside an 18px key square.
 
 ### Named Rules
-**The Display-Face Rule.** Marcellus names things and never measures them: the wordmark, the share image's mark, and the three seat letters, which are chair names rather than figures and never change. Every heading, figure and verdict is IBM Plex Sans.
+**The Weight Carries Rank Rule.** Hierarchy is weight and size in one family: 900 for a name or a front, 700 for a figure or a heading, 500 for a label or a chip, 400 for prose. A second family, a serif, or an italic display voice is outside the world.
 
-**The Tabular Figure Rule.** Every number sits in a printed slot and must not change width as it ticks; tabular lining numerals are set at the root and never overridden. The share image's canvas uses the same face for the same reason.
-
-**The Printed Label Rule.** A label is 11px / 500 / 0.16em / uppercase / muted, above the value it names. Labels are the world's native device (a kneeboard's pre-printed slot names), not decoration: a label exists only where a figure or block needs naming.
+**The Measure Rule.** A monumental name and a front word are sized to the column they stand in, by character count, never by a breakpoint alone; a long name gets smaller, it never wraps and never covers a card face.
 
 ## Layout
 
-The shell is a three-row grid: a 44px title bar (38px under 820px of height), the body, and an auto-height legal footer carrying the full Fan Content line. The title bar holds the h1 wordmark, a bordered run chip (deck name, bracket, seed; truncates at the name), and a THEME toggle drawn as a printed label with a key square. The footer is ruled off with a hairline, never truncated.
+The shell is a three-row grid: a 44px title bar (38px under 820px tall) with a hairline below it, the body, and the legal footer with a hairline above it. Between runs the body is a 280px deck rail beside the centre panel with a 12px gap and 12px padding; both are flat paper with 14px internal padding and no box, and a panel's heading is a label with a hairline under it.
 
-**Live run.** One full-width column with no gap and no padding, in two rows: the table at `minmax(0, 1fr)` and the player bar at `auto`. The HUD overlay shares the table's grid cell, contributes no height to it, and takes no pointer events except on the panes themselves, so the board stays droppable everywhere a pane is not. The table is `ground` with no border and its own stacking context, so nothing inside it (a hovered hand card lifts to z-index 60) can climb over a pane. Inside it, the battlefield is split into two equal halves by height (nonland permanents above, lands below, a hairline between), and cards are sized to the largest width whose rows fit each half, the card unit at most down to a floor 0.6 of it (never under 84px), after which a half scrolls; it also carries `--hud-top` (82px, 72px in a short window) of top padding so no card is dealt onto the board already hidden under a frame. The bottom strip is `auto minmax(2.86 card units, 1fr) auto`: zone stacks, the hand (never hidden, never narrower than that floor), more stacks. Because the card scales with the window, the five zones and the hand's floor fit by construction at every width down to the declared 820px floor — the strip only gives up its own spacing below 1024px, never its card size. Under 820px — a 1440px screen at 200% zoom reports 720px — the card has bottomed out and the table scrolls horizontally rather than clipping the outer stacks off the edge; the hand keeps its width and the board above is untouched.
+During a run the board takes the whole body and the HUD stands over it in the board's own margins, with the body as the containing block. Three fixed columns sit across the top edge inside a 2000px table maximum (A left, B centred, C right), each `clamp(300px, 26vw, 420px)` wide with the slack between them so a seat is always in the same place. The forming word occupies the casting seat's column between the fronts and the first card row; the board spends `--hud-top` (208px; 182px in a short window) as top padding so no card is ever dealt under a name or under the weather. The event sheet is `clamp(300px, 22vw, 420px)` wide, justified start / centre / end to its seat, in the grid's second row. The spent-weather strip stands in a 100px left margin that the board reserves as padding (126px including the inset); it hides below 1100px and the margin closes. The five-zone strip and the player bar hold the bottom rows, ruled off with a hairline.
 
-**Live HUD.** A three-column grid inset 10px from the board's edges and bounded at `--table-max`, centred over a board that keeps the full window; tracks at `clamp(212px, 19vw, 272px)` with `justify-content: space-between` — seat A left, B centred, C right, at the two ends and the middle of that bounded row rather than of the window, so the three readings stay comparable at a glance on an ultrawide. Row one is the three seat columns: the frame, the detail pane it opens, the seat's tells, and one dashed line per queued event. Row two holds the active event at `clamp(300px, 22vw, 320px)`, placed in the column of the seat that threw it and aligned to that frame's outer edge (`justify-self: start / center / end`), so it never leaves the window; it is one element moved between grid columns rather than between parents, because its reading is a live region. The drawer is a slide-over from the right edge of the board, 360px, `pane-strong`, closed by its own control or Escape; it stays flush with the window's edge rather than the bounded row's, because the tab group that opens it sits at that end of the player bar. The player bar is **one** row at the foot on `ground`, ruled off above and `nowrap` down to 1100px: TURN (with the phase caption), MANA, HAND, TAX, LIFE (swing, four life steps, `undo life`), CLOCK, then a spacer, the two turn buttons, and the tab group (LOG NOTES TOKENS JUDGE KEYS END RUN) in a hairline frame at the right end. A second line put the tabs somewhere the eye had to go looking for them, so the row holds: the spacer collapses first, then CLOCK — the one reading that is a sentence, and so the one allowed to ellipsise — while every other slot keeps its printed width. Only below 1100px does it wrap.
+The card unit is one registered custom property, `--card-w: round(clamp(84px, min(11vw, 18.6vh), 158px), 1px)`, read by CSS and by JavaScript alike; every card-sized thing derives from it and the height is width times the card aspect. Past 1440px a bigger window buys more board, not bigger cards.
 
-**Card unit.** Every card in the app is one width, `--card-w` in `tokens.css`, registered with `@property` so it resolves to a single length the stylesheet and the TypeScript both read, and rounded to the whole pixel so both read the same integer: `round(clamp(84px, min(11vw, 18.6vh), 158px), 1px)`. It scales with the window between a floor at which a card face is still readable and a cap past which a larger monitor buys more board rather than larger cards — 113px at 1024x768, 141px at 1280x800, the 158px cap at 1440x900 and every window wider than that. The height term is what binds on a short or a wide-and-short window: a 3440x1440 window has no more height than a 2560x1440 one. Card height is never a second token; it is this width times `CARD_ASPECT` (1.396), written as `aspect-ratio: 1 / 1.396` wherever the element is one card wide. The unit is the strip's card, the hand's card, the battlefield's ceiling, and the base for the browse cell (0.9), the battlefield floor (0.6, never under 84px), the hand's fan spacing (0.095 gap, 0.143 minimum step) and the preview panel (twice the unit, held between 240px and 340px). The hand alone may print its cards below the unit, down to 0.8 of it with a 0.04 gap, before it starts fanning: seven whole cards a fifth smaller read faster than a fan that hides most of each card. `--table-max` (2000px) is the second half of the rule: the HUD's frame row and the bottom strip's five zones are centred inside it while the battlefield and the ground behind them keep the whole window, so three seat readings and the graveyard-to-command-zone span stay inside one glance on an ultrawide.
-
-**Between runs.** A 280px deck rail and a centre panel, both `surface` panels with a hairline border and 6px radius, 14px internal padding, separated by a 12px gap in 12px page padding. The scorecard lives in the centre panel as ruled sections: a verdict line, metric slots in an auto-fit grid of 170px minimum columns, chart, ledger table, seats, profile.
-
-**Spacing rhythm.** Hairline rules at 1px; 2-4px inside a slot; 6-8px between rows and chips; 12px page gap; 14px panel and block padding; 16px title-bar and overlay padding; 24px column gap between cards on the battlefield. Pointer targets are held to a 24px minimum on the height axis by padding handed back as negative margin, so the printed size of a word or figure never grows to satisfy the target.
+Spacing runs on a small even rhythm: 6px between a rule and the thing it rules, 8px between rows, 10px inside a block, 12px as the shell gap, 14px panel padding, 16px title-bar padding. Breakpoints are 1280px and 1100px on width (names, figures and the front step down; the HIT chip is dropped below 1280px while the name's tracking still says it) and 820px on height (shell chrome tightens first, then the names). The hand never collapses at any width down to 1024px; 390px is out of scope by decision.
 
 ## Elevation & Depth
 
-Flat at rest. Depth on the play surface is structural, not tonal: hairline rules separate blocks, and the only fills are the three neutral steps (`ground`, `surface`, `raised`) plus the HUD's two translucent versions of `ground`. Shadows exist only under things that float over the table: the drawer, pickers, pop menus, overlay panels, and a card while it is lifted or hovered in the hand. The HUD's frames and event pane are the exception in the other direction — they float and take no shadow at all, because the blur behind them is what separates them from the board. Selection and focus are 2px rings drawn as `box-shadow: 0 0 0 2px` or `outline: 2px solid`, never a glow.
-
-### Shadow Vocabulary
-- **Drawer** (`box-shadow: -10px 0 26px var(--shadow)`): the HUD's slide-over coming in from the right edge of the board.
-- **Picker** (`box-shadow: 0 12px 26px var(--shadow)`): the event pane's card picker hanging down over the battlefield.
-- **Menu** (`box-shadow: 0 12px 30px var(--shadow-strong)`): fixed-position pop menus on cards and stacks.
-- **Overlay panel** (`box-shadow: 0 24px 60px var(--shadow-strong)`): the zone browser and the hotkey reference, over the scrim.
-- **Lifted card** (`box-shadow: 0 14px 28px var(--shadow-strong)`): a card mid-drag; the hand hover uses `0 10px 22px var(--shadow-strong)` with a `translateY(-8px) scale(1.06)` lift.
-- **Ring** (`box-shadow: 0 0 0 2px`): `accent` for the commander and keyboard focus, `ok` for a selected card, `ink` inset `0 -2px 0` under the open tab in the player bar.
+There is no depth. `--shadow` and `--shadow-strong` resolve to `transparent`, no element sets a box-shadow, and there is no backdrop-filter anywhere. Everything is one sheet of paper; a thing that has to stand over a card face (the event sheet, a seat's detail, the log drawer, the answer picker, a pop menu, the browse overlay, the hotkey and judge overlays) is the paper itself at full opacity, separated by a 1px `--line` or `--rule` border, and an overlay sits on the 78% mist. The one tonal step, `--raised`, is a slab, not a lift.
 
 ### Named Rules
-**The Only Floating Things Cast Shadows Rule.** A surface that sits in the layout has a rule, not a shadow. A surface that is positioned over the table has a shadow from the vocabulary above and nothing else.
+**The No Shadow Rule.** A floating thing is separated by its border, never by a shadow, a blur or a translucent pane. If a block must be read over card art, it is opaque paper.
 
-**The Settle Rule.** On turn advance the seat frames settle in reading order, left to right: 240ms `cubic-bezier(0.16, 1, 0.3, 1)` from 0.3 opacity and 3px down, staggered 60ms (B) and 120ms (C), replayed by alternating `data-settle` between two identical keyframe names. A new event fades in over 140ms ease-out and the drawer slides 12px in over 140ms; drop targets, hover lifts and the history caret transition in 110-120ms ease. Every animation and transition is disabled by name under `prefers-reduced-motion: reduce`, and the settled state reads the same without it.
+**The One Rule Rule.** Exactly one 2px ink rule per screen: the storm rule across the top of the active event sheet. The open tab's underline and the commander's ring are also 2px ink but are outlines of a state, not a second sheet. Every other rule is a 1px hairline.
 
 ## Shapes
 
-Two form languages, assigned by what the element is. Printed things are square: chips, key squares, the readout's outlined buttons, the event's response buttons, the run chip, the theme toggle, zone-stack frames, library and empty-slot slabs, threat segments, the mana-value badge. Panels that float or hold content have a gentle 6px radius: between-runs panels, base buttons and inputs, the deck cards in the rail, pop menus, pickers, overlay panels, and the battlefield's top corners. Card faces keep Scryfall's own corners under a 5px radius and a hairline edge. Empty zone slots are drawn with a dashed `rule` border. The scorecard's result, event-ledger and profile-tag chips and the deck rail's bracket chip are full pills (999px), as are the counter badges on cards; these are the between-runs vocabulary and the play surface does not use them.
-
-Borders do the work of shape: a 1px `line` hairline where the border is structure, a 1px `rule` where the border is a control edge or printed frame, and 1px `accent` where the thing is the one that needs an answer.
+Nothing is rounded. `--radius` is 0 and every control, chip, key square, field, slab, sheet and overlay has square corners. The single exception is a card face, which keeps Scryfall's own 5px corner set locally (the thumbnail in the cited-card line and the preview keep it too; the drag ghost uses 4px). Borders are hairlines: 1px `--line` for structure and card edges, 1px `--rule` for a control edge or a chip, 1px dashed `--rule` for an empty pile, a queued event's line and a drop target, 2px solid `--ink` for the commander's ring and a focus ring (offset 2px), 2px dashed `--ink` for a selected card. The strike is a 1px `--rain` line at 54% of the front word's height, or a 2px `--ink` line through an eliminated seat's name. Threat is ten small filled-or-outlined cells in a row beside the number and the trend word. Chips are square, borders only, uppercase words. There are no icons in the world: the one glyph is a hairline chevron drawn on the select, and every action is a word or a key square.
 
 ## Components
 
 ### Buttons
-Quiet by default; the loudest button on screen is the one whose border is the accent.
-- **Shape:** 6px radius on the base button (`raised` fill, `line` border, 5px 10px); square on the play surface (transparent fill, `rule` border, 4px 9px).
-- **Hover:** border to `accent` (base) or to `ink` (title-bar toggle); quiet buttons go `muted` to `ink`. Disabled is 0.45 opacity.
-- **Focus:** `outline: 2px solid var(--accent)`, offset 1px, on every button and field.
-- **Primary answer:** the event's key-1 response: square, `accent` border, key square in `accent`, hover fills `color-mix(in srgb, var(--accent) 12%, transparent)`.
-- **Filled primary:** the deck rail's Start-run only: `accent` fill, `ground` ink at 600, hover `brightness(1.08)`.
-- **Quiet word:** `undo life`, `dismiss`, `add note`, `close · Esc`: 12px underlined muted text, no border, 24px tall box via padding and negative margin so the row keeps its rhythm.
-- **Turn actions:** two equal-width square outlined buttons with a key square inside (Next phase / Space, Next turn / T).
-- **Life steps:** -5 -1 +1 +5 as 12px muted text, transparent border that becomes `line` on hover, 24px tall.
+Controls are an edge drawn around a word: no fill, no radius, nothing to make them a plate.
+- **Shape:** square (0 radius), 1px `--rule` edge.
+- **Edge (default):** transparent, ink text, 13px to 14px, `5px 10px` (4px 9px in the pressure layer). Key squares ride inside where the action has a hotkey (Next phase Space, Next turn T, the response keys 1 and 2).
+- **Hover / Focus:** hover takes the raised paper behind the label and the edge goes to full ink; nothing moves. Focus is a 2px ink outline offset 2px, standing off the control so it reads over a card face. Disabled is 0.45 opacity.
+- **Plate (the one reversed control):** ink fill, paper letters and paper key square, 2px ink edge with padding pulled in by 1px so it stands the same height as the edge control beside it. During a run it is the active event's key-1 response; between runs it is Start run (700, 13px, `3px 10px`).
+- **Word (link-style):** an underlined 12px word in `--muted` with no edge, coming up to ink on hover; padded to a 24px hit target with the growth handed back as negative margin. Used for add note, Drill hands, Edit, Import deck, pick different target, Close. Delete and END RUN set in `--danger`.
 
 ### Chips
-- **Style:** a word in 11px / 0.12em uppercase, `rule` border, no radius, no fill, `muted` text, 2px 6px.
-- **State:** OUT, CLOCK, ARMED n+ and the event's seat chip stay in `rule`/`muted`. HIT is the only accent chip. The player's own OUT is `danger`. The event class chip wears its mana colour on border and text and prints the class name.
-- **Between runs:** result chips (WIN in `ok`, LOSS / CONCEDE in `danger`, ABANDONED in `muted`) and ledger event chips are 999px pills with a `currentColor` border.
+- **Style:** square, 1px `--rule` border, no fill, 10px 500 uppercase tracked 0.16em, ink text, `2px 6px` (5px and 0.1em tracking below 1280px). State words: TURN, HIT, ARMED n+, OUT, CONC, B3.
+- **Class chip:** the one chip that carries colour, as a 10px square swatch in the class's mana colour beside the class word; text stays ink.
+- **Spent:** an eliminated seat's chips go to `--rain` text and border.
 
-### Printed Slot (signature)
-The unit of every reading. A label (11px / 500 / 0.16em / uppercase / muted) beside or above its figure (19-24px / 600 / tabular); no fill, no side borders, no radius. On the player bar the pairs run along one row (`gap: 4px 14px`, `nowrap` down to 1100px), label then figure then caption on the baseline: LIFE carries its delta in 13px muted (`danger` when down), the four life steps and `undo life`; CLOCK is a sentence at 16px, `danger` when it is the last turn, and prints its seat as the bare letter (`A · T10 · 2 turns`) with the full "Seat A" wording kept in the tooltip and in a visually-hidden span for assistive tech. The scorecard's metric slots are the same element stacked, with a 24px figure, 7px 18px 9px 0 padding and a 1px `line` on `border-top`; an unmeasurable value reads in `muted` at 400 and 16px.
-
-### Seat Frame (signature)
-A `pane` over the top edge of the board at `--hud-frame-w` (`clamp(212px, 19vw, 272px)`), 7px 10px 8px, 6px row gap, and one button end to end: nothing inside it is interactive, because the whole of it is the pin target. Its border is `rule` rather than `line` — it is a control edge, and a `line` hairline over a board of card art was not a frame at all — going to `ink` on hover. Line one is the seat letter in Marcellus (20px / 400 / 0.06em, `ink`), life (22px / 600), the `life` caption (dropped below 1100px) and the state chips right-aligned. Three chips do not fit a narrow frame, and CLOCK + HIT is the ordinary pairing because the seat to hit is the clock seat whenever there is one, so below 1280px the HIT chip is dropped — the accent already runs round the whole frame, and the `aria-label` says "the seat to hit" at every width. `.rd-chips` wraps as the floor under that rather than running out of the pane. Line two is the ten-segment threat meter (9px tall segments, `rule` outline, `ink` fill when on, restated in system colours under forced colours), the numeral and the trend word. The frame carries the whole reading in one `aria-label` and everything inside it is `aria-hidden`. The seat to hit takes the HIT chip and the `accent` on the frame's own border. An eliminated seat is 0.6 opacity with a 1px `rule` through line one and never moves.
-
-**Detail pane.** Hover or focus reads it, a click pins it (`aria-expanded`); one seat is pinned at a time and a pinned pane never closes on mouse-out. A `pane` of the same width hanging **out of flow under the whole column** — `position: absolute; top: 100%; z-index: 5` against `.hud-col`, so it opens below the frame, the tells and the queue and covers none of them. Out of flow is the whole point: a detail that took part in the frame grid's row heights pushed the event pane under a *different* seat down by its own height every time the pointer crossed a frame. It holds the silhouette (creatures, power, artifacts, open mana), then `cmdr dmg n/21` with the +1 / +3 buttons, then the four life steps; un-pinned it prints `click to adjust` where the buttons would be.
-
-The one thing it can still reach is the event pane in row two. When the seat that threw the event is the seat whose detail is open, that pane — and only that pane, so no other column moves — steps down past it: `is-under-detail` sets `margin-top: calc(12px + var(--hud-detail-h))`, the height measured by a `ResizeObserver` on the detail because the silhouette wraps and the pinned state adds a row. The event is never raised over the detail instead; the detail holds the buttons, so the detail stays on top.
-
-### Event Pane (signature)
-A `pane-strong` at `--hud-event-w` (`clamp(300px, 22vw, 320px)`) with an `accent` border, hung in the frame grid's second row under the seat that threw the event and aligned to that frame's outer edge. 8px 10px 9px, 7px row gap. Head label ACTIVE EVENT in `accent` (muted when only a race clock is standing), then the seat chip and class chip, then the prompt (13px, capped at 2.8em and scrolling inside its slot, printed through `<Glossed>`), then the cited card line (the card name in ink at 13px/500 with an 18px key-square mana-value badge, and the card's true effect in 12px muted clamped to three lines, two in a short window), then two equal-width response buttons whose labels clamp to two lines and carry key squares 1 and 2, then extras (a right-aligned numeric field, a target name clamped to two lines, `add note`). The card picker hangs down over the battlefield on the side the pane is anchored to, in a `surface` panel with the class colour as its border. Everything waiting behind the active event prints under its own seat as a dashed one-line `queued: <class>`, and a seat's tells print under it as a one-line `pane` with a 2px left rule. Both live inside that seat's always-mounted `role="status"` slot: an event landing behind the one in front is news, and outside a live region it was news nobody was told. Neither takes the pointer — a line of text must never be the reason a card under it cannot be hovered or right-clicked — only the hint's `dismiss` button does. With nothing standing the event pane is hidden the visually-hidden way (1px, `clip-path: inset(50%)`, out of flow) rather than collapsed to 0x0, which some screen readers treat as unrendered and which cost the first event of a run its announcement.
-
-**Glossed prose.** Every line of rules text the player reads under the clock goes through `<Glossed>`: the event's prompt, the cited card's effect, and the post-wipe survivor hint. Answer-button labels do not — they are labels, not rules text, and a dotted underline inside the one control the table is waiting on would read as a second thing to click.
+### Key squares
+An 18px box (min-width 18px, `0 4px`), 1px `--rule` edge, 11px 700 ink character, tabular. The same recipe for a hotkey beside its action, a card's mana value at its top-right corner (raised paper behind it), and the response keys 1 and 2 (the key-1 square reverses with its plate).
 
 ### Cards / Containers
-- **Pane:** `pane` (or `pane-strong` where it holds controls), 1px border (`line`, or `rule` where the pane is a control edge), no radius, no shadow. The only four-sided border on the play surface. The fill and the `backdrop-filter: blur(8px)` ride on a `::before` at `inset: -1px` with `z-index: -1`, never on the pane element itself: `backdrop-filter` makes an element the containing block for every fixed-position descendant, which silently moved the glossary's fixed keyword tooltip by the pane's own offset. The pseudo-element has no descendants to capture. It falls back to solid `ground` where the blur is unsupported and under forced colours.
-- **Panel:** `surface`, 1px `line` border, 6px radius, 14px padding (between-runs rail and centre).
-- **Zone stack:** 92px wide, `surface`, 1px `rule` frame, square, 6px padding, printed-label head with a tabular count in `ink`; 80x112 slot in `raised` with a dashed `rule` border when empty; the library is a plain `raised` slab carrying its count at 26px.
-- **Card:** 5px radius, `raised` fallback, 1px `line` edge, Scryfall image `object-fit: cover`; tapped rotates 90deg; ghost at 0.32 opacity; an 18px square mana-value badge in `raised` with a `rule` border at the top-right corner.
-- **Drawer:** a 360px slide-over from the right edge of the board: `pane-strong`, one hairline on its left edge, drawer shadow, a 7px 14px head ruled off below, 10px 14px body, entering on a 140ms 12px slide.
-- **Pop menu:** `surface`, 6px radius, menu shadow, 4px padding, 12px items with 4px radius `raised` hover, printed-label group heads.
-- **Overlay:** `scrim` backdrop, 32px padding, `surface` panel up to 1040px (440px for the hotkey reference) with 12px 16px head and 8px 16px foot ruled off.
+- **Card face:** 5px radius, 1px `--line` edge, untouched image on paper; tapped rotates a quarter turn (110ms); ghost at 0.32 opacity; the commander wears a 2px ink outline, a selected card a 2px dashed ink outline, a drop target a 1px dashed hairline inside its edge; a face still loading is a `--raised` slab.
+- **Sheet (the event block):** opaque paper, a 2px `--rule` across the top and no other border, `10px 12px 11px` inside with 6px to 8px row gaps, fading in over 140ms; contains the head label, the seat and class chips, the 15px prompt (three lines then scrolls), the cited card (56x78 face, name at 500, mana-value key square, effect at 12px muted, consequence at 12px ink), and the two equal-width responses.
+- **Pane (detail, drawer, picker, pop menu, overlay):** opaque paper, 1px `--line` (detail, drawer) or `--rule` (picker, pop menu, overlay) border, no shadow; the picker also carries the class colour as its 2px top rule and its rows are ruled by hairlines with a raised-paper hover.
+- **Zone cell:** a label beside a figure over a hairline-ruled cell with no fill; an empty pile is a dashed rule with the word EMPTY; the library is a raised slab with the count at Figure L.
+- **Between-runs block:** no box; a label heading with a hairline under it, ruled rows beneath (deck rows, history rows, scorecard readings as label-beside-figure rows, review rows, dense 13px tables).
 
 ### Inputs / Fields
-- **Style:** `ground` fill, 1px `rule` border, 6px radius, 5px 8px, inherits body type. Numeric fields are right-aligned and tabular (62px wide in the dock, 46px in the token bar). The decklist textarea is `mono` at 12px / 1.45, 220px minimum height.
-- **Focus:** `outline: 2px solid var(--accent)`, offset 1px.
-- **Error / Warning:** a printed word (ERROR, WARNING) in label type above the message, ruled on the left by 1px `rule`; error text in `danger`, warning in `muted`. Scorecard banners use the same left rule in `ok`, `accent` or `danger`.
+- **Style:** paper background, 1px `--rule` edge, 0 radius, `5px 8px`, inherited type; the select draws its own hairline chevron; a checkbox is a 14px square that reverses to an ink plate with a paper tick when checked.
+- **Focus:** 2px ink outline offset 2px; the caret is ink; selection is the page reversed.
+- **Error:** the scorecard banner prints the word ERROR and its text in `--danger` with a danger left rule; there is no red field state.
 
 ### Navigation
-- **Title bar:** wordmark, run chip, spacer, THEME toggle; ruled off below by a hairline, no fill of its own.
-- **Tabs:** six tabs in a hairline frame at the right of the player bar, 26px tall, 11px / 500 / 0.1em uppercase with 8px sides (6px below 1280px), hairline between tabs, `muted` text going `ink` on hover; the open tab is `ink` with a 2px inset `ink` underline (redrawn as a Highlight border under forced colours). END RUN prints as END below 1100px.
-- **Hotkeys:** every action prints its key in a key square beside its label; the `?` overlay lists them in 13px rows with 24px `ground` key chips, 4px radius, `line` border.
+The title bar is a wordmark (900, 20px), a 12px muted run line with the seed alone in 700 ink, and the KEYBOARD and THEME controls as labels with a key square, no edge of their own. The player bar's tab group (LOG, NOTES, TOKENS, JUDGE, KEYS, END RUN) is a row of labels; the open tab takes a 2px ink underline, END RUN is set in `--danger`. Hover on a label goes muted to ink.
 
-### Share Image
-A 1200x600 canvas drawn with the same tokens, read from the document's computed custom properties at render time, and the same faces: Marcellus for the PROVING GROUNDS mark only, IBM Plex Sans 400/600 for the deck name, verdict chip and every metric value, with the full Fan Content line at 9px along the foot.
+### The Seat Front (signature)
+A seat is one button with no box: the name at Monumental, bottom-aligned in a fixed-height box with a 2px transparent bottom rule that fills with ink on hover; under it, inside the name's measure, one row of life at Figure L with its LIFE label, ten threat cells with the number and trend word, and the seat's colour letters in their mana colours; under that its state chips. Hover or focus opens the detail pane beneath the whole column; the pin makes it act. A tell or a queued line prints under the front as bare 13px ink prose or a dashed 10px QUEUED: CLASS line, with no box. An eliminated seat stays in its slot: the name drops to 700 in `--rain` with a 2px ink strike at 0.38em from its floor, the readings go to rain, and the chip says OUT. On turn advance the three fronts settle in reading order (opacity 0.3 to 1, 3px rise, 240ms, `cubic-bezier(0.16, 1, 0.3, 1)`, delayed 60ms and 120ms for B and C), driven by alternating `data-settle` keyframe names; reduced motion reads the settled state.
+
+### The Forming Front (signature)
+A new event's class word forms over the seat that cast it, in the seat's column inside the board's top clearance, taking no pointer. Each letter starts a scattered offset above its baseline in `--silver` and settles to ink over 560ms with `cubic-bezier(0.16, 1, 0.3, 1)`, staggered 24ms per letter and capped at 300ms total; the last letters hold the silver flash until 84% of the way in. Under the word a 40px strip, pulled 12px up into the word's line box, holds 14 to 20 small letterforms drawn from the class word itself, scattered across its measure, a quarter of them in ink and the rest in rain, falling 12px and fading in over the same 560ms; the strip clips so the rain never reaches a card. The word then rolls into the event sheet (140ms fade). Answered or resolved, the whole front goes `--rain` and a 1px rain strike draws left to right across it in 180ms, and the run's passed fronts accumulate in the left margin as struck 12px rain lines (T4 · COMBAT · resolved) under a rain PASSED label, newest at the foot. Reduced motion shows the formed word in ink and the strike already drawn; nothing is lost.
+
+### The Receipt (share image)
+The 1200x600 canvas reads `--ground`, `--ink` and `--muted` off the root at render time so it draws the paper world in whichever theme is up: the mark PROVING GROUNDS at 900, figures at 700, class letters as the event marks. It is the same system, not a second one.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** set every reading as a printed slot: label at 11px / 500 / 0.16em uppercase muted, figure at 19px or larger at 600, ruled off above by a 1px `line`.
-- **Do** separate blocks and rows with one hairline on one side; a surface in the layout has a rule, not a box.
-- **Do** keep chips, key squares and readout buttons square with a 1px `rule` border; keep the 6px radius for panels, menus and pickers.
-- **Do** print the word for every state (OUT, HIT, rising, struck-through) and let colour underline it.
-- **Do** spend `accent` on the one thing that needs an answer and on focus, hover and drop affordances only.
-- **Do** declare every colour, including scrims and shadows, in `tokens.css` with a value in both theme blocks, and use `color-mix()` for tints.
-- **Do** hold pointer targets to 24px on the height axis with padding and negative margin, leaving the printed size alone.
-- **Do** disable every animation and transition by name under `prefers-reduced-motion`, and make sure the settled state reads the same.
-- **Do** keep the hand visible at every width and never narrower than 2.86 card units; size every card from `--card-w` and let it, not any one surface, be what gives when the window does.
-- **Do** keep the HUD's containers inert and give `pointer-events: auto` to the panes that hold controls alone. A pane that is only a reading — a tell, a queued line — hands the pointer back to the board, and only the controls inside it take it again, so no line of text becomes a lid over the cards beneath it.
-- **Do** print a state whose chip has been folded for width somewhere else that survives greyscale (the frame's accent border) and keep the word itself in the `aria-label`.
+- **Do** set every surface on `--ground`; the board, the strip, the rail, inputs and overlays are the same paper.
+- **Do** carry rank with weight in one family: 900 names and fronts, 700 figures and headings, 500 labels and chips, 400 prose.
+- **Do** size a monumental name by its column and character count (`--name-chars`) and a front word by its glyph count (`--pgf-n`), so long words get smaller rather than wrapping or covering a face.
+- **Do** print a label beside or under its figure, 11px 500 uppercase tracked 0.16em in `--muted`.
+- **Do** draw structure as 1px hairlines, and spend the single 2px ink rule on the active event sheet.
+- **Do** reverse exactly one element per screen: the key-1 response during a run, Start run between runs.
+- **Do** put every state in a word: OUT, HIT, TURN, ARMED 4+, QUEUED: COMBAT, WIN, ERROR; a colour, a strike or a grey never stands alone.
+- **Do** make an occluding block opaque paper with a hairline edge and no shadow, and keep the forming word inside the board's top clearance so it never covers a card.
+- **Do** keep `--rain` for what has passed and `--silver` for a word still forming.
+- **Do** ship every authored motion with a reduced-motion fallback that shows the finished state.
 
 ### Don't:
-- **Don't** use Marcellus for anything but a name: the wordmark, the share mark and the seat letters. Headings, verdicts and figures are IBM Plex Sans.
-- **Don't** draw instruments: no gauges, needles, lamps, dials, hatched card backs or rendered props. A meter is filled-or-outlined segments.
-- **Don't** add glow, bloom, bevels, neon, gradients, textures or paper; no `filter` on any surface, and no `backdrop-filter` anywhere but a HUD pane's `::before`, where it is 8px of blur behind the theme's own ground and never touches a card face. Putting it on the pane element itself makes that pane the containing block for every fixed-position descendant and breaks the glossary tooltips inside it.
-- **Don't** box a metric: no KPI tiles with fill, four-sided border and radius on the scorecard or the player bar. A HUD pane is a sheet, not a tile: it fills with the ground itself and carries readings, not one figure.
-- **Don't** dim `muted` further with opacity; the token clears AA at full strength and loses it when multiplied.
-- **Don't** put a literal hex, rgb or rgba in component CSS, or fork the palette into a script; read the custom properties.
-- **Don't** give a seat a second accent chip; CLOCK and ARMED print in `rule`.
-- **Don't** make `danger` and `mana-r` the same hue; a life loss and a combat event must read as different signals.
-- **Don't** add clicks or modal interruptions to the play loop, or hide the hand to make room.
+- **Don't** add a fill, a shadow, a blur, a gradient, a glow, a grain or a radius; card faces alone keep their 5px corner.
+- **Don't** use a second type family, a serif, or the old Marcellus wordmark; the wordmark is the body face at 900.
+- **Don't** make `--accent` or `--rule` differ from `--ink`; emphasis is weight, tracking and the one plate.
+- **Don't** use a mana colour as a fill, a border or a word colour anywhere but beside the class word or colour letter it names.
+- **Don't** use `--danger` on a resting control or as a fill; it is life leaving, the losing verdict, and text after the word ERROR.
+- **Don't** draw pill chips, tiles, cards-with-borders or a translucent pane over a Scryfall face.
+- **Don't** add literal instruments (gauges, needles, dials, lamps) or icon glyphs; every action is a word, a key square, or a hairline mark.
+- **Don't** hide the hand or add motion that interrupts play; hover changes only an edge or a colour, and nothing moves.

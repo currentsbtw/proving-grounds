@@ -1,70 +1,40 @@
-/* ── Proving Grounds — the live HUD ──────────────────────────────────────── */
+/* ── Proving Grounds — the live readout ──────────────────────────────────── */
 /*
-   The readout stopped being a rail. It is now a set of translucent panes over a
-   full-width board: three opponent frames along the top edge, whatever each seat
-   is telling you hanging under its own frame, and your own numbers as one bar
-   across the foot. The printed idiom is unchanged — small-caps labels over
-   tabular figures, hairline rules, one accent held back for whatever needs an
-   answer now — it is only the sheet that moved.
+   The readout is weather on paper. Nothing here is a panel: three seat names are
+   set monumental across the top of the board, each one's readings sit inside its
+   own measure, and the states are words inside hairline boxes. Structure is a
+   rule where a rule is needed and nothing anywhere else — no fill, no shadow, no
+   radius, no glow. The only things that occlude a card face are the pieces that
+   have to be read over one: a seat's detail, the active event, the drawer, and
+   those are the paper itself at full opacity.
 */
 
 /* ── The pane ───────────────────────────────────────────────────────────── */
 
 /*
-   The one recipe every floating piece of the HUD is drawn with: the theme's own
-   ground at 78% (or 92% for the pieces that carry controls), blurred behind, a
-   single hairline, and no radius. A pane is a sheet laid on the board, not a new
-   surface colour, so it never gains a fill of its own or a shadow.
-*/
-/*
-   The fill and the blur ride on a pseudo-element rather than on the pane itself,
-   and this is load-bearing rather than tidy: `backdrop-filter` makes an element
-   the containing block for every fixed-position descendant, and the glossary's
-   keyword tooltip is fixed and positioned from viewport coordinates. On the pane
-   itself the blur silently moved every tooltip opened inside a HUD pane by the
-   pane's own offset. On a pseudo-element with no descendants it cannot.
+   The one recipe for a piece of the HUD that has to be read over card art: the
+   paper at full strength with a single hairline round it. It is opaque rather
+   than blurred on purpose — a translucent sheet over a Scryfall face is a sheet
+   you read the face through, and this world has no glass in it.
 */
 .pg-pane,
 .pg-pane-strong {
+  /* Positioned, because the pieces drawn with it anchor things of their own:
+     the event host's answer picker, the detail's hazard pickers. */
   position: relative;
-  background: transparent;
+  background: var(--ground);
   border: 1px solid var(--line);
   border-radius: 0;
+  box-shadow: none;
   pointer-events: auto;
 }
 
-.pg-pane::before,
-.pg-pane-strong::before {
-  content: '';
-  position: absolute;
-  /* Out to the border box, so the hairline is drawn over the pane's own fill
-     rather than over whatever card happens to be under that edge. */
-  inset: -1px;
-  z-index: -1;
-  background: var(--pane);
-  backdrop-filter: blur(8px);
-  pointer-events: none;
-}
-
-.pg-pane-strong::before {
-  background: var(--pane-strong);
-}
-
-/* Blur is a paint effect, not a reading: where it is unavailable the pane simply
-   sits on the ground at full strength rather than letting the board show
-   through text. */
-@supports not (backdrop-filter: blur(8px)) {
-  .pg-pane::before,
-  .pg-pane-strong::before {
-    background: var(--ground);
-  }
-}
-
-/* Forced colours flatten the alpha to one system pair anyway; stating it keeps
-   the pane opaque rather than leaving cards legible through the text. */
+/* Forced colours flatten every author colour to one system pair; stating the
+   ground in system keywords keeps the pane opaque rather than leaving the board
+   legible through its text. */
 @media (forced-colors: active) {
-  .pg-pane::before,
-  .pg-pane-strong::before {
+  .pg-pane,
+  .pg-pane-strong {
     background: Canvas;
   }
 }
@@ -100,12 +70,21 @@
   pointer-events: none;
 }
 
+/* The layer is inert, so the things on it that are controls take the pointer
+   back: a front is the pin target (hover reads, click pins), and the detail it
+   opens holds buttons. The old world gave both this through the pane class;
+   the fronts have no pane now, so they say it themselves. */
+.hud-frame,
+.hud-detail {
+  pointer-events: auto;
+}
+
 /* ── The settle ─────────────────────────────────────────────────────────── */
 /*
-   On turn advance the frames settle. The two keyframe sets are identical:
-   `data-settle` alternates between them with the turn, and a changed animation
-   name is what replays the animation. Opacity and transform only, so nothing
-   reflows and the figures never move the scan.
+   On turn advance the fronts settle in reading order. The two keyframe sets are
+   identical: `data-settle` alternates between them with the turn, and a changed
+   animation name is what replays the animation. Opacity and transform only, so
+   nothing reflows and the figures never move the scan.
 */
 @keyframes rd-settle-a {
   from {
@@ -153,29 +132,25 @@
   }
 }
 
-/* ── Frame placement ────────────────────────────────────────────────────── */
+/* ── Front placement ────────────────────────────────────────────────────── */
 
 /*
    Three fixed columns across the top edge — A left, B centred, C right — with
    the slack between them rather than inside them, so a seat is always in the
-   same place whatever the window is doing. The event pane rides in a second row
+   same place whatever the window is doing. The event block rides in a second row
    of the same grid: that is how it can move between seats without ever changing
    parent, and a live region that changes parent is a live region that stops
    speaking.
 */
 /*
-   One stacking context for the whole set of frames, and it is load-bearing
+   One stacking context for the whole set of fronts, and it is load-bearing
    rather than tidy. The pieces inside carry z-indexes of their own — the detail
-   pane at 5, the event pane's picker at 40 — and a column is only
-   `position: relative`, so without this those numbers escaped every column and
-   landed in `.hud-over`, where the drawer is their sibling. They compared
-   against the drawer's 30 instead of against each other: the picker outright
-   beat it, and a pinned seat's frame and detail, kept on composited layers of
-   their own by the settle animation and the panes' own `backdrop-filter`,
-   were free to be composited over it — a drawer with the seat's numbers
-   printed across its text. Isolating here keeps every one of those numbers a
-   comparison between seats, and leaves the whole set one layer under the
-   drawer whatever any seat is doing.
+   at 5, the event's picker at 40 — and a column is only `position: relative`,
+   so without this those numbers escaped every column and landed in `.hud-over`,
+   where the drawer is their sibling. They compared against the drawer's 30
+   instead of against each other, and a pinned seat's readings could be
+   composited over the drawer's text. Isolating here keeps every one of those
+   numbers a comparison between seats.
 */
 /* The row is bounded and centred over the board rather than pinned to the
    window's own two edges: three seat readings held at the far ends of an
@@ -183,21 +158,27 @@
    against each other. The board underneath keeps the full width. */
 .hud-frames {
   position: absolute;
+  /* Above the spent strip: a block standing in seat A's column is a sheet laid
+     over the margin, and the strip must not print through it. */
+  z-index: 1;
   top: var(--hud-inset);
   left: var(--hud-inset);
   right: var(--hud-inset);
+  /* The grid spans the board, so its second row has a definite height and the
+     event block can be bounded by it: the block never crosses into the strip. */
+  bottom: var(--hud-inset);
   max-width: var(--table-max);
   margin-inline: auto;
   isolation: isolate;
   display: grid;
   grid-template-columns: repeat(3, var(--hud-frame-w));
-  grid-auto-rows: min-content;
+  grid-template-rows: min-content minmax(0, 1fr);
   justify-content: space-between;
   align-items: start;
   column-gap: 10px;
 }
 
-/* The one thing in the frames that has to beat the drawer: an open answer
+/* The one thing in the fronts that has to beat the drawer: an open answer
    picker. The player pressed a hotkey to answer the event in front of them, and
    a picker composited under a Notes or Log drawer is a control they cannot see.
    While one is open the whole set lifts over the drawer, pinned detail and all;
@@ -206,9 +187,10 @@
   z-index: 35;
 }
 
-/* Positioned, because the detail pane hangs off the bottom of the whole column
-   rather than off the bottom of the frame: below the tells and the queue, so it
-   covers none of them, and out of flow, so opening it costs the grid nothing. */
+/* Positioned, because two things hang off the column rather than sitting in it:
+   the detail (under the whole column, so it covers none of the seat's own
+   lines) and the forming front (in the clearance the board keeps above its top
+   card row). */
 .hud-col {
   grid-row: 1;
   position: relative;
@@ -216,116 +198,214 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+
+  /* The front's own printed height: the name (64px at .78 plus the 2px rule
+     that is always drawn under it), the readings row, the chips row, and the
+     two 6px gaps between them. The forming front is budgeted against it. */
+  --hud-front-h: 108px;
 }
 
-/* ── The seat frame ─────────────────────────────────────────────────────── */
+/* ── The seat front ─────────────────────────────────────────────────────── */
 
 .hud-frame-wrap {
   min-width: 0;
 }
 
-/* The whole frame is the pin target, so it is one button and nothing inside it
-   is interactive. It is still a printed block: no fill of its own, no radius,
-   and a border that only changes when the seat is the one to hit. The border is
-   `rule` rather than `line` because this pane is a control edge, and because a
-   hairline in `line` over a board of card art was not a frame at all. */
-.hud-frame,
-.hud-detail {
-  border-color: var(--rule);
-}
-
+/*
+   No box. The whole front is the pin target, so it is one button and nothing
+   inside it is interactive — but a button here is a name, its readings and its
+   state words, drawn straight on the paper. Hover and focus open the detail;
+   the only hover cue is a rule coming up under the name, the same 2px ink the
+   open tab wears.
+*/
 .hud-frame {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   width: 100%;
-  padding: 7px 10px 8px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
   text-align: left;
   color: var(--ink);
   cursor: pointer;
 }
 
-.hud-frame:hover:not(:disabled) {
-  border-color: var(--ink);
-}
-
-/* The seat whose turn the player is answering, marked the way a tell is: one
-   2px rule down the inside edge, drawn as an inset shadow so a seat taking its
-   turn never moves by the pixel a thicker border would cost. It is quiet on
-   purpose — the TURN chip is what says it, and the accent stays spent on the
-   seat to hit. */
-.hud-frame.is-acting {
-  box-shadow: inset 2px 0 0 var(--ink);
-}
-
-/* The accent is spent on the seat to hit, on the frame's own border as well as
-   on its chip: the answer to "who do I attack" is the loudest thing up there. */
-.hud-frame.is-hit {
-  border-color: var(--accent);
-}
-
-.hud-frame-top {
+/* The name and the archetype as one word run: "A CONTROL". The archetype keeps
+   its own tooltip, which is the line the run has no room to print. */
+.hud-seat-name {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  /* The letters sit on the floor of a box that never changes height, so the
+     readings under them start at the same y in all three columns. The name is
+     set to fit its own column, which means a seat called "B COMBO" is set
+     larger than "A MIDRANGE" — and with the line box following the font size,
+     the three readings rows landed on three different baselines and the row
+     read as three separate blocks rather than one. The height is the step's own
+     ceiling at the 0.78 line (64 · 0.78 = 50, plus the 2px rule that is always
+     drawn), so the tallest name in the world exactly fills it. */
+  align-items: flex-end;
+  height: 52px;
+  gap: 0.26em;
+  max-width: 100%;
+  /* Always drawn, transparent until hovered: the front never moves. */
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-display);
+  font-size: min(64px, calc(var(--hud-frame-w) / var(--name-chars, 8) * 1.25));
+  font-weight: 700;
+  line-height: 0.78;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.hud-frame:hover:not(:disabled) .hud-seat-name {
+  border-bottom-color: var(--ink);
+}
+
+.hud-seat-id,
+.hud-seat-arch {
   min-width: 0;
 }
 
-/* The seat letter is the one place on the play surface the display face is
-   allowed: it names a chair, it is never a figure, and it never changes. */
-.hud-seat-id {
-  flex: none;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 400;
-  line-height: 1;
+/* A seat that is pressing sets at full weight; one that is not may sit back. */
+.hud-frame.is-acting .hud-seat-name,
+.hud-frame.is-hit .hud-seat-name {
+  font-weight: 900;
+}
+
+/* The seat to hit is set into the wind: full weight, opened up. The word HIT is
+   still printed beside it — the tracking is the emphasis, never the reading. */
+.hud-frame.is-hit .hud-seat-name {
   letter-spacing: 0.06em;
-  color: var(--ink);
+}
+
+/* ── The readings, inside the name's measure ────────────────────────────── */
+
+.hud-frame-read {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  height: 26px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* One label-beside-figure pair. */
+.rd-read,
+.hud-frame-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  min-width: 0;
+}
+
+.hud-frame-read .rd-label {
+  padding-bottom: 2px;
 }
 
 .hud-life {
   flex: none;
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.01em;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 0.78;
+  letter-spacing: -0.015em;
   color: var(--ink);
 }
 
-.hud-frame-meter {
+/* The seat's colour identity, as its own letters in its own colours. The word
+   is never carried by the colour alone: the aria-label spells the colours out,
+   and the archetype is printed in the name. */
+.rd-colors {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  align-items: flex-end;
+  gap: 6px;
+  padding-bottom: 3px;
 }
 
-/* An eliminated seat keeps its slot: dimmed, ruled through, never moved. */
-.hud-frame.is-out {
-  opacity: 0.6;
+.rd-color {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.hud-frame.is-out .hud-frame-top {
+.rd-color.is-w {
+  color: var(--mana-w);
+}
+
+.rd-color.is-u {
+  color: var(--mana-u);
+}
+
+.rd-color.is-b {
+  color: var(--mana-b);
+}
+
+.rd-color.is-r {
+  color: var(--mana-r);
+}
+
+.rd-color.is-g {
+  color: var(--mana-g);
+}
+
+/* ── An eliminated seat ─────────────────────────────────────────────────── */
+
+/* It keeps its slot and its row: the name drops to rain with a rule struck
+   through it, the readings go with it, and the word OUT says so. */
+.hud-frame.is-out .hud-seat-name {
   position: relative;
+  font-weight: 700;
+  color: var(--rain);
 }
 
-.hud-frame.is-out .hud-frame-top::after {
+/* Measured from the floor the letters stand on rather than from the middle of
+   the box: the box is now a fixed height the name is bottom-aligned inside, so
+   half of it is nowhere near the caps of a name set small in a narrow column.
+   0.38em is the middle of the cap height at this line, at every step. */
+.hud-frame.is-out .hud-seat-name::after {
   content: '';
   position: absolute;
-  top: 50%;
+  top: auto;
+  bottom: 0.38em;
   left: 0;
   right: 0;
-  border-top: 1px solid var(--rule);
+  border-top: 2px solid var(--ink);
   pointer-events: none;
 }
 
-/* ── The detail pane ────────────────────────────────────────────────────── */
+.hud-frame.is-out .hud-life,
+.hud-frame.is-out .rd-threat-num,
+.hud-frame.is-out .rd-label,
+.hud-frame.is-out .rd-trend,
+.hud-frame.is-out .rd-color,
+.hud-frame.is-out .rd-chip {
+  color: var(--rain);
+}
+
+.hud-frame.is-out .rd-chip,
+.hud-frame.is-out .rd-threat-seg {
+  border-color: var(--rain);
+}
+
+/* The strike is a reading, so it survives the forced-colours flattening that
+   drops every author colour. */
+@media (forced-colors: active) {
+  .hud-frame.is-out .hud-seat-name::after {
+    border-top-color: CanvasText;
+  }
+}
+
+/* ── The detail ─────────────────────────────────────────────────────────── */
 
 /* Hover reads it, the pin makes it act. It hangs out of flow under the whole
-   column — below the frame, the tells and the queue — the same width, so
+   column — below the front, the tells and the queue — the same width, so
    opening it costs the layout nothing and covers none of the seat's own lines.
-   The one thing it can reach is the event pane in row two, which is pushed
-   clear of it by `is-under-detail` below rather than being raised over it: the
-   detail holds the buttons, so the detail stays on top. */
+   It is opaque paper because it is read over card art; the event block below is
+   pushed clear of it rather than raised over it, the detail holding the
+   buttons. */
 .hud-detail {
   position: absolute;
   top: 100%;
@@ -335,19 +415,21 @@
   margin-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 6px 10px 7px;
-  font-size: 12px;
+  gap: 6px;
+  padding: 8px 10px 9px;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--muted);
 }
 
 .hud-sil {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px 12px;
+  gap: 3px 14px;
 }
 
 .hud-sil .num {
+  font-weight: 700;
   color: var(--ink);
 }
 
@@ -359,6 +441,7 @@
 }
 
 .hud-cmdr-tally {
+  font-weight: 700;
   color: var(--ink);
 }
 
@@ -368,7 +451,6 @@
   margin-left: auto;
   font-size: 12px;
   color: var(--muted);
-  font-style: italic;
 }
 
 .hud-detail .rd-steps {
@@ -379,25 +461,20 @@
 
 /* The pieces this seat has left on the table, listed rather than counted. The
    pane is measured, so it is free to grow: a seat holding something is worth a
-   taller pane, and nothing under it moves except the event pane, which is
+   taller pane, and nothing under it moves except the event block, which is
    already pushed clear by its own rule. */
 .hud-hazards {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 
 .hud-hazard {
-  /* The picker hangs off this row, so the row is what it is measured against —
-     and wears the piece's own colourless rather than the readout's one accent,
-     which the seat to hit is still spending. */
-  --pgp-accent: var(--mana-c);
+  /* The picker hangs off this row, so the row is what it is measured against. */
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-left: 7px;
-  border-left: 2px solid var(--mana-c);
+  gap: 3px;
 }
 
 .hud-hazard-head {
@@ -445,14 +522,89 @@
   border-color: var(--rule);
 }
 
-/* In the dock the picker hangs over the battlefield, out of flow. In here it is
-   part of the pane: the pane is what the ResizeObserver measures and what the
-   pointer has to stay inside, so a picker floating out of it would be a picker
-   the pin no longer holds open. */
+/* In the event block the picker hangs over the battlefield, out of flow. In here
+   it is part of the pane: the pane is what the ResizeObserver measures and what
+   the pointer has to stay inside, so a picker floating out of it would be a
+   picker the pin no longer holds open. */
 .hud-detail .pgp-picker {
   position: static;
   margin-top: 6px;
   box-shadow: none;
+}
+
+/* ── The forming front ──────────────────────────────────────────────────── */
+
+/*
+   The band the event's class word gathers in, directly under its own seat's
+   name. It is inert: a word over the board must never be the reason a card
+   cannot be picked up.
+
+   It is 92px tall, and it is also held inside the clearance the board keeps
+   above its top card row — the whole point of that clearance. The budget,
+   measured from the board's own top edge, is `--hud-inset` plus the front plus
+   this band, and `--hud-top` is what the board sets aside for it; the clamp is
+   what makes the band give way rather than the cards, if ever the two numbers
+   disagree.
+*/
+/* The word is centred on its column, but a word wider than the column on an
+   outer seat would run off the window: A aligns to the left edge and C to the
+   right, and the overflow runs toward the centre, where the front row is empty
+   (one event stands at a time). */
+.hud-col:first-child .hud-front-slot .pgf {
+  align-items: flex-start;
+}
+
+.hud-col:last-child .hud-front-slot .pgf {
+  align-items: flex-end;
+}
+
+/* Aligning the body was only half of it. The word inside is a centred flex row
+   whose letters never shrink (pressure.css), so a class word wider than its
+   column still spilled the same amount off both of its ends — off the window on
+   seat A's left and on seat C's right. The row's own justification is what
+   decides which end the surplus comes out of: A's word grows rightward, C's
+   leftward, and both run into the middle of the board where the front row is
+   empty. The rain strip is a sibling of the word inside the body, stretched to
+   the body's width rather than placed against the word, so it needs nothing. */
+.hud-col:first-child .hud-front-slot .pgf-word {
+  justify-content: flex-start;
+}
+
+.hud-col:last-child .hud-front-slot .pgf-word {
+  justify-content: flex-end;
+}
+
+.hud-front-slot {
+  height: 92px;
+  max-height: max(0px, calc(var(--hud-top) - var(--hud-inset) - var(--hud-front-h)));
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ── The spent weather ──────────────────────────────────────────────────── */
+
+/* A narrow margin strip down the left edge of the board, inside the board's own
+   padding: the run's past events, struck through. It is a record rather than a
+   reading, so it is the first thing a narrow window gives up. */
+.hud-spent-slot {
+  position: absolute;
+  left: var(--hud-inset);
+  /* The lower half of the margin: seat A's tells and queue hang from the top
+     of the same margin, so the strip keeps to the part no tell reaches. */
+  /* The layer covers the whole table cell, strip included, so the strip is
+     placed by its top: below the tells, and short enough to end above the
+     zone stacks at every window the shell targets. */
+  top: 42%;
+  bottom: auto;
+  max-height: 22%;
+  z-index: 0;
+  /* One number for the strip and for the left margin the board keeps clear of
+     it: the token is declared beside the board's own margin in App.css, so the
+     two cannot drift apart and leave the strip standing over the first card
+     column. */
+  width: var(--hud-spent-w, 100px);
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* ── Tells and the queue ────────────────────────────────────────────────── */
@@ -463,25 +615,27 @@
   gap: 6px;
 }
 
-/* One line under the seat it belongs to, in the tell's own printed voice: a left
-   rule rather than a box. It is a reading and not a control, so it hands the
-   pointer back to the board underneath — a line of text must not be the reason
-   a card cannot be hovered or right-clicked. Only the things inside it that are
-   controls take the pointer back. */
+/* One line under the seat it belongs to, and nothing around it: a tell is prose
+   the player is living under, not a box. It is a reading and not a control, so
+   it hands the pointer back to the board underneath — a line of text must not be
+   the reason a card cannot be hovered or right-clicked. Only the things inside
+   it that are controls take the pointer back. */
 .hud-tell {
-  margin: 0;
-  padding: 4px 9px 5px 10px;
+  margin: 4px 0 0;
+  /* Paper behind the line: a tell can hang below the clearance, over cards,
+     and text must never sit on card art. No box, only the ground. */
+  padding: 3px 6px 4px;
+  width: fit-content;
+  max-width: 100%;
+  background: var(--ground);
   pointer-events: none;
-  border-left-width: 2px;
-  border-left-color: var(--rule);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--ink);
 }
 
 /* The standing hint is a reminder rather than a read; it recedes a step. */
 .hud-tell.is-quiet {
-  border-left-color: var(--line);
   color: var(--muted);
 }
 
@@ -490,14 +644,20 @@
   pointer-events: auto;
 }
 
-/* Waiting, not happening: dashed, one line, and no pane behind it — the queue is
-   a note about the future and never competes with the event in front. */
+/* Waiting, not happening: a dashed rule and the class as a label under it. The
+   queue is a note about the future and never competes with the event in
+   front. */
 .hud-queued {
-  margin: 0;
-  padding: 2px 8px 3px;
-  border: 1px dashed var(--rule);
-  font-size: 12px;
-  line-height: 1.35;
+  margin: 4px 0 0;
+  padding: 6px 6px 3px;
+  width: fit-content;
+  background: var(--ground);
+  border-top: 1px dashed var(--line);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -510,17 +670,46 @@
 /* ── The active event ───────────────────────────────────────────────────── */
 
 /*
-   Row two of the frame grid, in the column of the seat that threw it, aligned to
-   that frame's outer edge so it can never leave the viewport: A opens to the
-   right, C to the left, B spreads either side of centre. It is wider than a
-   frame because it carries the citation and two full answers.
+   Row two of the front grid, in the column of the seat that threw it, aligned to
+   that front's outer edge so it can never leave the viewport: A opens to the
+   right, C to the left, B spreads either side of centre. It is the screen's one
+   2px rule and its only other structure is the paper it is printed on.
 */
 .hud-event-host {
   grid-row: 2;
   width: var(--hud-event-w);
   margin-top: 6px;
-  padding: 8px 10px 9px;
-  border-color: var(--accent);
+  /* Bounded by the grid's second row rather than by a scroll container of its
+     own. The answer picker hangs out of this box — `top: calc(100% + 6px)`,
+     with the host as its containing block — so a host with `overflow` set to
+     anything but `visible` is a host that clips it: the player pressed the key
+     for the first response and the list of cards it opens was never drawn. The
+     block's height is held instead by the caps inside the dock (pressure.css:
+     the prompt at 3.8em, the cited effect at three lines and two on a short
+     foot), so its worst case is printed above the strip rather than scrolled
+     inside a window nobody can see the bottom of. */
+  max-height: calc(100% - 6px);
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  /* The dock inside carries its own padding (pressure.css); the host is only the sheet and its rule. */
+  padding: 0;
+  border-width: 0;
+  border-top: 2px solid var(--rule);
+}
+
+/* The block is bounded by the host: the dock fills it, and only the spoken
+   half (head, chips, prompt, citation) scrolls when a tall event meets a short
+   window. The answers stay on screen, and the picker, a sibling of the spoken
+   half, is never inside a scroller, so it is never clipped. */
+.hud-event-host .pgp-dock {
+  min-height: 0;
+  max-height: 100%;
+}
+
+.hud-event-host .pgp-say {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .hud-event-host[data-seat='A'] {
@@ -535,7 +724,7 @@
   justify-self: end;
 }
 
-/* The seat holding the event is also the seat whose detail is open, so the pane
+/* The seat holding the event is also the seat whose detail is open, so the block
    steps down past it. Written as the column's own 6px gap, the measured detail,
    and one more gap — the detail's height is not knowable from the markup, so
    the HUD measures it and hands it over as `--hud-detail-h`. */
@@ -543,7 +732,7 @@
   margin-top: calc(12px + var(--hud-detail-h, 0px));
 }
 
-/* The pane stays in the tree with nothing standing — its reading is a live
+/* The block stays in the tree with nothing standing — its reading is a live
    region, and a live region only speaks if it was already there when its text
    arrived. So it is hidden the visually-hidden way rather than collapsed to
    nothing: a box at 0x0 with `overflow: hidden` is treated by some screen
@@ -562,25 +751,7 @@
   pointer-events: none;
 }
 
-/* The prompt is the one part of the event with no fixed length, and it names
-   cards, so it is the part that is capped: the seat, class and responses stay
-   whole, and the pane never grows down over the board it is read against. */
-.hud-event-host .pgp-prompt {
-  max-height: 2.8em;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
-
-/* Same for the extras line: a named target scrolls inside its own slot. */
-.hud-event-host .pgp-target {
-  max-height: 2.2em;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
-
-/* The picker hangs down over the battlefield, on the side the pane itself is
+/* The picker hangs down over the battlefield, on the side the block itself is
    anchored to, so it stays inside the window at every seat. */
 .hud-event-host .pgp-picker {
   width: min(460px, 60vw);
@@ -617,6 +788,13 @@
   white-space: nowrap;
 }
 
+/* A title names the thing you opened rather than a reading beside a figure, so
+   it is the one label set in ink and at weight. */
+.rd-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
 /* The underlined word in the readout's own voice. The box is held to the 24px
    pointer minimum while the word stays exactly the size it was printed at: the
    extra height is taken as padding and handed straight back as negative margin,
@@ -642,81 +820,64 @@
   border-color: transparent;
 }
 
-/* Every state is a word inside a border, so it survives greyscale. */
+/* Every state is a word inside a square hairline, so it survives greyscale — and
+   none of them is a colour: the words TURN, HIT, CLOCK, ARMED and HATE are the
+   whole of what they say. */
 .rd-chip {
+  display: inline-flex;
+  align-items: center;
   padding: 2px 6px;
+  background: none;
   border: 1px solid var(--rule);
   border-radius: 0;
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 500;
   line-height: 1.2;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink);
   white-space: nowrap;
 }
 
-/* The archetype chip sits beside the seat letter rather than in the state row,
-   because it is not a state: it does not come and go, it is who the seat is.
-   Quiet by default, and the first thing on the row allowed to give up width —
-   the reader can lose a letter off "Midrange" more cheaply than the life
-   figure can lose a digit or the state chips can wrap to a second line. */
-.rd-chip.is-profile {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Your own death is the one chip that carries a colour, and it is the same
+   colour life leaving already wears in the bar beside it. */
+.rd-chip.is-dead {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
-/* Colourless, because that is what most hate pieces print as — and the word HATE
-   is what actually carries it, so the chip survives greyscale like every other
-   state on the row. It is not the accent: the seat to hit still owns that. */
-.rd-chip.is-hate {
-  border-color: var(--mana-c);
-  color: var(--mana-c);
+/* The chips are readings, so they are restated in system colours where every
+   author colour has been flattened away. */
+@media (forced-colors: active) {
+  .rd-chip {
+    border-color: CanvasText;
+    color: CanvasText;
+  }
 }
 
-/* Whose turn is in front of the player. Ink rather than the accent — the seat to
-   hit still owns that — and a word rather than the frame's rule alone, so it
-   survives greyscale like every other state on the row. */
-.rd-chip.is-turn {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-/* The accent is spent on one chip only: the seat to hit is the answer to "who
-   do I attack", and it has to be the loudest word on the frame. */
-.rd-chip.is-hit {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* Three chips beside a 22px figure do not fit a narrow frame, so the row is
-   allowed to take a second line rather than run out of the pane. It should not
-   have to: `showHit` drops the HIT chip below 1280px, where the accent border
-   round the whole frame is already saying it. This is the floor under that. */
+/* The state words, on their own row under the readings. */
 .rd-chips {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
-  margin-left: auto;
+  gap: 6px;
   min-width: 0;
 }
 
 /* ── The threat meter ───────────────────────────────────────────────────── */
 
+/* Ten cells, filled or outlined — never a colour telling the two apart. */
 .rd-threat-bar {
   display: flex;
-  gap: 3px;
-  flex: 1 1 auto;
-  min-width: 40px;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  padding-bottom: 2px;
 }
 
-/* Filled or outlined — never a colour telling the two apart. */
 .rd-threat-seg {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 9px;
+  flex: none;
+  width: 6px;
+  height: 12px;
   border: 1px solid var(--rule);
 }
 
@@ -726,7 +887,7 @@
 }
 
 /* Windows high contrast forces every author colour to one system pair, which
-   left a filled segment painted in the same ink as the ground behind it: ten
+   left a filled cell painted in the same ink as the ground behind it: ten
    identical outlines, the meter dead. System colour keywords are the one thing
    forced colours honours, so the fill is restated in them. */
 @media (forced-colors: active) {
@@ -743,16 +904,23 @@
 
 .rd-threat-num {
   flex: none;
-  min-width: 13px;
-  text-align: right;
-  font-size: 14px;
-  font-weight: 600;
+  min-width: 12px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 0.85;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
+/* The direction is a word, so no arrow rides along with it. */
 .rd-trend {
   flex: none;
-  font-size: 12px;
+  padding-bottom: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -761,13 +929,14 @@
 /* Life adjust stays reachable but recessive: the number is the reading. */
 .rd-steps {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 
 /* Same trick as the underlined word: the figure keeps its printed size, the box
    clears 24px, and the negative margin gives the row its height back. A mis-hit
    here writes a wrong number into the log the scorer reads. */
-.rd-steps button {
+.rd-steps button,
+.rd-sil-actions button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -776,21 +945,18 @@
   padding: 1px 4px;
   margin-top: -2px;
   margin-bottom: -2px;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   line-height: 1.3;
-  color: var(--muted);
+  color: var(--ink);
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 0;
 }
 
-.rd-steps button:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-.rd-steps button:focus-visible {
-  border-color: var(--rule);
+.rd-steps button:hover:not(:disabled),
+.rd-sil-actions button:hover:not(:disabled) {
+  border-color: var(--ink);
 }
 
 .rd-sil-actions {
@@ -800,51 +966,25 @@
   margin-left: auto;
 }
 
-.rd-sil-actions button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0 5px;
-  margin-top: -3px;
-  margin-bottom: -3px;
-  font-size: 12px;
-  line-height: 1.4;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 0;
-  color: var(--muted);
-}
-
-.rd-sil-actions button:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--line);
-}
-
 /* ── The player bar ─────────────────────────────────────────────────────── */
 
 /*
-   One row across the foot of the live shell, under the table strip rather than
-   over it: your own readings in the order they are looked at, then the two turn
-   controls, then the tabs. It is the only part of the readout still holding a
-   row of its own, so it is ruled off rather than floated.
+   One ruled row across the foot of the live shell, under the table strip rather
+   than over it: your own readings in the order they are looked at, then the two
+   turn controls, then the tabs. Everything but the clock holds its printed
+   width; the clock is a sentence, so it is the slot that gives way, and only
+   below 1100px does the row break at all.
 */
-/* One row, and one row is the point: the readings, the two turn controls and the
-   tabs are scanned left to right in that order, and a second line put the tabs
-   somewhere the eye had to go looking for them. Everything but the clock holds
-   its printed width; the clock is a sentence, so it is the slot that gives way,
-   and only below 1100px does the row break at all. */
 .hud-bar {
   grid-row: 2;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 4px 14px;
+  gap: 4px 16px;
   /* The rule and the ground run the full width; the readings inside sit within
-     the same `--table-max` span as the seat frames and the strip, so on an
+     the same `--table-max` span as the seat fronts and the strip, so on an
      ultrawide TURN and the tab group are not a screen apart. */
-  padding: 5px max(14px, calc((100% - var(--table-max)) / 2)) 6px;
+  padding: 7px max(14px, calc((100% - var(--table-max)) / 2)) 8px;
   background: var(--ground);
   border-top: 1px solid var(--line);
   min-width: 0;
@@ -855,15 +995,15 @@
   flex: none;
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
 .hud-stat-value {
-  font-size: 19px;
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.005em;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
   color: var(--ink);
   white-space: nowrap;
 }
@@ -877,7 +1017,9 @@
 }
 
 .hud-stat-value.is-sentence {
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -889,18 +1031,16 @@
 }
 
 /* The wording already carries the state ("this is the last turn"); the colour
-   and weight only underline it. */
+   only underlines it. */
 .hud-stat-value.is-urgent {
   color: var(--danger);
-  font-weight: 600;
 }
 
 /* The shot clock, riding in the TURN caption. Ink rather than the caption's
    muted grey so a countdown can be read at a glance; a fixed minimum so the
    reading does not shove the phase name as the digits change. Over the limit
-   the reading already says OVER; the R combat ink only underlines it, and it is
-   held away from `danger` so a turn running long never
-   reads as life leaving. */
+   the reading already says OVER, and the weight only underlines it — a turn
+   running long is held away from `danger`, which is life leaving. */
 .hud-shot {
   display: inline-block;
   min-width: 4ch;
@@ -908,8 +1048,7 @@
 }
 
 .hud-shot.is-over {
-  color: var(--mana-r);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .hud-stat-sub {
@@ -931,14 +1070,10 @@
   gap: 6px;
 }
 
-.rd-chip.is-dead {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
+/* The turn's change, beside the figure it happened to. */
 .rd-swing {
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--muted);
 }
 
@@ -964,8 +1099,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 4px 8px;
+  gap: 8px;
+  padding: 4px 9px;
   font-size: 13px;
   white-space: nowrap;
   background: transparent;
@@ -973,6 +1108,7 @@
   border-radius: 0;
 }
 
+/* The key the control answers to, printed as the key it is. */
 .rd-key {
   display: inline-flex;
   align-items: center;
@@ -981,50 +1117,62 @@
   height: 18px;
   padding: 0 4px;
   border: 1px solid var(--rule);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────────────── */
 
+/* Bare words, with a 2px rule under the one that is open — the same rule the
+   world uses everywhere for "this is the one you are in". */
 .rd-tabs {
   flex: none;
   display: flex;
-  align-items: stretch;
-  height: 26px;
-  border: 1px solid var(--line);
+  align-items: flex-start;
+  gap: 17px;
+  border: 0;
 }
 
 .rd-tab {
+  display: inline-flex;
+  align-items: flex-end;
   min-width: 0;
-  padding: 0 8px;
-  font-size: 11px;
+  min-height: 24px;
+  padding: 0 0 5px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   background: transparent;
   border: 0;
-  border-right: 1px solid var(--line);
   border-radius: 0;
   color: var(--muted);
 }
 
-.rd-tab:last-child {
-  border-right: 0;
-}
-
 .rd-tab:hover:not(:disabled) {
   color: var(--ink);
-  border-color: var(--line);
+  border-color: transparent;
 }
 
 .rd-tab.is-open {
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--ink);
+}
+
+/* Ending the run is the one word in the group that is not a drawer you can look
+   into and close again, so it is the one tab set in ink while the rest sit at
+   muted. It is not painted: colour in this world belongs to the class chips, and
+   `--danger` is life leaving, not a tab you have not pressed yet. The word,
+   the confirm behind it and the tooltip carry the rest. */
+.rd-tab[aria-label='End run'] {
+  color: var(--ink);
 }
 
 /* Forced colours drop box-shadow outright, which took the open tab's underline
@@ -1039,7 +1187,9 @@
 /* ── The drawer ─────────────────────────────────────────────────────────── */
 
 /* A slide-over from the right edge, over the board and never over the bar: the
-   panels it holds are read while the table stays where it is. */
+   panels it holds are read while the table stays where it is. Opaque paper with
+   one control edge down its left side — the world separates a floating thing
+   with a rule, never with a shadow. */
 .hud-drawer {
   position: absolute;
   top: 0;
@@ -1051,8 +1201,9 @@
   flex-direction: column;
   overflow: hidden;
   border-width: 0 0 0 1px;
-  box-shadow: -10px 0 26px var(--shadow);
-  animation: hud-drawer-in 140ms ease-out;
+  border-left-color: var(--rule);
+  box-shadow: none;
+  animation: hud-drawer-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes hud-drawer-in {
@@ -1077,7 +1228,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 9px 14px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -1091,8 +1242,8 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 12px 14px;
 }
 
 /* The log fills its drawer; everything else keeps its natural height. */
@@ -1102,33 +1253,46 @@
 
 /* ── Narrow and short windows ───────────────────────────────────────────── */
 
-/* A narrower frame keeps its readings and tightens its chips first. */
+/* The names step down before the board does. */
 @media (max-width: 1280px) {
+  /* The box follows the step's ceiling down: 56 · 0.78 = 44, plus the rule. */
+  .hud-seat-name {
+    font-size: min(56px, calc(var(--hud-frame-w) / var(--name-chars, 8) * 1.25));
+    height: 46px;
+  }
+
+  .hud-col {
+    --hud-front-h: 102px;
+  }
+
   .rd-chip {
-    padding: 2px 4px;
-    letter-spacing: 0.06em;
+    padding: 2px 5px;
+    letter-spacing: 0.1em;
   }
 
   .rd-chips {
-    gap: 3px;
+    gap: 4px;
   }
 
   /* The row still has to hold the whole clock reading at 1280, and the clock is
      the slot that must not give: the deadline turn is the number it exists for.
-     So the slack comes from the chrome around it — the tabs' side padding, the
-     turn buttons' gap and padding, and a little off the row gap — and never
-     from the reading itself. */
+     So the slack comes from the chrome around it — the figures, the tabs' gap,
+     the turn buttons' padding — and never from the reading itself. */
   .hud-bar {
-    gap: 4px 10px;
+    gap: 4px 12px;
   }
 
-  .rd-tab {
-    padding: 0 5px;
+  .hud-stat-value {
+    font-size: 19px;
+  }
+
+  .rd-tabs {
+    gap: 12px;
   }
 
   .rd-turn-actions button {
-    gap: 5px;
-    padding: 4px 6px;
+    gap: 6px;
+    padding: 4px 7px;
   }
 
   .rd-turn-actions .rd-key {
@@ -1138,41 +1302,64 @@
 }
 
 /* Below this the row genuinely cannot hold the readings, the turn controls and
-   six tabs, so it is allowed to break — and the frame gives up the "life"
-   caption, the one word on it the 22px figure beside it already says. */
+   six tabs, so it is allowed to break — the front gives up the "life" caption,
+   the one word on it the figure beside it already says, and the margin strip
+   goes entirely. */
 @media (max-width: 1100px) {
+  /* 44 · 0.78 = 34, plus the rule. */
+  .hud-seat-name {
+    font-size: min(44px, calc(var(--hud-frame-w) / var(--name-chars, 8) * 1.25));
+    height: 36px;
+  }
+
+  .hud-col {
+    --hud-front-h: 93px;
+  }
+
+  .hud-frame-read .rd-label {
+    display: none;
+  }
+
   .hud-bar {
     flex-wrap: wrap;
   }
 
-  .hud-frame-top .rd-label {
+  .hud-spent-slot {
     display: none;
   }
 }
 
 /* 768px of height is the floor the layout is held to. Every slot keeps its
-   printed label beside its figure — the frames just close up, and the board
+   printed label beside its figure — the fronts just close up, and the board
    gets the height back through `--hud-top` in App.css. */
 @media (max-height: 820px) {
-  .hud-frame {
-    gap: 4px;
-    padding: 5px 9px 6px;
+  /* Back to the 56 step, box and all: this block is written after the width
+     ones, so a short narrow window takes the pair from here and the line box
+     still matches the size the name is actually set at. */
+  .hud-seat-name {
+    font-size: min(56px, calc(var(--hud-frame-w) / var(--name-chars, 8) * 1.25));
+    height: 46px;
+  }
+
+  .hud-col {
+    --hud-front-h: 96px;
+  }
+
+  .hud-front-slot {
+    height: 76px;
   }
 
   .hud-life {
-    font-size: 19px;
+    font-size: 26px;
   }
 
-  .hud-seat-id {
-    font-size: 17px;
-  }
-
-  .rd-threat-seg {
-    height: 8px;
+  .hud-frame-read {
+    height: 22px;
+    gap: 18px;
   }
 
   .hud-stat-value {
-    font-size: 16px;
+    font-size: 19px;
   }
 
   .hud-stat-value.is-sentence {
@@ -1180,21 +1367,16 @@
   }
 
   .rd-turn-actions button {
-    gap: 5px;
-    padding: 3px 6px;
+    gap: 6px;
+    padding: 3px 7px;
     font-size: 12px;
   }
 
   .hud-bar {
-    padding: 3px 12px 4px;
+    padding: 5px 12px 6px;
   }
 
   .rd-chip {
-    padding: 1px 4px;
-  }
-
-  .hud-event-host .pgp-answers .pgp-btn {
-    padding-top: 3px;
-    padding-bottom: 3px;
+    padding: 1px 5px;
   }
 }

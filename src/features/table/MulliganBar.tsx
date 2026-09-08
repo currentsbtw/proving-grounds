@@ -1,4 +1,5 @@
 import { mulliganBottomCount, STARTING_HAND_SIZE } from '../../state/gameStore';
+import { keyLabel, useHotkeyStore } from '../../state/hotkeyStore';
 
 export interface MulliganBarProps {
   mulliganCount: number;
@@ -22,6 +23,10 @@ export function MulliganBar({
   onConfirmBottoming,
   onCancelBottoming,
 }: MulliganBarProps) {
+  // The one control here with a binding behind it. It is printed in the same
+  // square the tray and the player bar print theirs in, so the key the player
+  // would reach for is on the button rather than only in the help overlay.
+  const mulliganKey = useHotkeyStore((s) => keyLabel(s.keymap.mulligan));
   // Commander's first mulligan is free: bottom nothing after one, one after two.
   const bottomCount = mulliganBottomCount(mulliganCount);
   const nextSize = Math.max(0, STARTING_HAND_SIZE - mulliganBottomCount(mulliganCount + 1));
@@ -64,7 +69,12 @@ export function MulliganBar({
       )}
       <span className="tbl-mull-spacer" />
       <button type="button" onClick={onMulligan}>
-        Mulligan to {nextSize}
+        <span>Mulligan to {nextSize}</span>
+        {mulliganKey && (
+          <span className="rd-key" aria-hidden="true">
+            {mulliganKey}
+          </span>
+        )}
       </button>
       {bottomCount > 0 ? (
         <button type="button" className="is-primary" onClick={onStartBottoming}>
